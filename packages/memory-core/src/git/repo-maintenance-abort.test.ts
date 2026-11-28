@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { execFileSync, spawn } from "node:child_process"
 import { randomBytes } from "node:crypto"
@@ -11,6 +11,9 @@ import { createNodeGitExec, type GitExec } from "./exec"
 import { GitMemoryRepo } from "./repo"
 import { settlesWithin } from "./settles-within.test-support"
 import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
+
+// The abort case waits for a real repack's pack-objects child to start and exit; loaded runners need minutes.
+setDefaultTimeout(120_000)
 
 /** 16 packs of incompressible blobs, with a delta window wide enough that their fold runs for many seconds. */
 function repoDueForASlowFold(dir: string): void {
@@ -59,7 +62,10 @@ describe("runMemoryRepoMaintenance abort (#15429 L1)", () => {
         const real = createNodeGitExec()
         const tracedRepack: GitExec = {
           run: (argv, options) =>
-            real.run(argv, argv.includes("repack") ? { ...options, env: { ...options.env, GIT_TRACE2_EVENT: fifo } } : options),
+            real.run(
+              argv,
+              argv.includes("repack") ? { ...options, env: { ...options.env, GIT_TRACE2_EVENT: fifo } } : options,
+            ),
         }
         const repo = new GitMemoryRepo({ dir, agentId: "fold-abort", exec: tracedRepack })
         const controller = new AbortController()
@@ -93,6 +99,5 @@ describe("runMemoryRepoMaintenance abort (#15429 L1)", () => {
         await removeTree(dir)
       }
     },
-    120_000,
   )
 })

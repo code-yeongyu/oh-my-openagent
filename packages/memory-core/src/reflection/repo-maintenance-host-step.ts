@@ -50,7 +50,9 @@ export function createRepoMaintenanceHostSweepStep(options: RepoMaintenanceHostS
     } catch (error) {
       if (error instanceof LockContentionError) return []
       if (options.signal?.aborted === true) throw error
-      return [`FAIL ${identity.name} repo maintenance failed: ${error instanceof Error ? error.message : String(error)}`]
+      return [
+        `FAIL ${identity.name} repo maintenance failed: ${error instanceof Error ? error.message : String(error)}`,
+      ]
     }
   }
 }

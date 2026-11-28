@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { realpathSync } from "node:fs"
 import { mkdtemp, readFile, writeFile } from "node:fs/promises"
@@ -7,6 +7,9 @@ import { join } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { PUSH_LOG_MAX_LINES, SYNC_PUSH_ENV, mirrorLogPath } from "./mirror"
 import { createMirrorRepo, initBareMirror } from "./mirror.test-support"
+
+// These cases drive real git end to end; loaded CI runners need more than the 20 s default.
+setDefaultTimeout(30_000)
 
 const tempDirs: string[] = []
 
@@ -45,5 +48,5 @@ describe("mirror push log cap (#15421)", () => {
     expect(lines.at(-1)).toBe("exit=0")
     expect(lines).not.toContain("old attempt 0")
     expect(lines).toContain(`old attempt ${old.length - 1}`)
-  }, 30_000)
+  })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from "node:fs"
@@ -8,6 +8,9 @@ import { removeTree } from "../../../../test-support/remove-tree"
 import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { runMemoryRepoMaintenance } from "./repo-maintenance"
 
+// The real-git case runs 66 fetch + maintenance rounds; loaded CI runners need more than the 20 s default.
+setDefaultTimeout(60_000)
+
 type Call = readonly string[]
 
 /** A fake git whose `count-objects -v` answers (in order, the last one repeating) and command log the test controls. */
@@ -16,8 +19,7 @@ function fakeGit(...countObjects: string[]) {
   let counted = 0
   const git = async (argv: readonly string[]): Promise<{ readonly stdout: string }> => {
     calls.push(argv)
-    if (argv[0] === "count-objects")
-      return { stdout: countObjects[Math.min(counted++, countObjects.length - 1)] ?? "" }
+    if (argv[0] === "count-objects") return { stdout: countObjects[Math.min(counted++, countObjects.length - 1)] ?? "" }
     return { stdout: "" }
   }
   return { calls, git }
@@ -95,7 +97,12 @@ describe("runMemoryRepoMaintenance reflog expiry and prune (#15418)", () => {
     try {
       git(["init", "-q", "--initial-branch=main"])
       disableFixtureAutoMaintenance(dir)
-      const identity = { GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.org", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.org" }
+      const identity = {
+        GIT_AUTHOR_NAME: "Fixture",
+        GIT_AUTHOR_EMAIL: "fixture@example.org",
+        GIT_COMMITTER_NAME: "Fixture",
+        GIT_COMMITTER_EMAIL: "fixture@example.org",
+      }
       const old = { ...identity, GIT_AUTHOR_DATE: oldDate.toISOString(), GIT_COMMITTER_DATE: oldDate.toISOString() }
       writeFileSync(join(dir, "draft.md"), "abandoned draft\n")
       git(["add", "draft.md"])
@@ -120,7 +127,7 @@ describe("runMemoryRepoMaintenance reflog expiry and prune (#15418)", () => {
     } finally {
       await removeTree(dir)
     }
-  }, 60_000)
+  })
 })
 
 test("repeated transfers of rewritten history keep pack count and size bounded after maintenance", async () => {
@@ -139,8 +146,18 @@ test("repeated transfers of rewritten history keep pack count and size bounded a
     writeFileSync(join(source, "memory"), "stable memory content\n")
     git(source, "add", "memory")
     for (let round = 0; round < 66; round++) {
-      git(source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit",
-        ...(round === 0 ? [] : ["--amend"]), "--allow-empty", "-qm", `retention round ${round}`)
+      git(
+        source,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.org",
+        "commit",
+        ...(round === 0 ? [] : ["--amend"]),
+        "--allow-empty",
+        "-qm",
+        `retention round ${round}`,
+      )
       git(target, "fetch", "--no-tags", source, "+HEAD:refs/heads/sync")
       const before = git(target, "count-objects", "-v")
       await runMemoryRepoMaintenance(async (args) => ({ stdout: git(target, ...args) }), OPTIONS)
@@ -158,4 +175,4 @@ test("repeated transfers of rewritten history keep pack count and size bounded a
   } finally {
     await removeTree(root)
   }
-}, 60_000)
+})

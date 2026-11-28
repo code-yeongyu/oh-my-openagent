@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
@@ -17,6 +17,9 @@ import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext } from "./context"
 import { createMemoryMaintenance } from "./memory-maintenance"
 import { rmEfaultTolerant } from "./teardown.test-support"
+
+// These cases drive real git end to end; loaded CI runners need more than the 20 s default.
+setDefaultTimeout(60_000)
 
 const roots: string[] = []
 
@@ -67,7 +70,7 @@ describe("host sweep repo maintenance for unbound identities (#15419)", () => {
     await maintenance.settled()
 
     expect(packs(foreign.repo)).toBeLessThan(16)
-  }, 60_000)
+  })
 
   test("#given another runner holds the foreign identity's maintenance lock #when the host sweep visits it #then its repo is left alone and the round still completes", async () => {
     const { memoryRoot, context, foreign } = await hostWithForeignPackedRepo()
@@ -81,5 +84,5 @@ describe("host sweep repo maintenance for unbound identities (#15419)", () => {
 
     expect(packs(foreign.repo)).toBe(16)
     expect(existsSync(join(memoryRoot, "runtime-sweep.json"))).toBe(true)
-  }, 60_000)
+  })
 })
