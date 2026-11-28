@@ -22,7 +22,16 @@ export type GuestPlan = {
   readonly major: MacosMajor
   readonly baseImage: string
   readonly guestName: string
+  readonly consoleHost: string | null
   readonly labels: readonly string[]
+}
+
+// R-S4-1: a guest may land on a host with a signed-in console user, but only as a headless guest with clipboard
+// bridging off, so the start argv is fixed here and both the --up spawn and the process-count pattern consume it.
+export const GUEST_RUN_FLAGS = ["run", "--no-graphics", "--no-clipboard"] as const
+
+export function guestRunArgv(name: string): readonly string[] {
+  return [...GUEST_RUN_FLAGS, name]
 }
 
 const GUEST_NAME = /^omo-cu-[0-9a-z-]{1,48}$/
@@ -39,18 +48,22 @@ export function planGuest(host: PoolHost, major: MacosMajor, runId: string): Gue
   if (host.platform !== "darwin" || host.arch !== "arm64")
     return { kind: "refused", reason: `pool host must be Apple silicon macOS, got ${host.platform}/${host.arch}` }
   if (host.hypervisor === null) return { kind: "refused", reason: "no hypervisor command on the pool host" }
-  if (host.consoleUser !== null)
-    return {
-      kind: "refused",
-      reason: `${host.consoleUser} is signed in at the console; guests run only on a host nobody is using`,
-    }
+  // R-S4-1: a console user no longer refuses the plan; the plan records who is signed in, and the guest sharing that
+  // host is started headless with clipboard bridging off (guestRunArgv) and runs zero host-input legs.
   const baseImage = host.baseImages[major]
   if (baseImage === undefined)
     return { kind: "refused", reason: `no recorded base image for macOS ${major} (its first setup is a hands-on step)` }
   if (!/^[0-9]+$/.test(runId) && !/^[0-9a-z-]+$/i.test(runId))
     return { kind: "refused", reason: `run id ${JSON.stringify(runId)} is not a plain id` }
   const name = guestName(major, runId)
-  return { kind: "plan", major, baseImage, guestName: name, labels: [RUNNER_LABEL, `macos-${major}`] }
+  return {
+    kind: "plan",
+    major,
+    baseImage,
+    guestName: name,
+    consoleHost: host.consoleUser,
+    labels: [RUNNER_LABEL, `macos-${major}`],
+  }
 }
 
 export type GuestListing = { readonly name: string; readonly running: boolean }

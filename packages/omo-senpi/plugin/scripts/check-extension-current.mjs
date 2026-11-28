@@ -51,6 +51,7 @@ export async function checkExtensionCurrent(options = {}) {
     telemetryPosthogOutput,
     telemetryOtlpOutput,
     memorySyncOutput,
+    memorySyncRpcOutput,
     threadClientOutput,
     wakeOutput,
     telemetryRecoveryOutput,
@@ -101,6 +102,8 @@ export async function checkExtensionCurrent(options = {}) {
   const currentClaimReceipt = await readBuiltEntry(claimReceiptOutput)
   const currentMemorySync = await readBuiltEntry(memorySyncOutput)
   if (currentMemorySync === undefined) return { ok: false, reason: "missing-output", output: memorySyncOutput }
+  const currentMemorySyncRpc = await readBuiltEntry(memorySyncRpcOutput)
+  if (currentMemorySyncRpc === undefined) return { ok: false, reason: "missing-output", output: memorySyncRpcOutput }
   // Each committed sidecar asset must be byte-identical to its source: the wasm to the INSTALLED Loro
   // package's (a Loro bump without a rebuild would leave a stale binary beside new glue).
   for (const [name, source] of Object.entries(memorySyncAssetSources())) {
@@ -174,6 +177,7 @@ export async function checkExtensionCurrent(options = {}) {
     telemetryPosthogOutputPath: join(tempRoot, "omo-telemetry-posthog.js"),
     telemetryOtlpOutputPath: join(tempRoot, "omo-telemetry-otlp.js"),
     memorySyncOutputPath: join(tempRoot, "omo-memory-sync.js"),
+    memorySyncRpcOutputPath: join(tempRoot, "omo-memory-sync-rpc.js"),
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
     wakeOutputPath: join(tempRoot, "omo-wake.js"),
     telemetryRecoveryOutputPath: join(tempRoot, "omo-telemetry-recovery.js"),
@@ -209,6 +213,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentTelemetryPosthog, expected.telemetryPosthogOutputPath, telemetryPosthogOutput],
       [currentTelemetryOtlp, expected.telemetryOtlpOutputPath, telemetryOtlpOutput],
       [currentMemorySync, expected.memorySyncOutputPath, memorySyncOutput],
+      [currentMemorySyncRpc, expected.memorySyncRpcOutputPath, memorySyncRpcOutput],
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
       [currentWake, expected.wakeOutputPath, wakeOutput],
       [currentTelemetryRecovery, expected.telemetryRecoveryOutputPath, telemetryRecoveryOutput],

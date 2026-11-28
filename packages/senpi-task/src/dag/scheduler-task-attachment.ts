@@ -1,3 +1,4 @@
+import { isTerminalRecord } from "../manager/manager-helpers"
 import type { TaskRecord, TaskStatus } from "../state"
 import type { OwnedStartResult } from "./owner"
 import { dagNodeTaskAttachedEvent } from "./events"
@@ -11,6 +12,7 @@ import {
   type AttachedTask,
   type AttachedTaskSettlement,
 } from "./scheduler-context"
+import { flagConsumedDependents, watchSelfResume } from "./scheduler-self-resume"
 import type { DagNodeId, DagNodeErrorCode } from "./types"
 
 export function attachStarted(
@@ -35,7 +37,6 @@ export function attachStarted(
   } else if (result.status === "running") {
     transition(context, nodeId, "running", result.reused ? { kind: "resumed" } : { kind: "started" })
   }
-  context.attachedTaskIds.set(nodeId, result.task_id)
   attachTaskSettlement(context, nodeId, result.task_id)
 }
 
@@ -67,9 +68,24 @@ export function disposePromotionWatch(context: SchedulerContext, nodeId: DagNode
 }
 
 export function attachTaskSettlement(context: SchedulerContext, nodeId: DagNodeId, taskId: string): AttachedTask {
+  context.attachedTaskIds.set(nodeId, taskId)
+  const snapshot = context.journal.snapshot()
+  const node = nodeById(snapshot, nodeId)
+  for (const diagnostic of snapshot.diagnostics) {
+    if (
+      diagnostic.kind === "node_flag" &&
+      diagnostic.invalidatedBy !== undefined &&
+      node.dependsOn.includes(diagnostic.nodeId)
+    ) {
+      flagConsumedDependents(context, diagnostic.nodeId, diagnostic.invalidatedBy)
+    }
+  }
+  // Subscribe before waitFor can resolve: admission can yield while the completed child resumes.
+  watchSelfResume(context, nodeId, taskId)
   const folded = deferredSignal()
   const task: AttachedTask = {
     nodeId,
+    selfResumed: false,
     settled: context.taskManager.waitFor(taskId).then(
       (record): AttachedTaskSettlement => ({ nodeId, kind: "record", record }),
       (error: unknown): AttachedTaskSettlement => ({ nodeId, kind: "error", error }),
@@ -87,7 +103,6 @@ export async function watchRevivedInScheduler(
   nodeId: DagNodeId,
   taskId: string,
 ): Promise<void> {
-  context.attachedTaskIds.set(nodeId, taskId)
   const task = attachTaskSettlement(context, nodeId, taskId)
   await task.folded
 }
@@ -100,6 +115,9 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
     context.foreignSettlement = false
     return true
   }
+  // Own settlements are listed first and un-wrapped: when a child settles, its residency wake fires
+  // in the same tick, and the fold must win so the dependents it unblocks join the next admission
+  // batch.
   const settled = await Promise.race([
     ...[...context.attachedTasks.values()].map((entry) => entry.settled),
     ...(residencyReleased === undefined ? [] : [residencyReleased.then(() => null)]),
@@ -108,20 +126,53 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
   ])
   if (settled === null) return true
   if (settled === undefined || context.suspended || context.cancellationStarted) return false
+  foldSettlement(context, settled)
+  return true
+}
+
+// Pending forever while nothing is attached, which is what every caller's race wants.
+export function nextOwnSettlement(context: SchedulerContext): Promise<AttachedTaskSettlement> {
+  return Promise.race([...context.attachedTasks.values()].map((entry) => entry.settled))
+}
+
+export function foldSettlement(context: SchedulerContext, settled: AttachedTaskSettlement): void {
   const task = context.attachedTasks.get(settled.nodeId)
   context.attachedTasks.delete(settled.nodeId)
   context.attachedTaskIds.delete(settled.nodeId)
   disposePromotionWatch(context, settled.nodeId)
   try {
-    if (settled.kind === "error") {
+    if (task?.selfResumed) {
+      // The announcement arrived while this attachment was still waiting to be folded. Its
+      // resolved record belongs to the earlier run; waitFor now follows the resumed run instead.
+      const taskId = nodeById(context.journal.snapshot(), settled.nodeId).taskId
+      if (taskId !== undefined) attachTaskSettlement(context, settled.nodeId, taskId)
+    } else if (settled.kind === "error") {
       failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
-    } else {
+    } else if (settled.kind === "orphaned") {
+      failNode(context, settled.nodeId, "resume_task_orphaned", settled.message)
+    } else if (settled.kind === "followed") {
+      followRevivedChild(context, settled.nodeId, settled.taskId)
+      if (settled.fenceStale) context.revivalFences.set(settled.nodeId, { rule: "stale_live", taskId: settled.taskId })
+    } else if (settled.kind === "not_current") {
+      const { taskId, message, revivals } = settled
+      context.revivalFences.set(settled.nodeId, { rule: "not_current", taskId, message, revivals })
+    } else if (settled.kind === "record") {
       foldTaskOutcome(context, settled.nodeId, settled.record)
     }
   } finally {
     task?.resolveFolded()
   }
-  return true
+}
+
+// A waiting node's child came back (revived, or ended by the lifecycle): the node attaches it exactly as
+// admission would, so a self-resumed or held turn is followed by the same watch and folded once (#15150).
+function followRevivedChild(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
+  const record = context.taskManager.get(taskId)
+  const live = record !== undefined && !isTerminalRecord(record)
+  if (live && nodeById(context.journal.snapshot(), nodeId).state === "scheduled") {
+    transition(context, nodeId, "running", { kind: "resumed" })
+  }
+  attachTaskSettlement(context, nodeId, taskId)
 }
 
 function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: TaskRecord): void {
@@ -134,8 +185,12 @@ function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: Tas
     return
   }
   const failure = taskFailure(task.status, task.error_message)
+  const selfResumed = task.resumed_run_epoch === task.notification.run_epoch
+  if (selfResumed) flagConsumedDependents(context, nodeId)
   failNode(context, nodeId, failure.code, failure.message)
-  context.infrastructureRetries.retry(nodeId, task)
+  // A self-resumed run is a continuation of output already consumed by other nodes, not a fresh
+  // attempt. Its outcome must remain visible, including typed infrastructure failures (#10487).
+  if (!selfResumed) context.infrastructureRetries.retry(nodeId, task)
 }
 
 function taskFailure(

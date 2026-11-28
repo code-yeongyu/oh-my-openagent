@@ -4,6 +4,7 @@ import { threadToolFailure } from "../errors"
 import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
 import { listedStates } from "../tools/thread-state"
+import { hostCountsFor } from "./listing-liveness"
 import { type AliasRegistry, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { remoteNotSetUp } from "./address-book"
 import { readAccount } from "../address/account"
@@ -166,7 +167,12 @@ function deviceRows(
   self: { readonly id: string | null; readonly name: string | null },
   listingOf: (device: string) => DeviceListing,
   threads: readonly { readonly device?: string }[],
-  local: { readonly dropped?: number; readonly incomplete: boolean },
+  local: {
+    readonly dropped?: number
+    readonly incomplete: boolean
+    readonly host_counts?: ThreadDevice["host_counts"]
+  },
+  remoteCounts?: Readonly<Record<string, unknown>>,
 ): readonly ThreadDevice[] {
   // The account roster leaves this device out (relayd lists only peers), so this device's row is made here.
   const devices: readonly RemoteDevice[] =
@@ -195,6 +201,7 @@ function deviceRows(
       this_device: thisDevice,
       // This device's threads come from its own endpoints, whose answers say whether it listed them in full.
       listing: thisDevice ? (local.incomplete ? "incomplete" : "listed") : listingOf(row.device),
+      host_counts: thisDevice ? (local.host_counts ?? null) : hostCountsFor(remoteCounts, row.device),
       threads: threads.filter((thread) => (thread.device ?? self.id) === row.device).length,
       ...(thisDevice && local.dropped !== undefined ? { dropped: local.dropped } : {}),
     }
@@ -268,10 +275,18 @@ export async function listAcross(
     threads,
     ...(roster.ok
       ? {
-          devices: deviceRows(roster.devices, { id: here, name: hereName }, account.listingOf, threads, {
-            dropped: local.inactive_dropped,
-            incomplete: local.listing === "incomplete",
-          }),
+          devices: deviceRows(
+            roster.devices,
+            { id: here, name: hereName },
+            account.listingOf,
+            threads,
+            {
+              dropped: local.inactive_dropped,
+              host_counts: local.host_counts,
+              incomplete: local.listing === "incomplete",
+            },
+            account.host_counts,
+          ),
         }
       : { remote_unavailable: "devices_unavailable" }),
   }

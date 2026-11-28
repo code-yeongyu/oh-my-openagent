@@ -96,6 +96,7 @@ export async function exitedTask(
         terminatedByRunner: false,
       }),
       undefined,
+      "unrecorded",
     ),
   )
   await observed.promise

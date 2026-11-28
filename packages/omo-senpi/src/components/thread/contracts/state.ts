@@ -4,9 +4,17 @@
  * another device's cached listing still names), or `archived` (its session file carries the archived flag, whatever else
  * holds). A thread has no online state; `online` belongs to devices.
  */
-export type ThreadState = "opening" | "running" | "idle" | "inactive" | "archived"
+export type ThreadState = "opening" | "running" | "idle" | "held" | "unknown" | "inactive" | "archived"
 
-export const THREAD_STATES: readonly ThreadState[] = ["opening", "running", "idle", "inactive", "archived"]
+export const THREAD_STATES: readonly ThreadState[] = [
+  "opening",
+  "running",
+  "idle",
+  "held",
+  "unknown",
+  "inactive",
+  "archived",
+]
 
 /** The engine's finer activity of a held thread (senpi#6688); `state` folds it to running or idle. */
 export const THREAD_ACTIVITIES = ["idle", "running", "awaiting_approval", "queued", "errored"] as const

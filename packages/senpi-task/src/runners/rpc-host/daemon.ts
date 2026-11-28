@@ -119,7 +119,10 @@ async function ensureTaskDaemonOnce(
     policy: input.policy,
   })
 
-  const running = await host.probeHost({ socket })
+  // The host is launched in input.agentDir and writes its launch key record there (senpi#7568): every probe of it, and
+  // the engine's own ensure, prove it under that dir and no other.
+  const keyRoot = input.agentDir
+  const running = await host.probeHost({ socket, keyRoot })
   const decision = host.decideHostAction(
     {
       protocolVersion: TASK_DAEMON_PROTOCOL_VERSION,
@@ -149,6 +152,7 @@ async function ensureTaskDaemonOnce(
   const request: EnsureHostInput = {
     socket,
     agentDir: input.agentDir,
+    keyRoot,
     ...(input.owner === undefined ? {} : { owner: "caller" }),
     hostArgs: launch.hostArgs,
     env: launch.env,
@@ -170,7 +174,7 @@ async function ensureTaskDaemonOnce(
   // quiescence grace (seconds), so a non-owner ensuring after that exit may find the host gone.
   let answered: SenpiHostProtocolInfo | undefined = running
   try {
-    answered ??= await host.probeHost({ socket: ensured.socket })
+    answered ??= await host.probeHost({ socket: ensured.socket, keyRoot })
   } finally {
     ensured.release?.()
   }

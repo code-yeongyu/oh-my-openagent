@@ -40,10 +40,11 @@ export function remoteDependencies(packageRoot?: string): RemoteVerbDependencies
 
 /**
  * A launch of this runtime brings an installed session host unit an older runtime wrote to it (omo#14191). The runtime is
- * the running executable itself, never `OMO_BIN` or the caller's agent dir (#14194 review H1).
+ * the running executable itself, never `OMO_BIN` (#14194 review H1); the launch's agent dir only selects WHICH unit may be
+ * refreshed - the one that serves it - and is never written into it (omo#15029).
  */
 export const refreshSessionHostUnit = (isOlder: (installedRuntimeVersion: string) => boolean): Promise<void> =>
-  refreshColdWakeAtLaunch({ runtime: process.execPath, isOlder }, (line) =>
+  refreshColdWakeAtLaunch({ runtime: process.execPath, isOlder, agentDir: canonicalAgentDir() }, (line) =>
     process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`),
   )
 

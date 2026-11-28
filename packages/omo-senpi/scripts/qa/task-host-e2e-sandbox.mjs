@@ -28,6 +28,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { resolveProjectStateDirectory } from "../../../senpi-task/src/store/project-state-directory.ts"
+import { fileFingerprint } from "./isolation-state.mjs"
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 export const DELETED_CHILD_ENV = [
@@ -80,7 +81,7 @@ export function credentialDigest(root, files = CREDENTIAL_FILES) {
   for (const name of files) {
     const path = join(root, name)
     hash.update(`${name}\0`)
-    hash.update(existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : "absent")
+    hash.update(fileFingerprint(path))
   }
   return hash.digest("hex")
 }

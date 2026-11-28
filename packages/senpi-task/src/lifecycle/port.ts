@@ -1,3 +1,4 @@
+import type { OwnerProcessView } from "./owner-process"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { TeardownStepDeadline } from "./teardown-budget"
 
@@ -92,6 +93,7 @@ export type ProcessSignaller = {
 
 export type RespawnFailureCode =
   | "model_unavailable"
+  | "usage_limit"
   | "tools_unavailable"
   | "spawn_spec_unavailable"
   | "session_unavailable"
@@ -216,6 +218,7 @@ export type LifecycleDeps = {
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  readonly ownerProcesses?: OwnerProcessView
   // Row 17: reclaims stale clones and salvages a crashed host's isolated deltas at session start.
   readonly isolation?: IsolationRuntime
   readonly isolationProbe?: OwnerProbe
@@ -244,6 +247,10 @@ export type LifecycleDeps = {
   // never reach a daemon, so a deployment without one behaves exactly as it does today.
   readonly hostSessionProbe?: HostSessionProbe
   readonly hostSessionClose?: HostSessionCloser
+  // The agent dir this session's task hosts are launched in: each wrote its launch key record there, so the default
+  // probe and closer prove a recorded host under it (senpi#7568). Absent, no host can be proven: the defaults send a
+  // host nothing (liveness falls back to the busy check, a close is not confirmed).
+  readonly hostKeyRoot?: string
   // What a cancel reads once the serving generation does not list a child (omo#11765). Absent: "not listed"
   // keeps reading as ended, as it did before the view existed.
   readonly hostGenerationView?: HostGenerationView

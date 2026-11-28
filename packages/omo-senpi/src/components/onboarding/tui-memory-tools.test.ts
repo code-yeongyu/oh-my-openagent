@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { ONBOARDING_SCAN_RUNTIME_FILE } from "./scan-runtime-loader"
 import { createOnboardingMemoryTools } from "./tui-memory-tools"
 
 describe("TUI onboarding memory tools: lazy runtime", () => {
@@ -19,17 +20,21 @@ describe("TUI onboarding memory tools: lazy runtime", () => {
     expect(loads).toBe(0)
   })
 
-  test("#given consent and a sidecar that cannot load #when onboarding_understand runs #then it answers unavailable with the load reason", async () => {
+  // #15352: the tool text reaches the model; the import error names an absolute path under the user's home.
+  test("#given consent and a sidecar that cannot load #when onboarding_understand runs #then it answers unavailable without the load error's text", async () => {
     const tools = createOnboardingMemoryTools({
       scan: async () => undefined,
       loadRuntime: async () => {
-        throw new Error("sidecar missing")
+        throw new Error("Cannot find package 'x' imported from '/home/SYNTH-USER/plugin/extensions/omo.js'")
       },
     })
 
     const unavailable = await tools.understand.execute("u1", { consent: true }, undefined, undefined, {} as never)
 
     expect(unavailable.isError).toBe(true)
-    expect(unavailable.content[0]).toMatchObject({ type: "text", text: expect.stringContaining("sidecar missing") })
+    expect(unavailable.content).toEqual([
+      { type: "text", text: expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`) },
+    ])
+    expect(JSON.stringify(unavailable.content)).not.toContain("SYNTH-USER")
   })
 })
