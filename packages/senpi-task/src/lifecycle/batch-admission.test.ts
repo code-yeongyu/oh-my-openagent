@@ -2,10 +2,17 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
 import type { TaskRecordStore } from "../store"
-import { acquireSessionAdmissionLease, type SessionAdmissionLease } from "./admission-lease"
+import type { acquireSessionAdmissionLease, SessionAdmissionLease } from "./admission-lease"
 import { resolveContext, type LifecycleContext } from "./context"
 import { admitSuspendedBatch, reclaimOrphanedResident } from "./residency"
-import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  FakeRegistry,
+  seedRecord,
+  settings,
+  tempStore,
+  unreachablePid,
+} from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
@@ -274,7 +281,7 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
       task_id: "st_00000072",
       status: "completed",
       residency_state: "resident",
-      host_pid: 999_999,
+      host_pid: unreachablePid(),
     })
     const context = contextFor(store, 2)
 
@@ -296,7 +303,7 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
       task_id: "st_00000080",
       status: "completed",
       residency_state: "resident",
-      host_pid: 999_999,
+      host_pid: unreachablePid(),
     })
     const context = contextFor(store, 2)
 
