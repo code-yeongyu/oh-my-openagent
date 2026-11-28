@@ -111,6 +111,17 @@ function terminalLine(endpoint) {
   return `${line}: not responding (${endpoint.reason ?? "unreachable"}; omo daemon gc reaps it once its process is gone)`
 }
 
+/**
+ * Why a dead row is still listed and what removes it (#15239). The engine's gc pass after a host start and `omo daemon gc`
+ * collect a dead endpoint that names its socket; one that names none is collected only once nothing in it has changed for
+ * 14 days and no process it records is running (senpi#7564), so asking for gc would promise what gc will not do.
+ */
+function retainedState(endpoint) {
+  if (endpoint.socket === null)
+    return "unnamed leftover state; collected automatically once it is 14 days old and no process it records runs"
+  return "retained state; collected by the gc pass after the next host start, or now by omo daemon gc"
+}
+
 export function formatEndpointLines(endpoints) {
   const lines = []
   for (const endpoint of endpoints) {
@@ -120,7 +131,7 @@ export function formatEndpointLines(endpoints) {
     }
     const name = endpointName(endpoint)
     if (!endpoint.reachable) {
-      lines.push(`${name}: not running (retained state kept; run omo daemon gc)`)
+      lines.push(`${name}: not running (${retainedState(endpoint)})`)
       continue
     }
     const primary = endpointKind(endpoint) === "daemon"

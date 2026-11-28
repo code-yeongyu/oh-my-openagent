@@ -102,7 +102,7 @@ describe("omo daemon multi-endpoint status", () => {
     expect(stdout.text()).toContain("endpoint desk.sock:")
     expect(stdout.text()).toContain("gen 1 (draining) pid 20 · engine old · 1 session(s) · rss 12 MB (host 8 MB)")
     expect(stdout.text()).toContain("gen 2 (current) pid 21 · engine new · 2 session(s) · rss 30 MB (host 22 MB)")
-    expect(stdout.text()).toContain("not running (retained state kept; run omo daemon gc)")
+    expect(stdout.text()).toContain("shard p-cccccccccccccccc: not running (retained state; ")
     expect(stdout.text()).toContain(
       "hosts: 4 live (1 shards, 1 threads) · 5 session(s) · rss 100 MB (host 70 MB) · crashes 2",
     )
@@ -158,6 +158,30 @@ describe("omo daemon multi-endpoint status", () => {
 
     expect(lines[0]).toContain("INFO Daemon: running pid 42")
     expect(lines[1]).toBe("INFO Hosts: engine too old to enumerate")
+  })
+
+  test("#given a dead endpoint that names no socket #when status and doctor run #then gc is not promised and doctor still warns", () => {
+    const { pluginRoot, agentDir } = fixture()
+    const unnamed = {
+      reachable: false,
+      socket: null,
+      dir: join(agentDir, "rpc-host-daemon", "0123456789abcdef"),
+      identity: "unknown",
+      endpoint_kind: "rpc_host",
+      shard: null,
+      generations: [],
+      claims_live: 0,
+    }
+    const engine = scriptedEngine(() => ({ exitCode: 0, stdout: JSON.stringify({ endpoints: [unnamed] }) }))
+    const stdout = capture()
+
+    runDaemonCommand(["status"], { engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin" })
+    const row = stdout.text().split("\n")[0] ?? ""
+    const doctor = daemonReportLines({ engine, pluginRoot, agentDir, env: {}, platform: "darwin" })
+
+    expect(row.startsWith("endpoint 0123456789abcdef: not running (unnamed leftover state")).toBe(true)
+    expect(row).not.toContain("omo daemon gc")
+    expect(doctor.some((line) => line.startsWith("WARN Endpoint 0123456789abcdef: not running"))).toBe(true)
   })
 
   test("#given an empty adopted engine #when text status runs #then it exits three without endpoint rows", () => {

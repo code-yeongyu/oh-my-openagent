@@ -109,7 +109,7 @@ row with its sidecar, prints one row per endpoint (operator daemon, `shard p-<ke
 (parent <id prefix>, <session file>)`, `thread i-<key>`, or `endpoint <name>`), one line
 per generation when a handoff left more than one alive, and ends with the machine
 aggregate. `omo doctor` prints the same rows as `INFO` lines and a dead row as a
-`WARN` that points at `omo daemon gc`. `--json` returns the engine rows unchanged plus
+`WARN` that says what will collect it (below). `--json` returns the engine rows unchanged plus
 `owner` (the sidecar) and an `aggregate`:
 
 ```json
@@ -142,17 +142,23 @@ aggregate. `omo doctor` prints the same rows as `INFO` lines and a dead row as a
 `shards`, `threads`, `sessions` or the RSS totals, because a terminal is not a host.
 
 `status` never prunes, signals, unlinks, or refreshes an idle host. A dead row is kept
-until `omo daemon gc` asks the engine (`senpi host gc`) to remove it. The engine removes
+until the engine's gc removes it. Nobody has to run that gc: after every host start
+(`ensure`) the engine runs a budgeted gc pass over the other endpoints of the agent
+directory, at most once per 5 minutes, and `omo daemon gc` (`senpi host gc`) runs the
+same removal on demand. The engine removes
 an endpoint only under its ensure lock, and only when no generation pid is alive, no
 session-path claim has a live owner, and the socket refuses connections. Only after the
 engine reports an endpoint removed does OmO delete its owner sidecar. Everything else is
 kept with a reason: `live_generation`, `live_claim`, `reachable`, `locked`,
 `legacy_layout`, `unknown_identity`, or `failed`. An `unknown_identity` row has
-`socket: null`: nothing in its directory names the socket, so its lock cannot be taken
-and gc never removes it. Remove such a directory by hand only after checking that no
-pid named in its `generations/*/host.pid` or `reservations/*.json` is running and that
-no process still holds a file under it (`lsof +D <dir>` prints nothing; `lsof -U` lists
-the unix sockets processes still hold). The store index survives ordinary gc; only
+`socket: null`: nothing in its directory names the socket, so its lock cannot be taken.
+Such a directory is never removed for being unknown. Both the pass and `omo daemon gc`
+remove it only once nothing in its whole tree has changed for 14 days and every process
+it records (`*.pid`, `owner.json`, `reservations/*.json`) is gone, where an unreadable
+record counts as running; it is then listed under `removed` with the reason
+`identity_unknown_expired`. Until then `status` shows it as unnamed leftover state, not
+as something `omo daemon gc` would remove. Since the engine release that carries this,
+engine writers no longer create such directories. The store index survives ordinary gc; only
 `gc --prune-store-index` drops entries whose store directory no longer exists.
 
 `handoff` walks every live endpoint through the engine's upgrade gate: `rpc.sock`
