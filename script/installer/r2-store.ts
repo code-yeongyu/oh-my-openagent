@@ -47,9 +47,18 @@ export function createR2Store(credentials: R2Credentials, prefix: string): R2Sto
     async write(key, body, contentType) {
       const file = new Blob([body], { type: contentType })
       const hash = new Bun.CryptoHasher("sha256").update(body).digest("hex")
-      await withRetry(`write ${full(key)}`, () =>
-        putVerified(credentials, full(key), file, hash, { "content-type": contentType }),
-      )
+      const deadline = AbortSignal.timeout(5 * 60_000)
+      await withRetry(`write ${full(key)}`, async () => {
+        try {
+          deadline.throwIfAborted()
+          await putVerified(credentials, full(key), file, hash, { "content-type": contentType }, deadline)
+        } catch (error) {
+          if (!deadline.aborted) throw error
+          throw new MirrorPlanError(
+            `Timed out writing ${full(key)}; verify the stored pointer before rerunning installer-mirror for the same tag and channel.`,
+          )
+        }
+      })
     },
     async listReleaseVersions() {
       const versions = new Set<string>()

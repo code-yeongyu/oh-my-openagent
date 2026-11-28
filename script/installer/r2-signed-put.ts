@@ -125,11 +125,13 @@ export async function putVerified(
   file: Blob,
   sha256Hex: string,
   metadata: Readonly<Record<string, string>>,
+  signal?: AbortSignal,
 ): Promise<void> {
   const { url, headers } = signPut(credentials, key, sha256Hex, metadata)
   const response = await fetch(url, {
     method: "PUT",
     body: file,
+    signal,
     headers: { ...headers, "content-length": String(file.size) },
   })
   if (!response.ok) throw await toUploadError(credentials, "PUT", key, response)

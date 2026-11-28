@@ -3,6 +3,31 @@ import { createHash } from "node:crypto"
 import { createR2Store } from "./r2-store"
 
 describe("R2 text object writes", () => {
+  test.each(["releases/v5.1.48/.complete", "channels/latest"])(
+    "stops the signed write to %s at its deadline",
+    async (key) => {
+      const clock = new AbortController()
+      const timer = spyOn(AbortSignal, "timeout").mockReturnValue(clock.signal)
+      const request = async (...[, options]: Parameters<typeof fetch>) => {
+        clock.abort()
+        options?.signal?.throwIfAborted()
+        return new Response(null)
+      }
+      const replacement = Object.assign(request, { preconnect: fetch.preconnect })
+      const transport = spyOn(globalThis, "fetch").mockImplementation(replacement)
+      try {
+        const store = createR2Store(
+          { accountId: "dummy", accessKeyId: "test-key", secretAccessKey: "test-secret", bucket: "test" },
+          "",
+        )
+        await expect(store.write(key, "fixture", "text/plain")).rejects.toThrow(key)
+        expect(transport).toHaveBeenCalledTimes(1)
+      } finally {
+        transport.mockRestore()
+        timer.mockRestore()
+      }
+    },
+  )
   test.each([
     { key: "releases/v5.1.48/.complete", type: "application/json" },
     { key: "channels/latest", type: "text/plain" },
