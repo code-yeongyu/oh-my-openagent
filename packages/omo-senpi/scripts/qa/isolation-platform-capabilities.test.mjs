@@ -101,14 +101,13 @@ test("#given protected-file no-follow is unavailable #when protected state is ob
     })
 
     expect(before.complete).toBe(false)
-    expect(before.errors.map(({ code }) => code)).toEqual([
-      "NO_FOLLOW_UNAVAILABLE",
-      "NO_FOLLOW_UNAVAILABLE",
-      "NO_FOLLOW_UNAVAILABLE",
-      "NO_FOLLOW_UNAVAILABLE",
-      "NO_FOLLOW_UNAVAILABLE",
-      "NO_FOLLOW_UNAVAILABLE",
-    ])
+    // Secret-bearing files are observed by lstat alone, so only the content-compared files need no-follow reads.
+    expect(before.errors).toEqual(
+      ["settings.json", "models-store.json", "trust.json", "hooks-state.json"].map((path) => ({
+        path,
+        code: "NO_FOLLOW_UNAVAILABLE",
+      })),
+    )
     expect(protectedSnapshotsUntouched(before, after)).toBe(false)
   } finally {
     rmSync(root, { recursive: true, force: true })
