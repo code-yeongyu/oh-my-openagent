@@ -46,6 +46,16 @@ function runRootProgress(rootDir: string): () => string {
 
 type Step = { readonly exitCode: number; readonly stdout: string; readonly stderr: string }
 
+/** Fails with the command, its exit code and the tail of its output, so a red names its cause (#10075). */
+function expectSuccess(command: string, result: Step) {
+  const message = [
+    `${command} exited ${result.exitCode}`,
+    `stdout:\n${result.stdout.slice(-8192)}`,
+    `stderr:\n${result.stderr.slice(-8192)}`,
+  ].join("\n")
+  expect(result.exitCode, message).toBe(0)
+}
+
 /**
  * Runs one command and awaits its exit. Without a probe it fails at the absolute cap. With one, it
  * also fails - sooner - once the probe shows no progress for STEP_STALL_MS, and every failure names
@@ -165,7 +175,7 @@ describe("omo-ai packed install", () => {
   beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), "omo-ai-packed-install-"))
     const pack = await step(["bun", "pm", "pack", "--ignore-scripts", "--destination", root], { cwd: packageRoot })
-    expect(pack.exitCode).toBe(0)
+    expectSuccess("bun pm pack --ignore-scripts", pack)
     const packed = [...new Bun.Glob("*.tgz").scanSync(root)][0]
     expect(packed).toBeDefined()
     tarball = join(root, packed!)
@@ -178,7 +188,7 @@ describe("omo-ai packed install", () => {
 
   test("ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively", async () => {
     const listing = await step(["tar", "-tzf", tarball], { cwd: root })
-    expect(listing.exitCode).toBe(0)
+    expectSuccess("tar -tzf", listing)
     const entries = listing.stdout
       .split(/\r?\n/)
       .filter(Boolean)
@@ -187,7 +197,7 @@ describe("omo-ai packed install", () => {
 
     const consumer = newConsumer("consumer-trusted")
     const install = await bunAddInIsolatedCache(consumer, ["--trust"])
-    expect(install.exitCode).toBe(0)
+    expectSuccess("bun add --backend copyfile --trust", install)
     const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
     const senpiRoot = installedSenpiRoot(installedPackageRoot)
     expect(senpiRoot).toBeDefined()
@@ -214,7 +224,7 @@ describe("omo-ai packed install", () => {
     const home = join(root, "home")
     mkdirSync(home, { recursive: true })
     const install = await bunAddInIsolatedCache(consumer, ["--ignore-scripts"])
-    expect(install.exitCode).toBe(0)
+    expectSuccess("bun add --backend copyfile --ignore-scripts", install)
     const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
     const senpiRoot = installedSenpiRoot(installedPackageRoot)
     expect(senpiRoot).toBeDefined()
@@ -235,7 +245,7 @@ describe("omo-ai packed install", () => {
       progress: runRootProgress(root),
     })
     expect(launch.stderr).not.toContain("could not prepare the installed engine")
-    expect(launch.exitCode).toBe(0)
+    expectSuccess("node omo.js --help", launch)
     expect(readFileSync(rpcMode, "utf8")).toContain("invalid_stream_event")
     const omoVersion = JSON.parse(readFileSync(join(installedPackageRoot, "package.json"), "utf8")).version
     expect(readFileSync(stamp, "utf8").trim()).toBe(omoVersion)
