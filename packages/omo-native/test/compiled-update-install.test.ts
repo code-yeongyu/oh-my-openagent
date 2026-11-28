@@ -19,7 +19,7 @@ import {
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { compiledUpdate } from "../compiled-update"
-import { BinaryUpdateError, installReleaseBinary } from "../compiled-update-install"
+import { BinaryUpdateError, installReleaseBinary, refreshInstallManifest } from "../compiled-update-install"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -386,5 +386,86 @@ describe("verified standalone binary installation", () => {
     expect(result.exitCode).toBe(0)
     expect(result.output).toBe("omo updated 9.9.9 -> 9.9.10")
     expect(await readFile(f.destination, "utf8")).toBe("new executable")
+  })
+
+  describe("install manifest refresh", () => {
+    test("#given no install.json #then refreshInstallManifest returns silently without writing anything", async () => {
+      const f = await fixture()
+      const homeDir = join(f.root, "no-such-home")
+      // Must not throw and must not create a file where none existed.
+      await refreshInstallManifest(f.destination, "9.9.10", undefined, homeDir)
+      // The .omo directory must not be created when there is no manifest to refresh.
+      await expect(readFile(join(homeDir, ".omo", "install.json"), "utf8")).rejects.toThrow()
+    })
+
+    test("#given an existing install.json #then version, installedAt, and optional asset are updated", async () => {
+      const f = await fixture()
+      const homeDir = join(f.root, "home")
+      const omoDir = join(homeDir, ".omo")
+      await mkdir(omoDir, { recursive: true })
+      const manifestPath = join(omoDir, "install.json")
+      const original = {
+        version: "9.9.9",
+        installedAt: "2025-01-01T00:00:00Z",
+        asset: "omo-linux-x64",
+        binPath: "/old/path/omo",
+        extra: "keep-me",
+      }
+      await writeFile(manifestPath, JSON.stringify(original, null, 2))
+      await refreshInstallManifest(f.destination, "9.9.10", "omo-linux-x64", homeDir)
+      const updated = JSON.parse(await readFile(manifestPath, "utf8"))
+      expect(updated.version).toBe("9.9.10")
+      expect(updated.installedAt).not.toBe(original.installedAt)
+      expect(new Date(updated.installedAt).getTime()).toBeGreaterThan(Date.now() - 30_000)
+      expect(updated.asset).toBe("omo-linux-x64")
+      expect(updated.binPath).toBe(f.destination)
+      expect(updated.extra).toBe("keep-me")
+    })
+
+    test("#given a malformed install.json #then it is left untouched", async () => {
+      const f = await fixture()
+      const homeDir = join(f.root, "home")
+      const omoDir = join(homeDir, ".omo")
+      await mkdir(omoDir, { recursive: true })
+      const manifestPath = join(omoDir, "install.json")
+      const malformed = "{ not json }"
+      await writeFile(manifestPath, malformed)
+      await refreshInstallManifest(f.destination, "9.9.10", undefined, homeDir)
+      expect(await readFile(manifestPath, "utf8")).toBe(malformed)
+    })
+  })
+
+  describe("runtime prune after compiled update", () => {
+    test("#given a provisioned runtime directory with old versions #then old runtimes are pruned after a successful update", async () => {
+      const f = await fixture()
+      const runtimesDir = join(f.root, "runtimes")
+      // Create the provisioned path: ~/.omo/binary-runtime/<current>/omo(.exe)
+      const provisionedDir = join(runtimesDir, "9.9.9")
+      await mkdir(provisionedDir, { recursive: true })
+      const provisionedExe = join(provisionedDir, process.platform === "win32" ? "omo.exe" : "omo")
+      await writeFile(provisionedExe, "old runtime", { mode: 0o755 })
+      // Create an even older runtime that should be pruned.
+      const oldDir = join(runtimesDir, "9.9.8")
+      await mkdir(oldDir, { recursive: true })
+      await writeFile(join(oldDir, process.platform === "win32" ? "omo.exe" : "omo"), "very old", { mode: 0o755 })
+
+      const result = await compiledUpdate({
+        omoAiVersion: "9.9.9",
+        releaseTarget: "linux-x64",
+        destination: f.destination,
+        provisioned: provisionedExe,
+        platform: "linux",
+        arch: "x64",
+        fetchReleases: async () => [{ tag_name: "v9.9.10", assets: [{ name: "omo-linux-x64" }] }],
+        install: (request) => installReleaseBinary({ ...f.options, ...request }),
+        args: ["update"],
+      })
+      expect(result.exitCode).toBe(0)
+      expect(result.output).toBe("omo updated 9.9.9 -> 9.9.10")
+      // The current runtime (9.9.9) is kept as the rollback candidate; the older 9.9.8 is pruned.
+      const remaining = await readdir(runtimesDir)
+      expect(remaining).toContain("9.9.9")
+      expect(remaining).not.toContain("9.9.8")
+    })
   })
 })
