@@ -33,6 +33,6 @@ describe("onboarding scan source failure", () => {
     // then
     const failed = events.filter((event) => event.kind === "source_failed")
     expect(failed.map((event) => event.source)).toEqual(["providers"])
-    expect(failed.map((event) => event.reason)).toEqual([expect.stringMatching(/^EISDIR( \(.+\))?$/)])
+    expect(failed.map((event) => event.reason)).toEqual(["EISDIR"])
   })
 })
