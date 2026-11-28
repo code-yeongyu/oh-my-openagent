@@ -1,0 +1,34 @@
+name: Programming scaffold integration
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+      - name: Test the generated project outside the monorepo
+        env:
+          OMO_TEST_SCAFFOLD_INSTALL: "1"
+        run: |
+          cp -R packages/shared-skills/skills/programming/scripts/typescript "$RUNNER_TEMP/scaffold-tests"
+          cd "$RUNNER_TEMP/scaffold-tests"
+          bun test ./new-project.test.ts
+      - name: Report result
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Programming scaffold integration
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: Generated a Hono project and ran install, lint, formatting, and TSX typechecking.
+          JOB_SUMMARY_NEXT: Inspect the generated-project test output for the first failing command.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
