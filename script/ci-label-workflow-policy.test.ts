@@ -28,8 +28,29 @@ describe("#given required CI and an optional full-matrix label run", () => {
 
     // then
     expect(Object.keys(triggers)).toEqual(["pull_request"])
-    expect(pullRequest["types"]).toEqual(["labeled"])
+    expect(pullRequest["types"]).toEqual(["labeled", "edited", "synchronize", "opened", "reopened"])
     expect(pullRequest["branches"]).toEqual(["dev", "master"])
+  })
+
+  test("#then a body edit or push re-evaluates a labeled PR without touching the label", () => {
+    // given
+    const triggers = record(workflow("ci-full-matrix-label.yml")["on"])
+    const pullRequest = record(triggers["pull_request"])
+    const decision = workflow("pr-platform-decision.yml")
+    const decide = record(record(decision["jobs"])["decide"])
+    const run = (decide["steps"] as unknown[])
+      .map(record)
+      .map((step) => String(step["run"] ?? ""))
+      .join("\n")
+
+    // then: the trigger set covers a body fix and a push, the job gate reads the label from the PR rather than the
+    // event's label name, and no message sends the author to remove and re-add the label (#15329).
+    expect(pullRequest["types"]).toEqual(expect.arrayContaining(["edited", "synchronize", "opened", "reopened"]))
+    expect(String(record(record(workflow("ci-full-matrix-label.yml")["jobs"])["gate"])["if"])).toContain(
+      "github.event.pull_request.labels.*.name",
+    )
+    expect(run).toContain("re-runs automatically")
+    expect(JSON.stringify(decision)).not.toContain("re-apply the label")
   })
 
   test("#then the called workflow cannot share normal CI's workflow identity", () => {
@@ -50,7 +71,7 @@ describe("#given required CI and an optional full-matrix label run", () => {
 
     // then: GitHub evaluates the job gate before job-level concurrency.
     expect(caller["concurrency"]).toBeUndefined()
-    expect(job["if"]).toBe("github.event.label.name == 'ci:full-matrix'")
+    expect(job["if"]).toBe("contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')")
     expect(job["uses"]).toBe("./.github/workflows/ci.yml")
     const concurrency = record(job["concurrency"])
     expect(concurrency["cancel-in-progress"]).toBe(true)
@@ -75,7 +96,7 @@ describe("#given required CI and an optional full-matrix label run", () => {
     // then: the label gate is the shared platform decision, failing on a refusal before the reusable full matrix.
     expect(gate["uses"]).toBe("./.github/workflows/pr-platform-decision.yml")
     expect(record(gate["with"])["fail-on-refusal"]).toBe(true)
-    expect(gate["if"]).toBe("github.event.label.name == 'ci:full-matrix'")
+    expect(gate["if"]).toBe("contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')")
     expect(fullMatrix["needs"]).toBe("gate")
     expect(String(decide["runs-on"])).toStartWith("ubuntu-")
     expect(Number(decide["timeout-minutes"])).toBeLessThanOrEqual(5)

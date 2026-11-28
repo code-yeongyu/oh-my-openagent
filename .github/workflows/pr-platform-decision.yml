@@ -72,7 +72,7 @@ jobs:
           fi
           jq -r '"full_matrix=\(.fullMatrix)"' <<< "$mode" >> "$GITHUB_OUTPUT"
           if jq -e '.labelRefused' <<< "$mode" > /dev/null; then
-            message="No changed path is platform-specific and the PR body has no reason line, so macOS/Windows stay off. Add a line 'Platform-reason: <why this change needs macOS/Windows on the pull request>' to the PR body and re-apply the label, or remove the label."
+            message="No changed path is platform-specific and the PR body has no reason line, so macOS/Windows stay off. Add a line 'Platform-reason: <why this change needs macOS/Windows on the pull request>' to the PR body; this check re-runs automatically when the body is edited or the branch is pushed, or remove the label."
             if [ "$FAIL_ON_REFUSAL" = "true" ]; then
               echo "::error title=ci:full-matrix refused::$message"
               exit 1
@@ -89,5 +89,5 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - May use macOS/Windows: `${{ steps.decide.outputs.full_matrix || 'unknown' }}`.
             - A pull request gets them only with `ci:full-matrix` plus a platform path in the diff, a `Platform-reason: <why>` body line, or a file list too long to check (over 3000 files), or for a release source-state head.
-          JOB_SUMMARY_NEXT: Add the Platform-reason line to the PR body and re-apply the label, or remove the label.
+          JOB_SUMMARY_NEXT: Add the Platform-reason line to the PR body; this check re-runs automatically when the body is edited or the branch is pushed, or remove the label.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

@@ -130,7 +130,7 @@ describe("#given every workflow a pull request triggers", () => {
       .filter((file) => /\.ya?ml$/.test(file))
       .filter((file) => /pull_request\.labels|'ci:full-matrix'/.test(readFileSync(new URL(file, workflowsDir), "utf8")))
     // ci.yml and pr-platform-decision.yml feed the labels to the classifier; changelog-gate.yml reads changelog labels;
-    // the label workflow's trigger tests the labeled event's own label name.
+    // the label workflow's job gate reads the label from the pull request itself (edited/synchronize included, #15329).
     expect(readers.sort()).toEqual([
       "changelog-gate.yml",
       "ci-full-matrix-label.yml",
@@ -245,6 +245,7 @@ describe("#given the label-triggered full-matrix run", () => {
     ["bug", false],
   ])("#then the %s label starts it: %p", (label, starts) => {
     const condition = job("ci-full-matrix-label.yml", "full-matrix")["if"]
-    expect(evaluate(condition, { github: { event: { label: { name: label } } } })).toBe(starts)
+    const github = { event: { pull_request: { labels: [{ name: label }] } } }
+    expect(evaluate(condition, { github })).toBe(starts)
   })
 })

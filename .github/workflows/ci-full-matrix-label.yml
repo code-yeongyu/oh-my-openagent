@@ -3,7 +3,9 @@ name: CI Full Matrix Label
 on:
   pull_request:
     branches: [dev, master]
-    types: [labeled]
+    # edited/synchronize re-evaluate a labeled PR after a body fix or a push, so the check never depends on
+    # removing and re-adding the label (#15329).
+    types: [labeled, edited, synchronize, opened, reopened]
 
 # Reusable workflows cannot elevate the caller's token permissions.
 # ci.yml's PR guard and push-only jobs declare these write permissions.
@@ -19,7 +21,7 @@ jobs:
   # full matrix schedules anything. These checks are optional; required CI is untouched.
   gate:
     name: Full-matrix label gate
-    if: github.event.label.name == 'ci:full-matrix'
+    if: contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     permissions:
       contents: read
       pull-requests: read
@@ -29,7 +31,7 @@ jobs:
 
   full-matrix:
     needs: gate
-    if: github.event.label.name == 'ci:full-matrix'
+    if: contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     # Only matching labels enter this group; bot labels cannot cancel it.
     concurrency:
       group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}-full-matrix
