@@ -569,7 +569,7 @@ describe("#13037 the sender half reaches a session on another device that is not
         wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
       })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      return (result as { error: { code: string; message: string; details?: { reason?: string } } }).error
+      return (result as { error: { code: string; message: string; next_action: string; details?: { reason?: string } } }).error
     }
 
     test.each([
@@ -584,6 +584,16 @@ describe("#13037 the sender half reaches a session on another device that is not
       "wake_unsupported",
     ])("#given the known code %s #then its reason is the code itself", async (code) => {
       expect((await refusalOf(code)).details?.reason).toBe(code)
+    })
+
+    test("#given the sender is not admitted #then the advice names the holder machine, not another thread (#15276)", async () => {
+      // A sender_not_admitted refusal is of this device, so another thread on it fails the same way; only
+      // not_wakeable is about the session, where addressing another thread can help.
+      const notAdmitted = await refusalOf("sender_not_admitted")
+      const notWakeable = await refusalOf("not_wakeable")
+      expect(notAdmitted.next_action).toContain("machine that holds the thread")
+      expect(notAdmitted.next_action).not.toContain("another thread")
+      expect(notWakeable.next_action).toBe("Address another thread.")
     })
 
     test.each(["some_new_code", "v2.busy-now"])(
