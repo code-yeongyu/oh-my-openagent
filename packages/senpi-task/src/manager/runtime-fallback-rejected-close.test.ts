@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { configureSharedSubunitLogger } from "@oh-my-opencode/utils"
+configureSharedSubunitLogger((message, data) => console.error("[omo-log]", message, JSON.stringify(data)?.slice(0, 600)))
 
 import { createManagerResidencyRegistry } from "../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../lifecycle/create"
