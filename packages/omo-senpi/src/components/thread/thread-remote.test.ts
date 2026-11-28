@@ -196,9 +196,19 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
         last_seen: null,
         this_device: true,
         listing: "listed",
+        host_counts: { answered: 1, unanswered: 0 },
         threads: 1,
       },
-      { device: "b", name: "studio", online: true, last_seen: null, this_device: false, listing: "listed", threads: 1 },
+      {
+        device: "b",
+        name: "studio",
+        online: true,
+        last_seen: null,
+        this_device: false,
+        listing: "listed",
+        host_counts: null,
+        threads: 1,
+      },
       {
         device: "c",
         name: "laptop",
@@ -208,6 +218,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
         last_seen: "2023-11-14T22:13:20.000Z",
         this_device: false,
         listing: "incomplete",
+        host_counts: null,
         threads: 0,
       },
       {
@@ -219,6 +230,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
         last_seen: null,
         this_device: false,
         listing: "offline",
+        host_counts: null,
         threads: 0,
       },
     ])

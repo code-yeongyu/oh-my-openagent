@@ -89,6 +89,8 @@
     "packages/omo-native/bin/lib/launcher.js": ["engineHostCall", "rollbackMigrateCall"],
     // pre-existing at origin dev 4686e425b5: unused export(s) formatModelChainLines
     "packages/omo-native/bin/lib/model-chains.js": ["formatModelChainLines"],
+    // added by #15247: the declaration of the sibling read-failure.js, which every importer resolves to
+    "packages/omo-native/bin/lib/read-failure.d.ts": ["describeReadFailure"],
     // pre-existing at origin dev 4686e425b5: unused export(s) readInstalledVersion
     "packages/omo-native/bin/lib/self-update.js": ["readInstalledVersion"],
     // pre-existing at origin dev 4686e425b5: unused export(s) default

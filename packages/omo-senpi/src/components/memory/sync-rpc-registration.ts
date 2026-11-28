@@ -1,8 +1,9 @@
 import { boundedServiceFloor } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { z } from "zod"
+import { syncRpcHandlerFailure, syncRpcUntrusted, type SyncRpcVerb } from "./sync-rpc-contract"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
 import { syncErrorFields } from "./sync-rpc-operation"
-import type { SyncRpcContext, SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
+import type { SyncRpcContext, SyncRpcOptions } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
 const enableRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
@@ -49,20 +50,12 @@ const device = z.object({
   syncPrincipal: z.string().nullable(),
 })
 
-export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOptions) {
+export function createSyncRpcDispatcher(options: SyncRpcOptions) {
   const coordinator = createSyncRpcCoordinator(options)
-  for (const verb of [
-    "enable",
-    "pending",
-    "approve",
-    "status",
-    "devices",
-    "features",
-    "acknowledge",
-    "disable",
-  ] as const) {
-    rpc.handle(`omo.memory.sync.${verb}`, async (data, context) => {
-      if (!coordinator.check(context)) return { kind: "unavailable", reason: "A live trusted connection is required." }
+  return {
+    coordinator,
+    async dispatch(verb: SyncRpcVerb, data: unknown, context?: SyncRpcContext) {
+      if (!coordinator.check(context)) return syncRpcUntrusted()
       try {
         if (verb === "approve") {
           const parsed = approval.safeParse(data)
@@ -110,9 +103,8 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
           code: "handler_failed",
           ...syncErrorFields(error),
         })
-        return { kind: "unavailable", reason: "The sync operation could not complete.", code: "handler_failed" }
+        return syncRpcHandlerFailure()
       }
-    })
+    },
   }
-  return coordinator
 }

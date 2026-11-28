@@ -110,7 +110,13 @@ test("#given a pinned device and a served chain whose last row was altered #when
     listEntries: async (operation) => {
       const rows = await served.listEntries(operation)
       if (rows === null) return null
-      return rows.map((row, n) => (n === rows.length - 1 ? { ...row, digest: `${row.digest.slice(0, -1)}A` } : row))
+      // The last char is replaced by one that differs by construction: a fixed "A" left a digest that already ended in
+      // "A" (1 in 16) unchanged, so the chain verified and the test flaked.
+      return rows.map((row, n) =>
+        n === rows.length - 1
+          ? { ...row, digest: `${row.digest.slice(0, -1)}${row.digest.endsWith("A") ? "E" : "A"}` }
+          : row,
+      )
     },
   }
   const { outcome, begun } = await guardedRecover(world, altered, dir)

@@ -1,7 +1,37 @@
 import { afterEach, expect, test } from "bun:test"
+import { syncRpcUntrusted } from "./sync-rpc-contract"
+import type { SyncRpcRegistration } from "./sync-rpc-ports"
 import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
+import { wireSyncRpc } from "./sync-rpc-wiring"
 
 afterEach(disposeSyncRpcFixtures)
+
+test("#given a cold sync RPC dispatcher #when the binding retires during loading #then the queued call cannot resolve the new binding's account", async () => {
+  const handlers = new Map<string, Parameters<SyncRpcRegistration["handle"]>[1]>()
+  let sourceCalls = 0
+  const rpc = wireSyncRpc({
+    rpc: { handle: (name, handler) => handlers.set(name, handler) },
+    source: async () => {
+      sourceCalls++
+      return null
+    },
+    memoryRoot: "",
+    pinDir: "",
+    signal: new AbortController().signal,
+    syncStatus: async () => undefined,
+    logger: { error() {} },
+  })
+  const status = handlers.get("omo.memory.sync.status")
+  if (status === undefined) throw new Error("Sync status was not registered")
+  const { context } = owner("a")
+  const retired = status({}, context)
+  rpc.retireBinding()
+
+  expect(await retired).toEqual(syncRpcUntrusted())
+  expect(sourceCalls).toBe(0)
+  expect(await status({}, context)).toMatchObject({ kind: "unavailable", code: "no_account" })
+  expect(sourceCalls).toBe(1)
+})
 
 test("#given a held selected-account boundary #when the transport gate retires without notification #then its dispatch never runs", async () => {
   const f = await setup()

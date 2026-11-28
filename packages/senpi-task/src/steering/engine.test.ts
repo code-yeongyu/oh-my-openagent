@@ -264,7 +264,7 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
 })
 
 describe("steering engine scope + resolution guards", () => {
-  test("#given a task owned by another session #when sent without all_scope #then it is scope-denied naming the owning session", async () => {
+  test("#given a task owned by another session #when sent without all_scope #then it reads as not found", async () => {
     // given
     const harness = makeHarness()
     const record = harness.seedRecord({ parent_session_id: "parent-1", root_session_id: "parent-1" })
@@ -279,8 +279,7 @@ describe("steering engine scope + resolution guards", () => {
     })
 
     // then
-    if (outcome.kind !== "scope_denied") throw new Error("expected scope_denied")
-    expect(outcome.owning_session_id).toBe("parent-1")
+    expect(outcome.kind).toBe("not_found")
   })
 
   test("#given a cross-session task #when sent with all_scope #then delivery is allowed", async () => {

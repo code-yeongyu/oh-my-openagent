@@ -4,7 +4,34 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { RpcClient } from "../../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/rpc-client.js"
 import { resolveSenpi } from "../bin/lib/package-paths.js"
-import { createDaemonTestRunner, TREE_BOUNDED_TEST_TIMEOUT_MS } from "./daemon-test-runner"
+import {
+  createDaemonTestRunner,
+  describeTreeBound,
+  TREE_BOUNDED_TEST_TIMEOUT_MS,
+  watchTreeProgress,
+} from "./daemon-test-runner"
+
+// A drained host can still be shutting down when `host stop --wait-ms` returns (a loaded macOS runner, 5.1.85): wait
+// for its pid to go, bounded by its own CPU progress like every engine call here, never by a longer wall-clock wait.
+// The host is not this test's child, so no exit event exists; checking the pid is the OS boundary.
+function awaitHostExit(pid: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const check = setInterval(() => {
+      try {
+        process.kill(pid, 0)
+      } catch (error) {
+        clearInterval(check)
+        stopWatch()
+        if ((error as NodeJS.ErrnoException).code === "ESRCH") resolve()
+        else reject(error)
+      }
+    }, 100)
+    const stopWatch = watchTreeProgress(pid, (bound) => {
+      clearInterval(check)
+      reject(new Error(`drained scratch host ${pid} ${describeTreeBound(bound)}`))
+    })
+  })
+}
 
 // Like the other real-engine suites, each engine call is bounded by its process tree's progress; bun's timeout is
 // only the outer bound (a loaded host stretches two cold engine starts past the 20 s suite default).
@@ -36,7 +63,9 @@ test.skipIf(process.platform === "win32")(
     const stop = async () => {
       if (pid === undefined) return
       const result = await call(engine, "host", "stop", "--socket", socket, "--drain", "--wait-ms", "10000")
-      if (result.exitCode !== 0 || JSON.parse(result.stdout).exited !== true) {
+      const outcome = result.exitCode === 0 ? JSON.parse(result.stdout) : undefined
+      if (outcome?.action === "drained" && outcome.exited !== true) await awaitHostExit(pid)
+      else if (outcome?.exited !== true) {
         try {
           process.kill(pid, "SIGTERM")
         } catch (e) {

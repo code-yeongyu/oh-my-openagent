@@ -8,7 +8,7 @@ import { enableSync } from "../../../../memory-core/src/sync/account/enable"
 import { joinAccount } from "../../../../memory-core/src/sync/account/join"
 import { approveDevice } from "../../../../memory-core/src/sync/account/approve"
 import { createSyncRpcClaims } from "./sync-rpc-claims"
-import { registerSyncRpc } from "./sync-rpc-registration"
+import { registerSyncRpcForTest } from "./sync-rpc-test-support"
 import type { SyncRpcAccount, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const data = z
@@ -53,7 +53,7 @@ const account: SyncRpcAccount = {
   },
 }
 const handlers = new Map<string, Parameters<SyncRpcRegistration["handle"]>[1]>()
-const coordinator = registerSyncRpc(
+const coordinator = registerSyncRpcForTest(
   {
     handle: (name, handler) => {
       handlers.set(name, handler)

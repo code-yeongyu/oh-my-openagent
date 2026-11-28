@@ -1394,6 +1394,14 @@
                 },
                 {
                   "type": "string",
+                  "const": "held"
+                },
+                {
+                  "type": "string",
+                  "const": "unknown"
+                },
+                {
+                  "type": "string",
                   "const": "inactive"
                 },
                 {

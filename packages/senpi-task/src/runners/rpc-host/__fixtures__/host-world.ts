@@ -19,6 +19,7 @@ import type { RpcRunnerSpec } from "../../types"
 import { closeHostSession } from "../close"
 import { HostSessionClient } from "../session-client"
 import { startFakeHost, type FakeHost, type FakeHostOptions } from "./fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./fake-host-key-root"
 import { listFakeHostSessions, probeFakeHost } from "./fake-host-probe"
 import { fakeCloseChannel, fakeFallbackRunner } from "./host-world-ports"
 import type { ManualRecoveryClock } from "./manual-recovery-clock"
@@ -177,7 +178,11 @@ function connectParent(input: ConnectParentInput): ParentSession {
         upgradeable: true,
       }),
     createClient: (socket) =>
-      new HostSessionClient({ socketPath: socket, ports: { probeProtocolInfo: () => probeFakeHost(socket) } }),
+      new HostSessionClient({
+        keyRoot: FAKE_HOST_KEY_ROOT,
+        socketPath: socket,
+        ports: { probeProtocolInfo: () => probeFakeHost(socket) },
+      }),
     modelAdmission: () => Promise.resolve(),
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,
@@ -225,7 +230,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
     hostSessionProbe:
       input.options.productionProbe === true
-        ? defaultHostSessionProbe()
+        ? defaultHostSessionProbe(FAKE_HOST_KEY_ROOT)
         : createHostSessionProbe({
             daemonReachable: async (socket) => (await probeFakeHost(socket)) !== undefined,
             liveSessionPaths: (socket) => listFakeHostSessions(socket, { includeWorkers: true }),

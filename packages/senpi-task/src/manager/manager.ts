@@ -28,7 +28,7 @@ import type { AwaitingInputReason, LiveRunStats, ResolvedModelRecord, TaskRecord
 import { createSelfResumedListeners, reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { ownedClaims, ownedStartResult } from "./owned-claims"
 import { ContinuedRuns } from "./continued-run"
-import { createSteeringEngine, ownsTask, resolveTaskCallerFirst } from "../steering"
+import { createSteeringEngine, redispatchNotFound, resolveSendTarget } from "../steering"
 import type {
   CancelOptions,
   CancelOutcome,
@@ -180,7 +180,7 @@ type ReattachingTaskManager = TaskManager &
       credential?: ResumeCredential,
       options?: { readonly paused?: boolean },
     ): Promise<RespawnResult>
-    redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome>
+    redispatchTask(idOrName: string, callerSessionId?: string, allScope?: boolean): Promise<RedispatchOutcome>
     reattach(
       record: TaskRecord,
       handle: ManagedChildHandle,
@@ -854,25 +854,15 @@ class TaskManagerImpl implements TaskManager {
   // senpi#3266: the one-step action out of "resumed, waiting for input" that keeps the work. The
   // flagged task's dead session is abandoned and a FRESH child launches from the persisted prompt,
   // under the same task identity and a new run epoch. Only a non-terminal flagged task may take it.
-  // Callers passing no callerSessionId act across sessions (task_send forwards none under all_scope).
-  async redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome> {
+  // A caller resolves only its own tasks unless allScope; no caller resolves across sessions.
+  async redispatchTask(idOrName: string, callerSessionId?: string, allScope?: boolean): Promise<RedispatchOutcome> {
     const listed = this.list({ scope: "all" }).map((entry) => entry.record)
-    const record = resolveTaskCallerFirst(
+    const record = resolveSendTarget(
       { load: (taskId) => listed.find((entry) => entry.task_id === taskId), list: () => listed },
       idOrName,
-      callerSessionId,
+      { ...(callerSessionId === undefined ? {} : { callerSessionId }), ...(allScope === true ? { allScope } : {}) },
     )
-    if (record === undefined) {
-      return { kind: "not_found", reason: `No task named ${idOrName}.` }
-    }
-    if (callerSessionId !== undefined && !ownsTask(callerSessionId, record)) {
-      return {
-        kind: "scope_denied",
-        task_id: record.task_id,
-        owning_session_id: record.parent_session_id,
-        reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to act across sessions.`,
-      }
-    }
+    if (record === undefined) return redispatchNotFound(idOrName)
     // One re-dispatch per task at a time, across processes too: a second caller waits, then re-reads
     // the record and finds the flag already cleared instead of spawning a second child.
     return withTaskRecordLockAsync(

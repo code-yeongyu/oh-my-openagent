@@ -179,7 +179,7 @@ noFollowIt(
   () => {
     const root = mkdtempSync(join(tmpdir(), "omo-senpi-protected-error-"))
     try {
-      writeFileSync(join(root, "auth.json"), "secret\n")
+      writeFileSync(join(root, "settings.json"), "{}\n")
       const deniedRead = () => {
         const error = new Error("denied")
         error.code = "EACCES"
@@ -190,7 +190,7 @@ noFollowIt(
       const after = snapshotProtectedState(root, deniedRead)
 
       expect(before.complete).toBe(false)
-      expect(before.errors).toEqual([{ path: "auth.json", code: "EACCES" }])
+      expect(before.errors).toEqual([{ path: "settings.json", code: "EACCES" }])
       expect(changedSnapshotPaths(before.snapshot, after.snapshot)).toEqual([])
       expect(isolationState.protectedSnapshotsUntouched?.(before, after)).toBe(false)
     } finally {

@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test"
 
 import { classifyReflectionLockHolder } from "./stale-holder"
-import { REFLECTION_DIR, SCENARIOS, probeFor } from "./stale-holder.scenarios.test-support"
+import {
+  deadHolder,
+  LAUNCHER,
+  lock,
+  LOCK,
+  REFLECTION_DIR,
+  RUN,
+  SCENARIOS,
+  probeFor,
+} from "./stale-holder.scenarios.test-support"
 
 describe("reflection lock holder decision (#10377)", () => {
   // Each fail-closed rule has its own scenario that changes exactly one fact of a provably dead
@@ -29,4 +38,43 @@ describe("reflection lock holder decision (#10377)", () => {
       runId: "reflection-run-64",
     })
   })
+
+  // #15362: an older reader recorded the launcher start as local wall time (`ps-lstart:`); the zone bound (UTC-12..UTC+14,
+  // 15-minute steps), not the scheme, decides whether the live process started then.
+  test.each([
+    [
+      "no zone offset maps onto",
+      "dead",
+      "ps-lstart:Tue Sep 15 14:59:03 2026",
+      "ps-lstart-utc:Wed Sep 16 14:59:03 2026",
+    ],
+    [
+      "a real zone offset maps onto",
+      "live",
+      "ps-lstart:Tue Sep 15 23:59:03 2026",
+      "ps-lstart-utc:Tue Sep 15 14:59:03 2026",
+    ],
+    [
+      "names, in another scheme (#8304), the same instant as",
+      "live",
+      "ps-lstart:Tue Sep 15 15:00:00 2026",
+      "proc-start-epoch:1789452000",
+    ],
+  ] as const)(
+    "#given a live launcher whose legacy ps-lstart start %s its live start #when the holder is classified #then it is %s",
+    async (_name, state, recorded, actual) => {
+      // given
+      const facts = deadHolder({
+        files: { [LOCK]: lock({ launcherProcessStart: recorded }) },
+        pids: { [LAUNCHER]: "alive" },
+        starts: { [LAUNCHER]: actual },
+      })
+
+      // when
+      const verdict = await classifyReflectionLockHolder(REFLECTION_DIR, probeFor(facts))
+
+      // then
+      expect(verdict).toEqual({ state, runId: RUN })
+    },
+  )
 })

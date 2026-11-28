@@ -1,4 +1,5 @@
 import { startFakeHost, type FakeHost, type FakeHostOptions } from "./__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 import { HostSessionClient, type HostSessionOpenInput } from "./session-client"
 
 /** The child launch profile every session-client suite opens with. */
@@ -40,6 +41,7 @@ export function sessionClientHarness(): SessionClientHarness {
     },
     hostClient: (host) => {
       const client = new HostSessionClient({
+        keyRoot: FAKE_HOST_KEY_ROOT,
         socketPath: host.socketPath,
         ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
       })
