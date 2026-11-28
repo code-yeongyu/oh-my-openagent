@@ -274,10 +274,8 @@ fn unsupported_modern_versions_are_rejected_before_any_daemon_exchange() {
             assert_eq!(reply["error"]["code"], -32022, "{request}: {reply}");
             assert_eq!(
                 reply["error"]["data"],
-                json!({
-                    "supported": ["2026-07-28", "2025-06-18", "2025-03-26", "2024-11-05"],
-                    "requested": version
-                })
+                // omo#11406: the error lists only what a modern-metadata request may ask for.
+                json!({ "supported": ["2026-07-28"], "requested": version })
             );
         }
     }
@@ -288,10 +286,17 @@ fn unsupported_modern_versions_are_rejected_before_any_daemon_exchange() {
 #[test]
 fn malformed_modern_metadata_is_invalid_params_before_dispatch() {
     let (mut server, sent) = server(false, json!({}));
+    // omo#11406: a non-object `_meta` carries no protocol keys, so only discovery rejects it.
+    for meta in [Value::Null, json!([]), json!("bad")] {
+        let mut request = modern("server/discover");
+        request["params"]["_meta"] = meta.clone();
+        assert_eq!(ask(&mut server, &request)["error"]["code"], -32602, "{request}");
+        let legacy = json!({ "id": 2, "method": "tools/list", "params": { "_meta": meta } });
+        let reply = ask(&mut server, &legacy);
+        assert!(reply["result"]["tools"].is_array(), "{legacy}: {reply}");
+        assert!(reply["result"].get("_meta").is_none(), "{legacy}: {reply}");
+    }
     for meta in [
-        Value::Null,
-        json!([]),
-        json!("bad"),
         json!({ "io.modelcontextprotocol/protocolVersion": "2026-07-28" }),
         json!({ "io.modelcontextprotocol/clientCapabilities": {} }),
         json!({ "io.modelcontextprotocol/clientInfo": {} }),

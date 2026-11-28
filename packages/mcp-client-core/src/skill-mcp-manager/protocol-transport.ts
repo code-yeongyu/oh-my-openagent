@@ -29,6 +29,16 @@ export function createProtocolTransport(
   const discoveryID = "skill-mcp-discover"
   const pending = new Map<RequestId, JSONRPCRequest>()
   const rejected = new Map<RequestId, JSONRPCRequest>()
+  // A connect that trusted the remembered legacy era, until its initialize result arrives.
+  let unconfirmedMemory = false
+
+  // A remembered connect that never got its initialize result (send failure, close, SDK timeout or
+  // cancellation) forgets the server, so the next connect probes discovery again (omo#11406).
+  function forgetUnconfirmedMemory(): void {
+    if (!unconfirmedMemory) return
+    unconfirmedMemory = false
+    if (eraKey) legacyServers.delete(eraKey)
+  }
 
   function failInitialization(error: unknown): void {
     if (!initialize) return
@@ -80,6 +90,7 @@ export function createProtocolTransport(
     async start() {
       transport.onclose = () => {
         clearTimeout(discoveryTimer)
+        forgetUnconfirmedMemory()
         pending.clear()
         rejected.clear()
         bridge.onclose?.()
@@ -87,8 +98,9 @@ export function createProtocolTransport(
       transport.onerror = (error) => bridge.onerror?.(error)
       transport.onmessage = (message, extra) => {
         if (initialize && "id" in message && message.id !== undefined && !("method" in message)) {
-          if (message.id === initialize.id && era === "legacy" && "error" in message && eraKey) {
-            legacyServers.delete(eraKey)
+          if (message.id === initialize.id && era === "legacy") {
+            if ("error" in message && eraKey) legacyServers.delete(eraKey)
+            unconfirmedMemory = false
           }
           if (message.id === discoveryID) {
             if (era !== "probing") return
@@ -139,6 +151,15 @@ export function createProtocolTransport(
               // local checks. Replace their contents without private SDK fields.
               const capabilities = client?.getServerCapabilities()
               const serverInfo = client?.getServerVersion()
+              // Fail closed if the SDK getters stop returning their live objects: rewriting a copy would
+              // silently leave the discovered capabilities in force (omo#11406).
+              if (
+                (capabilities && client?.getServerCapabilities() !== capabilities) ||
+                (serverInfo && client?.getServerVersion() !== serverInfo)
+              ) {
+                failFallback(new Error("MCP SDK no longer exposes live server state; legacy fallback cannot apply it."))
+                return
+              }
               if (capabilities) {
                 for (const key of Object.keys(capabilities)) Reflect.deleteProperty(capabilities, key)
                 Object.assign(capabilities, result.data.capabilities)
@@ -203,7 +224,13 @@ export function createProtocolTransport(
       if ("method" in message && message.method === "initialize" && "id" in message && !initialize) {
         initialize = message
         if (eraKey && legacyServers.has(eraKey)) {
-          await useLegacy()
+          unconfirmedMemory = true
+          try {
+            await useLegacy()
+          } catch (error) {
+            forgetUnconfirmedMemory()
+            throw error
+          }
           return
         }
         transport.setProtocolVersion?.(modernVersion)
@@ -225,6 +252,16 @@ export function createProtocolTransport(
           await useLegacy()
         }
         return
+      }
+      // The SDK cancels requests it timed out or aborted; their entries would otherwise stay for the
+      // connection's lifetime (omo#11406).
+      if ("method" in message && message.method === "notifications/cancelled") {
+        const requestId = message.params?.requestId
+        if (typeof requestId === "string" || typeof requestId === "number") {
+          pending.delete(requestId)
+          rejected.delete(requestId)
+          if (requestId === initialize?.id) forgetUnconfirmedMemory()
+        }
       }
       if (era === "failed" && fallbackError) {
         if ("method" in message && "id" in message) {

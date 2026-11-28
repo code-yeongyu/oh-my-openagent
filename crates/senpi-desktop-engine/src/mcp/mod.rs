@@ -137,18 +137,18 @@ impl<X: FnMut(&Value) -> io::Result<Value>> Server<X> {
     }
 }
 
-/// The era is local to this request; unrelated legacy metadata remains valid.
+/// The era is local to this request; unrelated legacy metadata remains valid. A non-object `_meta`
+/// cannot carry protocol keys, so outside discovery it leaves a legacy request legacy.
 fn modern_request(params: &Value, discovery: bool) -> Result<bool, Value> {
     let meta = params.get("_meta");
-    let has_protocol_meta = meta.is_some_and(|meta| {
-        !meta.is_object()
-            || [
-                VERSION_META_KEY,
-                CAPABILITIES_META_KEY,
-                CLIENT_INFO_META_KEY,
-            ]
-            .iter()
-            .any(|key| meta.get(key).is_some())
+    let has_protocol_meta = meta.and_then(Value::as_object).is_some_and(|meta| {
+        [
+            VERSION_META_KEY,
+            CAPABILITIES_META_KEY,
+            CLIENT_INFO_META_KEY,
+        ]
+        .iter()
+        .any(|key| meta.contains_key(*key))
     });
     if !discovery && !has_protocol_meta {
         return Ok(false);
@@ -167,7 +167,8 @@ fn modern_request(params: &Value, discovery: bool) -> Result<bool, Value> {
         return Err(json!({
             "code": -32022,
             "message": "Unsupported protocol version",
-            "data": { "supported": SUPPORTED_VERSIONS, "requested": version },
+            // Only versions a modern-metadata request may name; legacy versions are reached through initialize.
+            "data": { "supported": [MODERN_PROTOCOL_VERSION], "requested": version },
         }));
     }
     Ok(true)
