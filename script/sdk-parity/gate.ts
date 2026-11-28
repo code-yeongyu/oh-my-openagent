@@ -31,6 +31,8 @@ export type GateInput = {
   readonly scenarios: readonly Scenario[]
   readonly closures: ReadonlyMap<string, ReadonlySet<string>>
   readonly changedFiles: readonly string[]
+  // The files that produce or normalize an outcome (outcome-producers.ts, computed from the runner's imports).
+  readonly outcomeProducers: readonly string[]
   readonly body: string
   readonly headSha: string
   // presentation.json at the merge base (undefined when it has none) and at the head; only the rows the pull request
@@ -65,6 +67,8 @@ export type GateReport = {
   readonly changed: readonly DeclaredChange[]
   // Every exempt scenario, as '<scenario>#exempt=<provider>[:<detail>]'; the digest binds each.
   readonly exempted: readonly string[]
+  // The files of how outcomes are produced or normalized that this pull request changes, as '<file>#gate-change'.
+  readonly gateChanges: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -204,11 +208,12 @@ export function gateReport(
       continue
     }
     if (JSON.stringify(before) === JSON.stringify(after)) {
-      if (declared.has(scenario.id)) judged.add(scenario.id)
-      if (declared.has(scenario.id))
+      if (declared.has(scenario.id)) {
+        judged.add(scenario.id)
         failures.push(
           `SDK-Parity-Changed: ${scenario.id}: its outcome is equal on the merge base and the head; there is nothing to declare`,
         )
+      }
       continue
     }
     const baseVersions = input.versions.base
@@ -313,6 +318,10 @@ export function gateReport(
     })
     .map((row) => row.id)
     .toSorted()
+  const changedSet = new Set(input.changedFiles)
+  // Both trees run the HEAD's runner and its normalizer, so a change to them changes what every comparison sees and no
+  // outcome difference shows it: it is printed and enters the reviewer's digest, so the check needs a signed review.
+  const gateChanges = input.outcomeProducers.filter((file) => changedSet.has(file)).map((file) => `${file}#gate-change`)
   return {
     failures,
     candidates,
@@ -321,16 +330,18 @@ export function gateReport(
     presentationRows: presentationRows.toSorted(),
     versionMasked: versionMasked.toSorted(),
     head: input.headSha,
-    // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
-    // added later appends after these, so a merge that keeps both tiers keeps one order.
+    // Digest input order: candidates, live-schema, exempt marks, presentation rows, version-mask ids, then gate-change
+    // files. A tier added later appends after these, so a merge that keeps both tiers keeps one order.
     changed: declaredChanges.toSorted((a, b) => a.scenario.localeCompare(b.scenario)),
     exempted: exempted.toSorted(),
+    gateChanges,
     digest: candidateDigest(input.headSha, [
       ...candidates,
       ...liveSchema.map((id) => `${id}#live-schema`),
       ...exempted.toSorted(),
       ...presentationRows,
       ...versionMasked,
+      ...gateChanges,
     ]),
     unchangedLine,
     initialization,
@@ -361,6 +372,7 @@ const reviewed = (report: GateReport): string[] => [
   ...report.exempted,
   ...report.presentationRows,
   ...report.versionMasked,
+  ...report.gateChanges,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -398,6 +410,11 @@ export function renderReport(report: GateReport): string {
         `- ${change.scenario} (${change.capability}) ${[change.kind, ...change.args].join(" ")}`,
         ...printedPair(change.before, change.after),
       ]),
+      "",
+    )
+  if (report.gateChanges.length > 0)
+    lines.push(
+      `GATE CHANGE: this pull request changes the parity harness's own modules (${report.gateChanges.map((id) => id.replace("#gate-change", "")).join(", ")}), which produce, normalize or judge the outcomes; what the harness calls in the product is what the outcomes compare. Read it as a gate change; the security reader signs the digest.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")
