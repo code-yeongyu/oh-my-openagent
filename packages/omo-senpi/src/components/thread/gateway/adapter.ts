@@ -85,7 +85,6 @@ export type GatewayEndpointPort = {
     endpoint: GatewayEndpointRef,
     request: ReleaseSessionRequest,
   ) => Promise<ReleaseSessionReply>
-  readonly classifyLiveness?: (endpoint: GatewayEndpointRef) => Promise<EndpointLiveness>
 }
 
 export type RuntimePhase = "idle" | "mid_turn" | "waiting_question" | "compacting"
