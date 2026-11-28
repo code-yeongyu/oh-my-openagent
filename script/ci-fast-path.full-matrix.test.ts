@@ -380,6 +380,20 @@ describe("full-matrix classification", () => {
       expect(mode.labelRefused).toBe(false)
     })
 
+    // The native process readers branch on win32/darwin, and their file names do not say so (#15105).
+    test.each([
+      "packages/senpi-task/src/platform/native-process.ts",
+      "packages/senpi-task/src/platform/process-tree-cpu.ts",
+      "packages/senpi-task/src/platform/native-process.test.ts",
+    ])("#then it runs the full matrix when the diff touches the native process reader %s", (changedPath) => {
+      // given / when
+      const mode = classify({ ...labelled, changedPaths: [changedPath] })
+
+      // then
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
     test("#then it runs the full matrix when the body carries a Platform-reason line", () => {
       const mode = classify({
         ...labelled,
