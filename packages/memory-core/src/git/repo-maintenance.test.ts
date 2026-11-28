@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
@@ -7,6 +7,9 @@ import { join } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { runMemoryRepoMaintenance } from "./repo-maintenance"
+
+// The real-git case runs 66 fetch + maintenance rounds; loaded CI runners need more than the 20 s default.
+setDefaultTimeout(60_000)
 
 type Call = readonly string[]
 
@@ -73,8 +76,18 @@ test("repeated transfers of rewritten history keep pack count and size bounded a
     writeFileSync(join(source, "memory"), "stable memory content\n")
     git(source, "add", "memory")
     for (let round = 0; round < 66; round++) {
-      git(source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit",
-        ...(round === 0 ? [] : ["--amend"]), "--allow-empty", "-qm", `retention round ${round}`)
+      git(
+        source,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.org",
+        "commit",
+        ...(round === 0 ? [] : ["--amend"]),
+        "--allow-empty",
+        "-qm",
+        `retention round ${round}`,
+      )
       git(target, "fetch", "--no-tags", source, "+HEAD:refs/heads/sync")
       const before = git(target, "count-objects", "-v")
       await runMemoryRepoMaintenance(async (args) => ({ stdout: git(target, ...args) }), OPTIONS)
@@ -92,4 +105,4 @@ test("repeated transfers of rewritten history keep pack count and size bounded a
   } finally {
     await removeTree(root)
   }
-}, 60_000)
+})

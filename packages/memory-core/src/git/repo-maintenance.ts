@@ -30,7 +30,12 @@ export async function runMemoryRepoMaintenance(
     options.signal?.throwIfAborted()
   }
   if (looseObjectsBefore < options.minLooseObjects)
-    return { status: "skipped", looseObjects: looseObjectsBefore, packsBefore: packs, packsAfter: await countPacks(git) }
+    return {
+      status: "skipped",
+      looseObjects: looseObjectsBefore,
+      packsBefore: packs,
+      packsAfter: await countPacks(git),
+    }
   await git(["maintenance", "run", "--task=loose-objects", "--quiet"], options.timeoutMs, options.signal)
   options.signal?.throwIfAborted()
   await git(["prune-packed", "--quiet"], options.timeoutMs, options.signal)
