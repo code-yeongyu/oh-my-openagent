@@ -4,8 +4,11 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { isWithin as isWithinPath } from "./guard-foreign-roots"
 import { isGrantedProjectMemoryRead } from "./project-memory-grants"
 import { TRANSIENT_DIRNAME, isDurableIdentityRoot } from "./transient-identity"
+
+const NODE_PATH = { isAbsolute, relative, resolve }
 
 // Structural mirror of the Senpi filesystem policy API (senpi branch feat/extension-fs-policy:
 // pi.registerFilesystemPolicy(policy), deny-wins composition across policies, deniedRoots
@@ -196,8 +199,7 @@ function uniquePaths(paths: readonly (string | undefined)[]): string[] {
 }
 
 function isWithin(root: string, target: string): boolean {
-  const rel = relative(root, target)
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
+  return isWithinPath(root, target, NODE_PATH)
 }
 
 function isMissingPathError(error: unknown): boolean {
