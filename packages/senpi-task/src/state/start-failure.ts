@@ -6,10 +6,14 @@ export const TASK_START_FAILURE_KINDS = [
   "session-create-failed",
   "depth-exceeded",
   "model_unavailable",
+  "usage_limit",
   "tools_unavailable",
   "session_unavailable",
   "host_unavailable",
   "model_chain_exhausted",
+  // omo#10487: the child ended its turn while its own async work was pending and that work never
+  // settled into an answer (abandoned, or no progress within the hold's bound).
+  "async_work_pending",
 ] as const
 
 export type TaskStartFailureKind = (typeof TASK_START_FAILURE_KINDS)[number]

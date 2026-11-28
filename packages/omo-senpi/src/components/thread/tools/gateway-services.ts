@@ -35,9 +35,18 @@ export type GatewayServices = {
  * A published owner is listed on its own socket only (`sendView`), so its session file is found on disk with no endpoint. When
  * that one socket was refused for its host's identity, the refusal belongs to the owner's thread: it is not offline.
  */
-function withOwnerRefusal(book: readonly AddressEntry[], current: ThreadHostView, address: string): readonly AddressEntry[] {
+function withOwnerRefusal(
+  book: readonly AddressEntry[],
+  current: ThreadHostView,
+  address: string,
+): readonly AddressEntry[] {
   const [owner, ...others] = current.hosts
-  if (owner === undefined || others.length > 0 || owner.reason !== "identity_unproven" || !(owner.error instanceof Error))
+  if (
+    owner === undefined ||
+    others.length > 0 ||
+    owner.reason !== "identity_unproven" ||
+    !(owner.error instanceof Error)
+  )
     return book
   const refusal = owner.error
   return book.map((entry) =>
