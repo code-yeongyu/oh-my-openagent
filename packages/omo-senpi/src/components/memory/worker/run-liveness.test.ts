@@ -112,4 +112,28 @@ describe("run process liveness across start-identity schemes", () => {
     // then
     expect(verdict).toBe(true)
   })
+
+  // #15362: a start an older reader recorded as local wall time (`ps-lstart:`) is judged against today's UTC reading by
+  // the zone bound: no real offset (UTC-12..UTC+14, 15-minute steps) proves reuse, a real one does not.
+  test.each([
+    ["no zone offset maps onto", "ps-lstart:Tue Sep 15 14:59:03 2026", "ps-lstart-utc:Wed Sep 16 14:59:03 2026", true],
+    [
+      "a real zone offset maps onto",
+      "ps-lstart:Tue Sep 15 23:59:03 2026",
+      "ps-lstart-utc:Tue Sep 15 14:59:03 2026",
+      false,
+    ],
+  ] as const)(
+    "#given a live pid whose legacy ps-lstart start %s the live start #when classified and probed #then reuse is proven only outside the zone bound",
+    async (_name, recorded, actual, reused) => {
+      // given
+      const seams = { getPidLiveness: alive, getProcessStartIdentity: async () => actual }
+
+      // when
+      const verdicts = [await classifyRunProcess(222, recorded, seams), await isLauncherDead(111, recorded, seams)]
+
+      // then
+      expect(verdicts).toEqual([reused ? "dead" : "alive", reused])
+    },
+  )
 })
