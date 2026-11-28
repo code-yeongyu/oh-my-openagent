@@ -1,7 +1,7 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { GitMemoryRepo, createLockRecord, runFinalizationLockPath, withLock } from "@oh-my-opencode/memory-core"
-import { loadOnboardingScanRuntime } from "../onboarding/scan-component"
+import { loadOnboardingScanRuntime } from "../onboarding/scan-runtime-loader"
 import { appliedFactsDir, withFactsWriterLock } from "./facts-batch-apply"
 import { ledgerTargets } from "./facts-failure-recording"
 import { finalizeClaimedFactsRun } from "./facts-run-finalize"
