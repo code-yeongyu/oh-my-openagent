@@ -51,6 +51,8 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
     ...input.lifecycle,
     config: settings,
     hostEndpoint: host.hostEndpoint,
+    // Every task host this session reaches is launched in its agent dir, where the host writes its launch key record.
+    ...(host.agentDir === undefined ? {} : { hostKeyRoot: host.agentDir }),
     // A cancel reads the daemon state of the generation a record names (omo#11765).
     ...(host.agentDir === undefined ? {} : { hostGenerationView: createHostGenerationView(host.agentDir) }),
     revivePolicy: {

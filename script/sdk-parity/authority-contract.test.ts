@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 
 import {
   BEHAVIOUR_CHANGES,
@@ -44,7 +42,6 @@ import {
   pinnedEngineExportsContract,
   sessionShapeProblems,
 } from "./engine-snapshot-check"
-import { REPO_ROOT } from "./registry"
 import {
   type AUTHORITY_ROOT_OPTIONS,
   calls,
@@ -170,11 +167,11 @@ describe("custody of slice P1a-s (#14949)", () => {
     expect<readonly string[]>([...AUTH_ACCOUNT_CHECK_CODES]).toEqual([...snapshot.check_codes])
   })
 
-  test("#given omo's engine pin #then it does not export the contract yet, or the snapshot is stale and must be replaced", () => {
-    const manifest = JSON.parse(readFileSync(join(REPO_ROOT, "node_modules/@code-yeongyu/senpi/package.json"), "utf8"))
+  test("#given omo's engine pin #then it does not export the contract yet, or the snapshot is stale and must be replaced", async () => {
+    const engineExports = await import("@code-yeongyu/senpi/engine")
     // The engine pin's pull request owns the swap: delete the snapshot and import the engine's contract.
     expect({
-      exportsContract: pinnedEngineExportsContract(manifest.exports ?? {}),
+      exportsContract: pinnedEngineExportsContract(engineExports),
       why: AWAITING_ENGINE_PIN.why,
     }).toEqual({
       exportsContract: false,
