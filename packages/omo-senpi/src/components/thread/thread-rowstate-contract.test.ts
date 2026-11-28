@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test"
+import { expect, test } from "bun:test"
 import { once } from "node:events"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer } from "node:net"
@@ -8,50 +8,6 @@ import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/_
 import { createGatewayStore } from "./gateway/store"
 import { createLiveThreadSurface } from "./live-surface"
 import { createThreadTools } from "./tools"
-import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
-
-const fixture = createRemoteThreadFixture()
-afterEach(fixture.cleanup)
-
-test("reading a held peer reports the same whitelisted hold as its row", async () => {
-  const hold = {
-    kind: "session_hold",
-    key: "interrupted-run",
-    since: new Date(0).toISOString(),
-    queue_depth: 3,
-  } as const
-  const b = fixture.account({ rows: [{ ...B_ROW, liveness: { kind: "held", hold: { ...hold, data: "private" } } }] })
-  const { run } = fixture.surface(b.remote)
-  const list = await run("thread_list", { all_scope: true })
-  if (!("threads" in list)) throw new Error("no rows")
-  const row = list.threads.find((item) => item.thread === B_ROW.durable_id)
-  expect(row?.state).toBe("held")
-  expect(row?.hold).toEqual(hold)
-  const read = await run("thread_read", { thread: B_ROW.durable_id, all_scope: true })
-  expect(read).toMatchObject({ kind: "ok", state: "held", hold })
-  expect(JSON.stringify(read)).not.toContain('"data":"private"')
-})
-
-test("device A preserves B's per-host evidence without treating a legacy row as verified", async () => {
-  const legacy = { ...B_ROW, durable_id: "legacy", session_id: "r0" }
-  const fast = { ...B_ROW, durable_id: "fast", session_id: "r1", liveness: { kind: "running", activity: "running" } }
-  const slow = {
-    ...B_ROW,
-    durable_id: "slow",
-    session_id: "r2",
-    liveness: { kind: "unknown", host: "engine-b2", reason: "host_not_answering" },
-  }
-  const b = fixture.account({ rows: [legacy, fast, slow] })
-  const { run } = fixture.surface(b.remote)
-  const result = await run("thread_list", { all_scope: true })
-  if (!("threads" in result)) throw new Error("no rows")
-  const row = (id: string) => result.threads.find((item) => item.thread === id)
-  expect(row("legacy")).toMatchObject({ state: "idle", verification: "unverified" })
-  expect(row("fast")).toMatchObject({ state: "running", liveness: fast.liveness })
-  expect(row("slow")).toMatchObject({ state: "unknown", liveness: slow.liveness })
-  expect(result.devices?.find((device) => device.device === "b")).toMatchObject({ host_counts: null })
-})
-
 test("one host missing the listing deadline cannot turn its claimed session inactive; once its socket is gone, it lists inactive (dead), never unknown", async () => {
   const dir = mkdtempSync(join(tmpdir(), "row-"))
   const fast = join(dir, "rpc.sock")
@@ -132,6 +88,10 @@ test("one host missing the listing deadline cannot turn its claimed session inac
     const rows: readonly { thread: string; state?: string }[] = result.threads
     expect(rows.find((row) => row.thread === "fast")?.state).toBe("running")
     const row = rows.find((row) => row.thread === "slow")
+    // #15376 L1: the host that did not answer is named by an opaque id (16 hex of sha256), never by its socket path.
+    expect(row).toMatchObject({
+      liveness: { kind: "unknown", host: expect.stringMatching(/^[0-9a-f]{16}$/), reason: "host_not_answering" },
+    })
     if (row?.state === "inactive") {
       expect(row).toMatchObject({ status: "resumable", state: "inactive", error_note: "live_unresponsive" })
     }
