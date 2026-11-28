@@ -13,7 +13,8 @@ export function assistantEnd(text: string): ChildSessionEvent & { readonly text:
  * A session that behaves like senpi's AgentSession for omo#10487: `prompt()` resolves when the turn
  * ends, `lifecycle` reports the work the session still owns, and that work's completion starts a new
  * engine turn on its own. Like the engine's `dispose()` (agent aborted, listeners dropped), a disposed
- * session starts no turn when its work finishes.
+ * session starts no turn when its work finishes. Like the engine's `abort()`, an abort ends the turn that
+ * is running: `prompt()` resolves, and a turn the engine started itself emits its `agent_end`.
  */
 export function heldWorkSession(sessionId = "child-10487") {
   const listeners = new Set<ChildSessionListener>()
@@ -22,6 +23,7 @@ export function heldWorkSession(sessionId = "child-10487") {
   let endPrompt: (() => void) | undefined
   let disposed = false
   let agentStarts = 0
+  let engineTurnOpen = false
   let disposedSignal: () => void = () => undefined
   const whenDisposed = new Promise<void>((resolve) => {
     disposedSignal = resolve
@@ -45,7 +47,12 @@ export function heldWorkSession(sessionId = "child-10487") {
       }),
     steer: async () => "handled",
     followUp: async () => "handled",
-    abort: async () => {},
+    abort: async () => {
+      endPrompt?.()
+      if (!engineTurnOpen) return
+      engineTurnOpen = false
+      emit({ type: "agent_end" })
+    },
     subscribe: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -72,11 +79,14 @@ export function heldWorkSession(sessionId = "child-10487") {
     },
     finishWork: () => {
       waits = undefined
-      if (!disposed) emit({ type: "agent_start" })
+      if (disposed) return
+      engineTurnOpen = true
+      emit({ type: "agent_start" })
     },
     answer: (text: string, pendingAfter?: unknown) => {
       waits = pendingAfter
       emit(assistantEnd(text))
+      engineTurnOpen = false
       emit({ type: "agent_end" })
     },
   }

@@ -91,7 +91,6 @@ class ScriptedRunner implements ManagedRunner {
     readonly emit: (event: ManagedChildEvent) => void
     readonly listenerCount: () => number
     readonly settle: (output: string) => void
-    readonly disposed: Promise<void>
     readonly fail: (message: string) => void
   }> = []
   readonly #signals = new Map<number, ReturnType<typeof deferred<void>>>()
@@ -105,7 +104,6 @@ class ScriptedRunner implements ManagedRunner {
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const outcome = deferred<RunnerOutcome>()
-    const disposed = deferred<void>()
     const listeners = new Set<(event: ManagedChildEvent) => void>()
     const handle: ManagedChildHandle = {
       task_id: spec.taskId,
@@ -116,11 +114,7 @@ class ScriptedRunner implements ManagedRunner {
       abort: () => {
         this.abortCalls += 1
         outcome.resolve({ status: "cancelled" })
-        if (this.#abortError !== undefined)
-          queueMicrotask(() => {
-            void Promise.reject(this.#abortError)
-          })
-        return Promise.resolve()
+        return this.#abortError === undefined ? Promise.resolve() : Promise.reject(this.#abortError)
       },
       subscribe: (listener) => {
         listeners.add(listener)
@@ -130,7 +124,6 @@ class ScriptedRunner implements ManagedRunner {
       lastAssistantText: () => undefined,
       dispose: () => {
         this.disposeCalls += 1
-        disposed.resolve()
         return Promise.resolve()
       },
     }
@@ -141,7 +134,6 @@ class ScriptedRunner implements ManagedRunner {
       },
       listenerCount: () => listeners.size,
       settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
-      disposed: disposed.promise,
       fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
     })
     this.#signals.get(this.handles.length)?.resolve()
@@ -704,7 +696,7 @@ describe("assembled DAG runtime", () => {
   )
 
   test(
-    "#given a live-shaped in-process child whose abort rejects #when the assembled runtime cancels #then no unhandled rejection escapes and a later run still completes",
+    "#given a live-shaped in-process child whose abort rejects #when the assembled runtime cancels #then the child is aborted and disposed in that cancel, no unhandled rejection escapes and a later run still completes (#15191)",
     async () => {
       useTestTimeout(TEST_BUDGET_MS)
       // given
@@ -803,16 +795,11 @@ describe("assembled DAG runtime", () => {
 
           // then
           expect(cancelled.status).toBe("cancelled")
-          expect(runner.abortCalls).toBe(0)
-          expect(runner.disposeCalls).toBe(0)
+          expect(runner.abortCalls).toBe(1)
+          expect(runner.disposeCalls).toBe(1)
           expect(survived.status).toBe("completed")
           expect(survived.nodes.survivor).toEqual(expect.objectContaining({ output: "runtime survived" }))
           expect(unhandled).toEqual([])
-          runner.handles[0]?.settle("cancelled child reached its natural boundary")
-          const disposed = runner.handles[0]?.disposed
-          if (disposed === undefined) throw new Error("cancelled child handle was not retained")
-          await within(disposed, remainingTestTime(), "cancelled child dispose")
-          expect(runner.disposeCalls).toBe(1)
         } finally {
           runtime.dispose()
           disposeEngines()

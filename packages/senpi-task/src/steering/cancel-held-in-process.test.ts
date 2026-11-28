@@ -102,7 +102,7 @@ describe("cancel of an in-process child whose turn is held on its own work (#104
     expect(outcome).toMatchObject({ kind: "cancelled", task_id: TASK })
     expect(h.settled()).toEqual({ status: "cancelled" })
     await bounded(h.whenDestroyed)
-    expect(h.destroyed).toEqual([`${TASK}:cancel_without_abort`])
+    expect(h.destroyed).toEqual([`${TASK}:cancel`])
     expect(h.session.disposed()).toBe(true)
     expect(h.scheduler.pending()).toBe(0)
     h.session.finishWork()
@@ -129,13 +129,13 @@ describe("cancel of an in-process child whose turn is held on its own work (#104
     expect(outcome).toMatchObject({ kind: "cancelled", task_id: TASK })
     expect(h.settled()).toEqual({ status: "cancelled" })
     await bounded(h.whenDestroyed)
-    expect(h.destroyed).toEqual([`${TASK}:cancel_without_abort`])
+    expect(h.destroyed).toEqual([`${TASK}:cancel`])
     expect(h.session.disposed()).toBe(true)
     expect(h.scheduler.pending()).toBe(0)
     h.dispose()
   })
 
-  test("#given a held turn whose wake turn is running #when cancelled with the abort skipped #then that turn reaches its end, no second hold is taken and the session is destroyed after it", async () => {
+  test("#given a held turn whose wake turn is running #when cancelled with the abort skipped #then that turn is aborted, the session is destroyed in the same call and no later answer changes the record", async () => {
     // given
     const h = heldChild()
     h.session.endTurnWithDetachedCell()
@@ -147,22 +147,13 @@ describe("cancel of an in-process child whose turn is held on its own work (#104
     const outcome = await h.engine.cancelTask(TASK, "stop the run", { abort: "skip" })
     await flushSettlement()
 
-    // then - the running wake turn keeps the deferred teardown
-    expect(outcome).toMatchObject({ kind: "cancelled", task_id: TASK })
-    expect(h.settled()).toBeUndefined()
-    expect(h.destroyed).toEqual([])
-    expect(h.aborts()).toBe(0)
-
-    // when - that turn ends leaving work pending again
-    h.session.answer(FINAL_RESULT, DETACHED_CELL_WAITS)
-    await flushSettlement()
-
     // then
+    expect(outcome).toMatchObject({ kind: "cancelled", task_id: TASK })
+    expect(h.aborts()).toBe(1)
+    expect(h.destroyed).toEqual([`${TASK}:cancel`])
+    expect(h.session.disposed()).toBe(true)
     expect(h.settled()).toEqual({ status: "cancelled" })
     expect(h.scheduler.pending()).toBe(0)
-    await bounded(h.whenDestroyed)
-    expect(h.destroyed).toEqual([`${TASK}:cancel_without_abort`])
-    expect(h.session.disposed()).toBe(true)
     expect(h.store.load(TASK)?.status).toBe("cancelled")
     expect(h.store.load(TASK)?.final_response).toBeUndefined()
     h.session.finishWork()
@@ -190,7 +181,7 @@ describe("cancel of an in-process child whose turn is held on its own work (#104
     h.dispose()
   })
 
-  test("#given an active turn that holds nothing #when cancelled with the abort skipped #then the turn is not aborted and the session is destroyed only at its end", async () => {
+  test("#given an active turn that holds nothing #when cancelled with the abort skipped #then the turn is aborted and the session is destroyed in the same call (#15191)", async () => {
     // given - the prompted turn is still running
     const h = heldChild()
     h.session.setWaits(undefined)
@@ -201,18 +192,10 @@ describe("cancel of an in-process child whose turn is held on its own work (#104
 
     // then
     expect(outcome).toMatchObject({ kind: "cancelled", task_id: TASK })
-    expect(h.aborts()).toBe(0)
-    expect(h.destroyed).toEqual([])
-    expect(h.session.disposed()).toBe(false)
-
-    // when - the turn reaches its natural end
-    h.session.endTurnWithDetachedCell()
-    await bounded(h.whenDestroyed)
-
-    // then
-    expect(h.settled()?.status).toBe("completed")
-    expect(h.destroyed).toEqual([`${TASK}:cancel_without_abort`])
+    expect(h.aborts()).toBe(1)
+    expect(h.destroyed).toEqual([`${TASK}:cancel`])
     expect(h.session.disposed()).toBe(true)
+    expect(h.settled()).toEqual({ status: "cancelled" })
     expect(h.store.load(TASK)?.status).toBe("cancelled")
     h.dispose()
   })

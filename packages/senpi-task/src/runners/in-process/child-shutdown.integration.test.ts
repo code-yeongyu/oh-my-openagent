@@ -5,6 +5,7 @@ import type { ExtensionAPI, ExtensionError } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { InProcessRunner } from "../in-process"
+import { runFixtureScript, type BoundedRun } from "./__fixtures__/bounded-run"
 import {
   acceptsConnections,
   createBuiltinChildMachine,
@@ -47,8 +48,6 @@ async function stillOpen(ports: readonly number[]): Promise<number[]> {
   return open.flat()
 }
 
-type PrintRun = { readonly exit: number | "still running"; readonly stdout: string; readonly stderr: string }
-
 type BridgeRun = {
   readonly bridges: number
   readonly stillListening: number
@@ -59,26 +58,13 @@ type BridgeRun = {
 // AC1/AC3 run in a fresh process: a shared test process can already hold module state from other
 // files (an earlier codemode load), which hides the bridge from a listen hook armed later.
 async function bridgeRun(scenario: "ac1" | "ac3"): Promise<BridgeRun> {
-  const run = await spawnBounded(BRIDGE_RUN, scenario)
+  const run = await runFixtureScript(BRIDGE_RUN, scenario, PRINT_RUN_BOUND_MS)
   if (run.exit !== 0) throw new Error(`bridge run ${scenario} did not exit cleanly (${run.exit}): ${run.stderr}`)
   return JSON.parse(run.stdout) as BridgeRun
 }
 
-async function printRun(turn: "succeeds" | "fails"): Promise<PrintRun> {
-  return spawnBounded(PRINT_RUN, turn)
-}
-
-async function spawnBounded(script: string, arg: string): Promise<PrintRun> {
-  const child = Bun.spawn([process.execPath, script, arg], { stdout: "pipe", stderr: "pipe" })
-  let watchdog: ReturnType<typeof setTimeout> | undefined
-  const bound = new Promise<"still running">((resolve) => {
-    watchdog = setTimeout(() => resolve("still running"), PRINT_RUN_BOUND_MS)
-  })
-  const exit = await Promise.race([child.exited, bound])
-  clearTimeout(watchdog)
-  if (exit === "still running") child.kill("SIGKILL")
-  const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
-  return { exit, stdout, stderr }
+function printRun(turn: "succeeds" | "fails"): Promise<BoundedRun> {
+  return runFixtureScript(PRINT_RUN, turn, PRINT_RUN_BOUND_MS)
 }
 
 describe("in-process child teardown shuts down its extensions (#9413)", () => {
