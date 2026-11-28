@@ -28,6 +28,18 @@ export async function handleDispatchedParentWakeWindowElapsed(input: ParentWakeW
     return
   }
 
+  // A noReply notice never produces output; once it is recorded in the parent it has been delivered.
+  if (
+    !input.wake.shouldReply &&
+    (await input.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(input.sessionID, input.wake))
+  ) {
+    input.dispatchedTracker.clearWake(input.sessionID)
+    log("[background-agent] Cleared dispatched noReply parent wake once its notice was recorded:", {
+      sessionID: input.sessionID,
+    })
+    return
+  }
+
   const retryCount = input.wake.noAssistantOutputRetryCount ?? 0
   if (retryCount >= MAX_NO_ASSISTANT_OUTPUT_RETRIES) {
     input.dispatchedTracker.clearWake(input.sessionID)

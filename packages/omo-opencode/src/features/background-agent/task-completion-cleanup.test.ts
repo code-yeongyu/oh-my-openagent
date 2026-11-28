@@ -24,7 +24,7 @@ type SessionMessageForTest = {
     finish?: string
     time?: { created?: number }
   }
-  parts?: Array<{ type?: string; state?: { status?: string } }>
+  parts?: Array<{ type?: string; text?: string; state?: { status?: string } }>
 }
 
 type FakeTimers = {
@@ -460,7 +460,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(promptAsyncCalls).toHaveLength(0)
     })
 
-    test("#when partial completion arrives while parent session is busy #then notification waits until idle without waking a reply", async () => {
+    test("#when a wake none task finishes while parent session is busy #then its notice waits until idle without waking a reply", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "busy" },
@@ -469,6 +469,51 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       managerUnderTest = manager
       const taskA = createTask({
         id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+        wake: "none",
+      })
+      const taskB = createTask({ id: "task-b", parentSessionId: "parent-1", description: "task B", status: "running" })
+      getTasks(manager).set(taskA.id, taskA)
+      getTasks(manager).set(taskB.id, taskB)
+      getPendingByParent(manager).set(taskA.parentSessionId, new Set([taskA.id, taskB.id]))
+
+      // when
+      await notifyParentSessionForTest(manager, taskA)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+
+      // when
+      sessionStatuses["parent-1"] = { type: "idle" }
+      manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
+      await waitForDeferredWake(manager, promptAsyncCalls)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
+      expect(notificationPayload).toContain("BACKGROUND TASK COMPLETED")
+      expect(notificationPayload).not.toContain("ALL BACKGROUND TASKS COMPLETE")
+    })
+
+    test("#when a wake each task finishes while siblings still run #then its notice wakes a reply once the parent is idle", async () => {
+      // given
+      const sessionStatuses: Record<string, { type: string }> = {
+        "parent-1": { type: "busy" },
+      }
+      const { manager, promptAsyncCalls } = createManager(true, sessionStatuses, undefined, [
+        {
+          info: { role: "assistant", finish: "stop", time: { created: 1 } },
+          parts: [{ type: "text", text: "A's final answer" }],
+        },
+      ])
+      managerUnderTest = manager
+      const taskA = createTask({
+        id: "task-a",
+        sessionId: "ses-a",
         parentSessionId: "parent-1",
         description: "task A",
         status: "completed",
@@ -492,9 +537,10 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
-      expect(notificationPayload).toContain("BACKGROUND TASK RESULT READY")
+      expect(notificationPayload).toContain("<task-id>task-a</task-id>")
+      expect(notificationPayload).toContain("A's final answer")
       expect(notificationPayload).not.toContain("ALL BACKGROUND TASKS COMPLETE")
     })
 
