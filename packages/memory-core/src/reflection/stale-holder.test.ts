@@ -54,6 +54,12 @@ describe("reflection lock holder decision (#10377)", () => {
       "ps-lstart:Tue Sep 15 23:59:03 2026",
       "ps-lstart-utc:Tue Sep 15 14:59:03 2026",
     ],
+    [
+      "names, in another scheme (#8304), the same instant as",
+      "live",
+      "ps-lstart:Tue Sep 15 15:00:00 2026",
+      "proc-start-epoch:1789452000",
+    ],
   ] as const)(
     "#given a live launcher whose legacy ps-lstart start %s its live start #when the holder is classified #then it is %s",
     async (_name, state, recorded, actual) => {

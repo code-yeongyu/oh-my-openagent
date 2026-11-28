@@ -57,6 +57,12 @@ describe("recorded process classifiers (DESIGN.r2 4.3, C20-C22 controls)", () =>
       "ps-lstart:Tue Sep 15 23:59:03 2026",
       "ps-lstart-utc:Tue Sep 15 14:59:03 2026",
     ],
+    [
+      "names, in another scheme (#8304), the same instant as",
+      "alive",
+      "ps-lstart:Tue Sep 15 15:00:00 2026",
+      "proc-start-epoch:1789452000",
+    ],
   ] as const)(
     "#given a legacy ps-lstart start that %s the live start #when classified #then both classifiers read it as %s",
     async (_name, expected, recorded, actual) => {

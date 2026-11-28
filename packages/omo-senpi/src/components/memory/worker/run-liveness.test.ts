@@ -123,6 +123,12 @@ describe("run process liveness across start-identity schemes", () => {
       "ps-lstart-utc:Tue Sep 15 14:59:03 2026",
       false,
     ],
+    [
+      "names, in another scheme (#8304), the same instant as",
+      "ps-lstart:Tue Sep 15 15:00:00 2026",
+      "proc-start-epoch:1789452000",
+      false,
+    ],
   ] as const)(
     "#given a live pid whose legacy ps-lstart start %s the live start #when classified and probed #then reuse is proven only outside the zone bound",
     async (_name, recorded, actual, reused) => {
