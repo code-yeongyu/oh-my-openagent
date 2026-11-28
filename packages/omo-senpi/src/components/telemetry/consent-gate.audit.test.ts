@@ -51,7 +51,7 @@ export function sourceName(root: string, path: string, paths: PathApi = { relati
   return paths.relative(root, path).split(paths.sep).join("/")
 }
 
-export function telemetrySources(root: string): readonly SourceFile[] {
+export function telemetrySources(root: string, paths: PathApi = { relative, sep }): readonly SourceFile[] {
   const walk = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
       entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)],
@@ -59,7 +59,7 @@ export function telemetrySources(root: string): readonly SourceFile[] {
   return walk(root)
     .filter((path) => path.endsWith(".ts") && !path.includes(".test.") && !path.includes("test-support"))
     .sort()
-    .map((path) => ({ name: sourceName(root, path), source: readFileSync(path, "utf8") }))
+    .map((path) => ({ name: sourceName(root, path, paths), source: readFileSync(path, "utf8") }))
 }
 
 const realSources = (): readonly SourceFile[] => telemetrySources(import.meta.dir)
@@ -165,6 +165,19 @@ describe("telemetry consent gate audit", () => {
     ["posix", posix, "/repo/src", "/repo/src/components/telemetry/index.ts"],
   ])("#given a %s source path #when it is named #then the name uses forward slashes", (_label, paths, root, path) => {
     expect(sourceName(root, path, paths)).toBe("components/telemetry/index.ts")
+  })
+
+  test("#given a win32 path api #when a scanned file has a backslash in its name #then the collected name still uses forward slashes", () => {
+    const root = mkdtempSync(join(tmpdir(), "consent-gate-win32-"))
+    try {
+      mkdirSync(join(root, "components"))
+      writeFileSync(join(root, "components", "plain.ts"), "export const plain = 1\n")
+      writeFileSync(join(root, "components", "writer\\name.ts"), "export const writer = 2\n")
+      const names = telemetrySources(root, { relative: win32.relative, sep: win32.sep }).map((file) => file.name)
+      expect(names).toEqual(["components/plain.ts", "components/writer/name.ts"])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   test("#given a reviewed entry with no site or no reason #when the audit runs #then both are reported", () => {
