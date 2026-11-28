@@ -78,7 +78,8 @@ function secretKeys(value: unknown, path = "$"): string[] {
   if (typeof value === "string") return SECRETS.some((secret) => value.includes(secret)) ? [path] : []
   if (typeof value !== "object" || value === null) return []
   return Object.entries(value).flatMap(([key, child]) => [
-    ...(/token|secret|privateKey/i.test(key) ? [`${path}.${key}`] : []),
+    // A number is a count (the engine's reserveTokens / keepRecentTokens budgets), never a credential.
+    ...(/token|secret|privateKey/i.test(key) && typeof child !== "number" ? [`${path}.${key}`] : []),
     ...secretKeys(child, `${path}.${key}`),
   ])
 }
@@ -380,4 +381,109 @@ describe("config.status", () => {
         path: false,
       })
     })
+
+  // The same contract over the reads added beside status (explain, check, modelSwaps, status's routing and engine):
+  // each body also fills both engine settings files and the calling session's record.
+  for (const [label, body] of VARIANTS)
+    test(`#given ${label} in every config file and the session record #when every config read runs #then no answer carries a canary or a path`, async () => {
+      const base = mkdtempSync(join(tmpdir(), "omo-sdk-config-reads-"))
+      homes.push(base)
+      const home = join(base, "home")
+      const project = join(base, "project")
+      const agentDir = join(home, ".omo", "agent")
+      for (const dir of [agentDir, join(project, ".omo")]) mkdirSync(dir, { recursive: true })
+      for (const file of [
+        join(home, ".omo", "omo.jsonc"),
+        join(project, ".omo", "omo.jsonc"),
+        join(agentDir, "settings.json"),
+        join(project, ".omo", "settings.json"),
+        join(base, "session.jsonl"),
+      ])
+        writeFileSync(file, body)
+      const env = { HOME: home, OMO_CODING_AGENT_DIR: agentDir, PI_SESSION_FILE: join(base, "session.jsonl") }
+      const answers = await everyConfigRead(
+        createOmoSdk({ env, cwd: project }).config,
+        join(base, "CANARY-PATH-18.jsonl"),
+      )
+      expect(answers.filter(([, answer]) => "threw" in answer)).toEqual([])
+      expect(leaks(answers, base)).toEqual({ canaries: [], path: false })
+    })
+
+  test("#given secret-looking values under allowlisted paths #when they are explained and status runs #then the values are withheld", async () => {
+    const base = mkdtempSync(join(tmpdir(), "omo-sdk-config-shape-"))
+    homes.push(base)
+    mkdirSync(join(base, ".omo"))
+    writeFileSync(
+      join(base, ".omo", "omo.jsonc"),
+      JSON.stringify({
+        categories: { quick: { model: "sk-ant-api03-CANARYCANARYCANARYCANARYCANARY", variant: "Bearer CANARY" } },
+        agents: { explore: { models: ["CANARYCANARYCANARYCANARYCANARY"] } },
+      }),
+    )
+    const config = createOmoSdk({ env: { HOME: base }, cwd: base }).config
+    for (const path of ["categories.quick.model", "categories.quick.variant", "agents.explore.models"])
+      expect(valueOf(await config.explain({ path }))).toMatchObject({ set: true, value_withheld: true, source: "user" })
+    const answers = [
+      await config.explain({ path: "categories.quick.model" }),
+      await config.explain({ path: "agents.explore.models" }),
+      await config.status(),
+      await config.check(),
+    ]
+    expect(JSON.stringify(answers)).not.toContain("CANARY")
+  })
+
+  test("#given secrets under allowlisted-looking keys #when they are explained or edited #then each answers path_not_allowed and no canary appears", async () => {
+    const base = mkdtempSync(join(tmpdir(), "omo-sdk-config-keys-"))
+    homes.push(base)
+    mkdirSync(join(base, ".omo"))
+    writeFileSync(
+      join(base, ".omo", "omo.jsonc"),
+      JSON.stringify({
+        categories: { quick: { apiKey: "CANARY-SECRET-1", prompt_append: "CANARY-SECRET-2" } },
+        agents: { explore: { model_token: "CANARY-SECRET-3" } },
+      }),
+    )
+    const config = createOmoSdk({ env: { HOME: base }, cwd: base }).config
+    const paths = ["categories.quick.apiKey", "agents.explore.model_token", "categories.quick.prompt_append"]
+    const explained = await Promise.all(paths.map((path) => config.explain({ path })))
+    expect(explained.map((answer) => errorOf(answer).code)).toEqual(Array(3).fill("path_not_allowed"))
+    const edited = await config.check({ edits: [{ path: "categories.quick.apiKey", value: "CANARY-SECRET-4" }] })
+    expect(errorOf(edited).code).toBe("path_not_allowed")
+    const text = JSON.stringify([...explained, edited, await config.status(), await config.check()])
+    expect(text.match(/CANARY-SECRET-\d/g) ?? []).toEqual([])
+  })
 })
+
+type ConfigReads = ReturnType<typeof createOmoSdk>["config"]
+
+/** Every config read, each answer or thrown message by label; the SDK contract is that none throws. */
+async function everyConfigRead(config: ConfigReads, missingSession: string) {
+  const calls: readonly (readonly [string, () => Promise<unknown>])[] = [
+    ["status", () => config.status()],
+    ["explain routing", () => config.explain({ path: "categories.quick.model" })],
+    ["explain models", () => config.explain({ path: "agents.build.models" })],
+    ["explain engine", () => config.explain({ path: "engine:compaction.enabled" })],
+    ["explain chain", () => config.explain({ path: "engine:retry.fallbackChains.claude-opus-5-5" })],
+    ["explain unknown", () => config.explain({ path: "agents.zz-nobody.model" })],
+    ["explain refused", () => config.explain({ path: "providers.x.apiKey" })],
+    ["check", () => config.check()],
+    ["check edits", () => config.check({ edits: [{ path: "categories.quick.model", value: "openai/gpt-5.5" }] })],
+    ["check engine edit", () => config.check({ edits: [{ path: "engine:compaction.enabled", value: false }] })],
+    ["modelSwaps", () => config.modelSwaps()],
+    ["modelSwaps missing", () => config.modelSwaps({ session: missingSession })],
+  ]
+  const answers: (readonly [string, object])[] = []
+  for (const [label, call] of calls) {
+    try {
+      answers.push([label, { answer: await call() }])
+    } catch (error) {
+      answers.push([label, { threw: error instanceof Error ? error.message : String(error) }])
+    }
+  }
+  return answers
+}
+
+function leaks(answers: unknown, base: string) {
+  const text = JSON.stringify(answers)
+  return { canaries: text.match(/CANARY-[A-Z]+-\d+/g) ?? [], path: text.includes(base) }
+}
