@@ -24,4 +24,11 @@ mod test_support;
 pub use backend::WaylandBackend;
 pub use stop_path::{GlobalShortcutsListener, STOP_SHORTCUT_ID, UNAVAILABLE as STOP_PATH_UNAVAILABLE};
 
+/// Whether the session bus offers the RemoteDesktop portal: backend
+/// selection keeps this backend's portal-mediated input whenever it does,
+/// and takes a wlroots compositor's native tools only when it does not.
+pub fn remote_desktop_portal_offered() -> bool {
+    crate::portal::portal_runtime().is_ok_and(crate::portal::remote_desktop::is_offered)
+}
+
 pub const BACKEND_NAME: &str = env!("CARGO_PKG_NAME");

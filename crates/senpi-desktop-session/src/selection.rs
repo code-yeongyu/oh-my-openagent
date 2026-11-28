@@ -117,13 +117,35 @@ fn linux_display_server(is_set: impl Fn(&str) -> bool) -> Option<LinuxDisplaySer
     }
 }
 
+/// Whether a Wayland session takes the wlroots backend instead of the
+/// portal backend: a live sway IPC socket and no RemoteDesktop portal (the
+/// portal-mediated libei input path exists only then, and stays preferable
+/// when it does).
+#[cfg(target_os = "linux")]
+fn takes_wlroots(sway_socket: Option<std::path::PathBuf>, remote_desktop_offered: bool) -> bool {
+    sway_socket.is_some() && !remote_desktop_offered
+}
+
+#[cfg(target_os = "linux")]
+fn platform_prefers_wlroots() -> bool {
+    takes_wlroots(
+        senpi_desktop_backend_wlroots::sway_socket_path(&|name| std::env::var_os(name)),
+        senpi_desktop_backend_wayland::remote_desktop_portal_offered(),
+    )
+}
+
 #[cfg(target_os = "linux")]
 fn platform_backend(options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
     let selector = DisplaySelector::parse(options.display.clone());
     match linux_display_server(|name| std::env::var_os(name).is_some()) {
         Some(LinuxDisplayServer::Wayland) => {
-            let backend = senpi_desktop_backend_wayland::WaylandBackend::new(selector);
-            Ok(Box::new(backend))
+            if platform_prefers_wlroots() {
+                let backend = senpi_desktop_backend_wlroots::WlrootsBackend::new(selector)?;
+                Ok(Box::new(backend))
+            } else {
+                let backend = senpi_desktop_backend_wayland::WaylandBackend::new(selector);
+                Ok(Box::new(backend))
+            }
         }
         Some(LinuxDisplayServer::X11) => {
             let backend = senpi_desktop_backend_x11::X11Backend::new(selector)?;
@@ -197,6 +219,20 @@ mod tests {
                 None,
             ]
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn wlroots_needs_a_live_sway_socket_and_no_remote_desktop_portal() {
+        let sway = Some(std::path::PathBuf::from("/run/sway.sock"));
+
+        let picks = [
+            takes_wlroots(sway.clone(), true),
+            takes_wlroots(sway, false),
+            takes_wlroots(None, false),
+        ];
+
+        assert_eq!(picks, [false, true, false]);
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]

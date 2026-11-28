@@ -97,6 +97,14 @@ OmO picks the backend from the session: `WAYLAND_DISPLAY` wins over `DISPLAY` (a
 
   `gnome-extensions disable senpi-desktop-window-rects@omo.dev` turns it off again. OmO checks for the extension once per computer-use session, so enabling or disabling it takes effect in the next session: a new session then reports `gnome_extension_missing` in `windowInput` and refuses window pointer input as before.
 - **Stop chord on Wayland:** the global stop chord needs a compositor with the GlobalShortcuts portal. Without it, input is refused with `StopPathUnavailable` unless you opt into `allow_host_relay_only_stop`.
+- **Sway and other wlroots compositors:** when `SWAYSOCK` names a live IPC socket and the session bus offers no RemoteDesktop portal, the engine takes a wlroots backend instead of the portal path: capture through `grim` (wlr-screencopy), windows and displays from the sway tree, keyboard input through `wtype` (the virtual-keyboard protocol), pointer input through a direct `zwlr_virtual_pointer_v1` client, and `raise()` focuses the container through `swaymsg '[con_id=N] focus'`. Install the `grim` and `wtype` packages. wtype cannot press the plain Alt (Mod1) modifier, so chords naming Alt are refused with `InvalidKey`. Bounded key and button holds are unavailable on this backend; clicks, drags and scrolls still work, but modifier clicks and drags are refused (wtype holds a modifier only within its own process). Window-targeted input needs foreground delivery, which focuses the window first under the control grant; a background request against a window is refused rather than posted to your focused surface.
+- **Stop chord on sway:** sway has no GlobalShortcuts portal, so the engine's global stop path subscribes to sway binding events instead. sway only emits a binding event for bindings your config declares, so add one line matching the stop chord (the default is `ctrl+alt+shift+escape`):
+
+  ```sway
+  bindsym Ctrl+Alt+Shift+Escape exec true
+  ```
+
+  Pressing that binding suspends computer input exactly like the portal chord does on GNOME. Without a matching binding the subscription is live and heartbeats, but nothing fires the stop: add the line before relying on the chord.
 
 ### Windows
 

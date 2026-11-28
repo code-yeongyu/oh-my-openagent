@@ -29,6 +29,7 @@ senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 senpi-desktop-backend-wayland = { path = "../senpi-desktop-backend-wayland" }
+senpi-desktop-backend-wlroots = { path = "../senpi-desktop-backend-wlroots" }
 senpi-desktop-backend-x11 = { path = "../senpi-desktop-backend-x11" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
