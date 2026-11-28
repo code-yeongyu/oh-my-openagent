@@ -49,6 +49,8 @@ export interface MonitorManagerDeps {
 export interface MonitorManagerOptions {
   pluginContext: Pick<PluginInput, "client" | "directory">
   config?: Partial<MonitorConfig>
+  /** `background_task.busyParentWakeDelayMs`: how long a batch for a busy parent waits before it goes into the running turn. */
+  busyParentWakeDelayMs?: number
   deps?: MonitorManagerDeps
 }
 

@@ -312,6 +312,9 @@ export class BackgroundManager {
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
         parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
+        ...(this.config?.busyParentWakeDelayMs !== undefined
+          ? { busyParentWakeDelayMs: this.config.busyParentWakeDelayMs }
+          : {}),
       },
     )
     this.registerProcessCleanup()

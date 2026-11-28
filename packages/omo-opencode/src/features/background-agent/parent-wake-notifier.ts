@@ -56,6 +56,7 @@ export class ParentWakeNotifier {
       pendingQueue: this.pendingQueue,
       dispatchedTracker: this.dispatchedTracker,
       sessionInspector: this.sessionInspector,
+      ...(options.busyParentWakeDelayMs !== undefined ? { busyParentWakeDelayMs: options.busyParentWakeDelayMs } : {}),
     })
   }
 
