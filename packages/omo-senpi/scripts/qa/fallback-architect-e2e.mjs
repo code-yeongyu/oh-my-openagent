@@ -7,8 +7,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { homedir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { createHash } from "node:crypto"
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { fileFingerprint } from "./isolation-state.mjs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -254,7 +254,7 @@ function fileDigests(agentDir) {
   const digests = {}
   for (const name of [...CREDENTIAL_FILES, ...LIVE_SESSION_FILES]) {
     const path = join(agentDir, name)
-    digests[name] = existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : "absent"
+    digests[name] = fileFingerprint(path)
   }
   return digests
 }
