@@ -15,10 +15,10 @@ import {
 } from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
-import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
 import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
 import { classifyResumeFailure, failure, hostRefusal, isTeamRuntimeUnavailable } from "./respawn-failure"
+import { personaRefusal, respawnLaunchFacts } from "./respawn-rpc-spec"
 
 const CONTINUATION_MESSAGE = HOST_RESPAWN_CONTINUATION
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
@@ -74,16 +74,7 @@ async function respawnFresh(input: {
       cwd: rebuilt.spec.cwd,
       state_dir: rebuilt.spec.stateDir,
       prompt: rebuilt.spec.prompt,
-      model: input.record.model,
-      ...(input.record.resolved_model?.variant === undefined ? {} : { variant: input.record.resolved_model.variant }),
-      ...(input.record.fallback_models === undefined
-        ? {}
-        : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
-      ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
-      ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
-      depth: input.record.depth,
-      parent_session_id: input.record.parent_session_id,
-      root_session_id: input.record.root_session_id,
+      ...respawnLaunchFacts(input.record, rebuilt, trusted),
     })
     return { ok: true, handle: adaptRpcHandle(handle) }
   } catch (error) {
@@ -91,7 +82,7 @@ async function respawnFresh(input: {
     if (isTeamRuntimeUnavailable(error)) {
       return failure("retryable", "team_inactive", "team runtime is not active")
     }
-    const refused = hostRefusal(error)
+    const refused = hostRefusal(error) ?? personaRefusal(error)
     if (refused !== undefined) return refused
     log("senpi-task fresh rpc respawn failed", { taskId: input.record.task_id, error: String(error) })
     return failure("retryable", "respawn_failed", "rpc respawn failed")
@@ -165,16 +156,7 @@ async function respawnProcess(input: {
       resumeSessionPath: sessionPath,
       // The recorded endpoint, never a re-derived one: a pre-migration child keeps living where it was.
       ...(input.record.host_session === undefined ? {} : { hostSocket: input.record.host_session.socket }),
-      model: input.record.model,
-      ...(input.record.resolved_model?.variant === undefined ? {} : { variant: input.record.resolved_model.variant }),
-      ...(input.record.fallback_models === undefined
-        ? {}
-        : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
-      ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
-      ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
-      depth: input.record.depth,
-      parent_session_id: input.record.parent_session_id,
-      root_session_id: input.record.root_session_id,
+      ...respawnLaunchFacts(input.record, buildRespawnManagedSpec(input.record, input.stateDir), trusted),
     })
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
     // reopen what is already open, and a continuation nudge would inject a second prompt into a
@@ -230,7 +212,7 @@ async function respawnProcess(input: {
         ...(hold.retryAfterMs === undefined ? {} : { retryAfterMs: hold.retryAfterMs }),
       }
     }
-    const refused = hostRefusal(error)
+    const refused = hostRefusal(error) ?? personaRefusal(error, cleaned ? undefined : RESPAWN_CLEANUP_FAILURE_REASON)
     if (refused !== undefined) return refused
     log("senpi-task rpc respawn failed", { taskId: input.record.task_id, error: String(error) })
     return failure("retryable", "respawn_failed", cleaned ? "rpc respawn failed" : RESPAWN_CLEANUP_FAILURE_REASON)

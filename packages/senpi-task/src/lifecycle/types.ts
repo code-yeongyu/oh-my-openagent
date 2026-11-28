@@ -31,6 +31,9 @@ export type ReconcileDeferredReason =
   | "host_unreachable"
   // The recorded host answers, but incompatibly; the session is never reopened on another endpoint.
   | "host_incompatible"
+  // The recorded host cannot hold the child's instructions and tool policy (#13057); the child waits for an
+  // upgraded host and is never reopened without them, here or anywhere else.
+  | "host_persona_unsupported"
   // The recorded host is the one this session runs behind and it is silent; only the parent's next
   // resume (outside the host) can ensure it.
   | "own_host_unreachable"

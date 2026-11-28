@@ -6,6 +6,7 @@ import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
+import { MEMBER_EXTENSION_TOOL_NAMES } from "../team/member-tool-names"
 
 // The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
 // and the post-start pin check read (#9722 H1) - a stale resolvedModel from the failed rung would
@@ -90,6 +91,20 @@ export function buildRecordInput(input: {
   }
 }
 
+/**
+ * The allow list a child is launched with, on start and on every respawn. The record keeps the agent's own list; a
+ * team member reports and coordinates through the tools its member extension registers (its bootstrap prompt says
+ * so), so for a member those are added here, which also covers a member recorded before this rule. A deny list
+ * still removes them.
+ */
+export function launchToolAllowlist(
+  record: Pick<TaskRecord, "tool_allow" | "team_role">,
+): readonly string[] | undefined {
+  const allow = record.tool_allow
+  if (allow === undefined || record.team_role !== "member") return allow
+  return [...new Set([...allow, ...MEMBER_EXTENSION_TOOL_NAMES])]
+}
+
 // Background mode after promoteToBackground runs. A task already running in the background keeps
 // that mode - nothing was promoted. Legacy records carry no spawn mode, so the durable background
 // intent (notify_on_terminal) is the only evidence of how they started.
@@ -128,7 +143,7 @@ export function buildManagedSpec(input: {
     ...(plan.variant !== undefined ? { variant: plan.variant } : {}),
     ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
     ...(instructions !== undefined ? { instructions } : {}),
-    ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
+    ...(record.tool_allow !== undefined ? { toolAllowlist: launchToolAllowlist(record) } : {}),
     ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
     includeTaskTools: record.owner?.kind !== "dag",
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
@@ -191,7 +206,7 @@ export function buildRespawnManagedSpec(record: TaskRecord, stateDir: string): B
       ...(record.resolved_model?.variant === undefined ? {} : { variant: record.resolved_model.variant }),
       ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
       ...(spawnSpec.instructions !== undefined ? { instructions: spawnSpec.instructions } : {}),
-      ...(record.tool_allow !== undefined ? { toolAllowlist: record.tool_allow } : {}),
+      ...(record.tool_allow !== undefined ? { toolAllowlist: launchToolAllowlist(record) } : {}),
       ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
       includeTaskTools: record.owner?.kind !== "dag",
       ...(spawnSpec.member_scoped_tool_names !== undefined

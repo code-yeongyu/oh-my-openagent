@@ -28,6 +28,8 @@ const REASON_MESSAGES: Readonly<Partial<Record<TaskStartFailureReason, string>>>
     "The task store index could not be recorded, so no host was opened (store_index_unavailable).",
   host_incompatible:
     "The recorded task host is incompatible; the child was not opened anywhere else (host_incompatible).",
+  host_persona_unsupported:
+    "The child's record names a task host that cannot hold its instructions and tool policy, so it is not reopened anywhere until that host is upgraded to one that advertises session_persona (host_persona_unsupported).",
   open_timed_out: "The task host did not finish opening the child session in time (open_timed_out).",
   launch_spec_insecure:
     "The task host launch spec is writable by other users or not owned by you, so no task host was started (launch_spec_insecure).",

@@ -40,6 +40,8 @@ export const HOST_START_FAILURE_REASONS = [
   "shard_alt_root_unsafe",
   "legacy_host",
   "host_incompatible",
+  // The recorded host cannot hold the child's instructions and tool policy (no `session_persona`, #13057).
+  "host_persona_unsupported",
   "store_index_unavailable",
   "own_host_unreachable",
   "shard_identity_missing",

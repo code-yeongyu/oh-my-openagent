@@ -216,7 +216,7 @@ describe("validateSenpiTeamMembers", () => {
     if (caught instanceof SenpiTeamSpecError) {
       expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
       expect(caught.message).toBe(
-        'ulw reviewer agent "omo-senpi-code-reviewer" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead',
+        'ulw reviewer agent "omo-senpi-code-reviewer" cannot be a team member; delegate via the task tool instead',
       )
     }
   })

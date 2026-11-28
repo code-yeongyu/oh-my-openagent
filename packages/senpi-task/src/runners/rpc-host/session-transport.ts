@@ -9,7 +9,8 @@ import type {
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
 import { designatedChainOf } from "../designated-fallback-profile"
-import type { RpcEntriesResult, RpcSwitchSessionResult } from "../types"
+import { personaPolicy, type PersonaPolicy } from "../rpc/persona-args"
+import type { RpcEntriesResult, RpcPersona, RpcSwitchSessionResult } from "../types"
 import { HostUnavailableError, TASK_DAEMON_PROTOCOL_VERSION, TASK_DAEMON_REQUIRED_CAPABILITIES } from "./daemon"
 import type { HostRunHoldClient } from "./task-parent-wire"
 
@@ -81,7 +82,14 @@ export interface HostOpenSessionWire {
   readonly auto_title: boolean
   readonly retryFallback?: HostRetryFallbackProfile
   readonly permissionPreset?: string
+  readonly persona?: PersonaPolicy
 }
+
+/**
+ * HOST capability: the host applies `open_session.persona` (`appendSystemPrompt`, `tools`, `excludeTools`) to
+ * that one session, as `--append-system-prompt` / `--tools` / `--exclude-tools` apply to a process (#13057).
+ */
+const SESSION_PERSONA_CAPABILITY = "session_persona"
 
 /** The immutable launch profile of one child session, in omo's names. */
 export interface HostSessionOpenInput {
@@ -99,6 +107,14 @@ export interface HostSessionOpenInput {
   readonly retryFallback?: HostRetryFallbackProfile
   /** The parent's approval mode a child in the task host opens with (#6189 F2c); the host cannot see the parent. */
   readonly permissionPreset?: string
+  /** The agent's instructions and tool policy; only a host advertising `session_persona` may open it. */
+  readonly persona?: PersonaPolicy
+}
+
+/** A child's persona as the open request carries it; a child with none opens exactly as before. */
+export function hostPersona(spec: RpcPersona): { readonly persona?: PersonaPolicy } {
+  const persona = personaPolicy(spec, "host")
+  return Object.keys(persona).length === 0 ? {} : { persona }
 }
 
 export interface HostRpcClientOptions {
@@ -135,6 +151,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
     auto_title: input.autoTitle,
     ...(input.retryFallback === undefined ? {} : { retryFallback: input.retryFallback }),
     ...(input.permissionPreset === undefined ? {} : { permissionPreset: input.permissionPreset }),
+    ...(input.persona === undefined ? {} : { persona: input.persona }),
   }
 }
 
@@ -147,6 +164,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
 export function assertHostUsable(
   info: SenpiHostProtocolInfo | undefined,
   retryFallback?: HostRetryFallbackProfile,
+  persona?: PersonaPolicy,
 ): SenpiHostProtocolInfo {
   if (info === undefined) {
     throw new HostUnavailableError("host_unreachable", {
@@ -169,6 +187,15 @@ export function assertHostUsable(
     throw new HostUnavailableError("capability", {
       fallbackAllowed: true,
       detail: `missing ${missing.join(", ")}${chain}`,
+    })
+  }
+  // Only a child that carries a persona needs the host to hold it. On a host that cannot, the child runs as
+  // its own process, where the same persona applies as flags: it never opens here without it.
+  if (persona !== undefined && !info.capabilities.includes(SESSION_PERSONA_CAPABILITY)) {
+    throw new HostUnavailableError("capability", {
+      fallbackAllowed: true,
+      personaUnsupported: true,
+      detail: `missing ${SESSION_PERSONA_CAPABILITY}: this host cannot hold the child's instructions and tool policy, so the child never opens here; a child recorded on this host waits until it is upgraded`,
     })
   }
   return info

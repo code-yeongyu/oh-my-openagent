@@ -12,7 +12,7 @@ import { HostUnavailableError } from "./daemon"
 import { HostSessionOpenError, SessionHeldElsewhereError, type OpenedHostSession } from "./session-client"
 import { buildChildContext } from "./session-context"
 import { childRetryFallbackProfile } from "../retry-fallback-profile"
-import type { HostRetryFallbackProfile, HostSessionOpenInput } from "./session-transport"
+import { hostPersona, type HostRetryFallbackProfile, type HostSessionOpenInput } from "./session-transport"
 
 const SESSION_FAILURE_REASONS = new Set<TaskStartFailureReason>(SESSION_START_FAILURE_REASONS)
 
@@ -42,6 +42,7 @@ export async function openTaskHostSession(input: {
       retainOnDisconnect: true,
       autoTitle: false,
       ...childRetryFallback(input.spec),
+      ...hostPersona(input.spec),
     })
   } catch (error) {
     if (error instanceof HostUnavailableError) throw error
