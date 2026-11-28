@@ -44,6 +44,8 @@ export interface FakeHostOptions extends FakeHostIdentityOptions {
    * session ends on the host - closed, dropped unretained, or the host itself dying.
    */
   readonly sessionProcesses?: boolean
+  /** How a connection authenticates; the engine's own transport contract by default. */
+  readonly transport?: (socketPath: string) => FakeHostTransport
 }
 
 export interface FakeHost {
@@ -120,6 +122,9 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     readonly resolve: (command: FakeHostCommand) => void
   }> = []
   const sockets = new Set<Socket>()
+  // Every connection the listener accepted, authenticated or not: on win32 a connection still waiting for its secret is
+  // not in `sockets` yet, and stop() must end it too or server.close() waits on whatever its client does next (#14906).
+  const accepted = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
   const held = new Map<string, Array<() => void>>()
@@ -163,8 +168,10 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   }
 
   const listen = async (): Promise<void> => {
-    transport = fakeHostTransport(socketPath)
-    server = createServer((socket) =>
+    transport = (options.transport ?? fakeHostTransport)(socketPath)
+    server = createServer((socket) => {
+      accepted.add(socket)
+      socket.once("close", () => accepted.delete(socket))
       transport.authenticate(socket, () => {
         sockets.add(socket)
         settleConnectionWaiters()
@@ -186,8 +193,8 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
           table.detach(socket)
           settleConnectionWaiters()
         })
-      }),
-    )
+      })
+    })
     await new Promise<void>((resolve) => server.listen(transport.listenAddress, resolve))
   }
   await listen()
@@ -204,7 +211,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   }
 
   const dropConnections = (): void => {
-    for (const socket of [...sockets]) socket.destroy()
+    for (const socket of [...accepted]) socket.destroy()
   }
 
   /** A drain closes its connections gracefully, so the records it just wrote still arrive. */
