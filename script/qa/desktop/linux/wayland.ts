@@ -18,8 +18,16 @@ function spawnEngine(ctx: Context, stage: WaylandStage, libei?: string): Engine 
   return Engine.spawn(ctx.engineBinary, ctx.procs.childEnv({ ...stage.env, LIBEI_SOCKET: libei }))
 }
 
-async function capabilitiesHonest(ctx: Context, stage: WaylandStage, observe: WaylandObserver): Promise<Result> {
-  const engine = spawnEngine(ctx, stage)
+/** The engine surface the capabilities scenario drives; injectable so the a11y probe order is unit-testable (#11511). */
+export type ScenarioEngine = Pick<Engine, "activate" | "result" | "close">
+
+export async function capabilitiesHonest(
+  ctx: Context,
+  stage: WaylandStage,
+  observe: Pick<WaylandObserver, "socketPresent" | "busNames" | "busName">,
+  spawn: (ctx: Context, stage: WaylandStage) => ScenarioEngine = spawnEngine,
+): Promise<Result> {
+  const engine = spawn(ctx, stage)
   try {
     const before = {
       socketPresent: observe.socketPresent(),
@@ -28,10 +36,12 @@ async function capabilitiesHonest(ctx: Context, stage: WaylandStage, observe: Wa
       busNames: await observe.busNames(),
     }
     const portal = await observe.busName(PORTAL_NAME)
-    const a11y = await observe.busName(A11Y_NAME)
     const stop = await engine.activate(true)
     const caps = asObject(await engine.result("capabilities"))
     const status = asObject(await engine.result("stopPath.status"))
+    // Re-observed AFTER the engine answered, so both sides of the comparison describe the same moment:
+    // the AT-SPI bus can register between an earlier harness probe and the engine's own (#11511).
+    const a11y = await observe.busName(A11Y_NAME)
     const modes = JSON.stringify(caps.deliveryModes)
     const after = { portal, a11y }
     return result(
