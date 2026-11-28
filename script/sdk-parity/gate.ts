@@ -165,6 +165,25 @@ export function gateReport(
     tools: { base: input.base.tools, head: input.head.tools },
     ahead: input.ahead ?? new Map<string, unknown>(),
   }
+  // An additive input change (#15345) is admitted only by a declaration that names this capability's scenario and the
+  // exact field the tool schema moved at; the kind's own check then verifies the widening and the outcome difference.
+  const declaredWidening = (moved: readonly string[], capability: string): boolean => {
+    if (moved.length !== 1) return false
+    const line = moved[0] ?? ""
+    const variants = /^(.+): (\d+) variants in the tool and (\d+) in the SDK$/.exec(line)
+    const enumValues = /^(.+): enum is (.+) in the tool and (.+) in the SDK$/.exec(line)
+    const path = variants?.[1] ?? enumValues?.[1]
+    if (path === undefined) return false
+    if (variants !== null && Number(variants[3]) <= Number(variants[2])) return false
+    return parsed.declarations.some((declaration) => {
+      const scenario = scenarioById.get(declaration.scenario)
+      return (
+        declaration.kind === "input-enum-widened" &&
+        declaration.args[0] === path &&
+        scenario?.capability === capability
+      )
+    })
+  }
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
@@ -180,6 +199,7 @@ export function gateReport(
       )
       const moved = a !== undefined && b !== undefined ? schemaDifferences(a, b, entry.name) : []
       if (moved.length > 0) {
+        if (declaredWidening(moved, row.id)) continue
         failures.push(
           `${row.id}: tool ${entry.name} changed its input schema under an unresolved gap (${moved[0]}); add the SDK call ${row.sdk}`,
         )

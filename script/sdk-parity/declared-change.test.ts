@@ -9,6 +9,7 @@ import { type ExemptionProvider, loadBaseScenarioTable } from "./declared-change
 import { candidateDigest, EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
 import { HEAD, input, rows, text, unresolved } from "./gate-fixture"
 import type { Outcome } from "./scenario-run"
+import type { DiscoveredTool } from "./tool-check"
 import { SCENARIOS, type Scenario } from "./scenarios"
 import { readDeclaredVersions } from "./version-mask"
 import { verifyReview } from "./verify-review"
@@ -446,5 +447,178 @@ describe("verify-review over the two classes", () => {
       decision: "accepted",
       reason: `the CLEAR at ${HEAD.slice(0, 10)} reviewed the 1 candidate(s) of digest ${output.match(/digest=([0-9a-f]{24})/)?.[1]}`,
     })
+  })
+})
+
+// #15345: the two additive kinds. `thread_send` is the tool of the s1 scenario's capability (threads.send).
+describe("the declared form: additive input and result changes (#15345)", () => {
+  // The real list answers carry their fields at the result's top level (tool-list-empty's shape), not under `value`.
+  const listed = (fields: Readonly<Record<string, unknown>>): Outcome => ({ result: { kind: "ok", ...fields } })
+  const tool = (fields: Readonly<Record<string, readonly string[]>>): DiscoveredTool =>
+    JSON.parse(
+      JSON.stringify({
+        name: "thread_send",
+        parameters: {
+          properties: Object.fromEntries(
+            Object.entries(fields).map(([field, variants]) => [
+              field,
+              { anyOf: variants.map((value) => ({ type: "string", const: value })) },
+            ]),
+          ),
+          required: [],
+        },
+      }),
+    ) as DiscoveredTool
+  // A row whose tool entry names thread_send, so the kind's "is a tool of this capability" check holds.
+  const rowForTool = () => {
+    const base = input().head.rows
+    return base.map((row) =>
+      row.id === "threads.send"
+        ? {
+            ...row,
+            tool: [{ name: "thread_send", branch: "send", reads: ["delivery"], when: { present: [], absent: [] } }],
+          }
+        : row,
+    )
+  }
+  const widen = (base: readonly string[], head: readonly string[], body: string, extra: Partial<GateInput> = {}) => {
+    const usage = (variants: readonly string[]) => ({ exit: 2, stdout: "", stderr: `usage: --x ${variants.join(", ")}\n` })
+    const baseOutcome = usage(base)
+    const headOutcome = usage(head)
+    return gateReport(
+      withOutcomes(baseOutcome, headOutcome, body, {
+        base: { ...input().base, rows: rowForTool(), tools: [tool({ delivery: base })], outcomes: { s1: baseOutcome } },
+        head: { ...input().head, rows: rowForTool(), tools: [tool({ delivery: head })], outcomes: { s1: headOutcome } },
+        ...extra,
+      }),
+    )
+  }
+
+  test("#given a declared widening #when the outcomes differ only by the new variants #then it is exempt", () => {
+    expect(
+      widen(["a", "b"], ["a", "b", "c"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n").failures,
+    ).toEqual([])
+  })
+
+  test("#given an undeclared widening #then the schema and the outcome both fail", () => {
+    const report = widen(["a", "b"], ["a", "b", "c"], "")
+    expect(report.failures).toEqual(
+      expect.arrayContaining([expect.stringContaining("changed its input schema under an unresolved gap")]),
+    )
+  })
+
+  test("#given a declared narrowing #then the declaration fails", () => {
+    const report = widen(["a", "b", "c"], ["a", "b"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n")
+    expect(report.failures.join("\n")).toContain("does not widen in order")
+  })
+
+  test("#given a declared widening with another schema change beside it #then it fails", () => {
+    const report = gateReport(
+      withOutcomes(
+        { exit: 2, stdout: "", stderr: "usage: --x a, b\n" },
+        { exit: 2, stdout: "", stderr: "usage: --x a, b, c\n" },
+        "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n",
+        {
+          base: {
+            ...input().base,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a", "b"] })],
+            outcomes: { s1: { exit: 2, stdout: "", stderr: "usage: --x a, b\n" } },
+          },
+          head: {
+            ...input().head,
+            rows: rowForTool(),
+            tools: [
+              {
+                name: "thread_send",
+                parameters: {
+                  properties: {
+                    delivery: { anyOf: [{ type: "string", const: "a" }, { type: "string", const: "b" }, { type: "string", const: "c" }] },
+                    scope: { type: "string" },
+                  },
+                  required: [],
+                },
+              } as unknown as DiscoveredTool,
+            ],
+            outcomes: { s1: { exit: 2, stdout: "", stderr: "usage: --x a, b, c\n" } },
+          },
+        },
+      ),
+    )
+    expect(report.failures.join("\n")).toContain("differs outside the widened field")
+  })
+
+  test("#given a declared result field added #when nothing else differs #then it is exempt", () => {
+    const report = gateReport(
+      withOutcomes(listed({ threads: [] }), listed({ threads: [], host_counts: {} }), "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n", {
+        base: {
+          ...input().base,
+          rows: rowForTool(),
+          tools: [tool({ delivery: ["a"] })],
+          outcomes: { s1: listed({ threads: [] }) },
+        },
+        head: {
+          ...input().head,
+          rows: rowForTool(),
+          tools: [tool({ delivery: ["a"] })],
+          outcomes: { s1: listed({ threads: [], host_counts: {} }) },
+        },
+      }),
+    )
+    expect(report.failures).toEqual([])
+  })
+
+  test("#given an undeclared result field #then it fails", () => {
+    expect(
+      failuresOf(withOutcomes(listed({ threads: [] }), listed({ threads: [], host_counts: {} }), "")).join("\n"),
+    ).toContain("answers differently")
+  })
+
+  test("#given a result field the base already carries #then the declaration fails", () => {
+    const report = gateReport(
+      withOutcomes(listed({ threads: [], host_counts: {} }), listed({ threads: [], host_counts: { a: 1 } }), "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n", {
+        base: {
+          ...input().base,
+          rows: rowForTool(),
+          tools: [tool({ delivery: ["a"] })],
+          outcomes: { s1: listed({ threads: [], host_counts: {} }) },
+        },
+        head: {
+          ...input().head,
+          rows: rowForTool(),
+          tools: [tool({ delivery: ["a"] })],
+          outcomes: { s1: listed({ threads: [], host_counts: { a: 1 } }) },
+        },
+      }),
+    )
+    expect(report.failures.join("\n")).toContain("base result already carries")
+  })
+
+  test("#given a declared result field with another result change #then it fails", () => {
+    const report = gateReport(
+      withOutcomes(listed({ threads: [] }), listed({ threads: [], host_counts: {}, scope: "all" }), "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n", {
+        base: {
+          ...input().base,
+          rows: rowForTool(),
+          tools: [tool({ delivery: ["a"] })],
+          outcomes: { s1: listed({ threads: [] }) },
+        },
+        head: {
+          ...input().head,
+          rows: rowForTool(),
+          tools: [tool({ delivery: ["a"] })],
+          outcomes: { s1: listed({ threads: [], host_counts: {}, scope: "all" }) },
+        },
+      }),
+    )
+    expect(report.failures.join("\n")).toContain("differ outside the added result field")
+  })
+
+  test("#given a declared widening whose outcome did not move #then the declaration is refused", () => {
+    const report = widen(["a", "b", "c"], ["a", "b", "c"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n", {
+      base: { ...input().base, tools: [tool({ delivery: ["a", "b"] })] },
+      head: { ...input().head, tools: [tool({ delivery: ["a", "b", "c"] })] },
+    })
+    expect(report.failures.join("\n")).toContain("nothing to declare")
   })
 })
