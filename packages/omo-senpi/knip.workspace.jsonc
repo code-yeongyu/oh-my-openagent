@@ -742,10 +742,6 @@
     "packages/omo-senpi/src/components/native-badge/index.ts": ["NATIVE_BADGE_DEV_BUILD_TEXT", "NATIVE_BADGE_STATUS_KEY", "NATIVE_BADGE_TEXT", "createNativeBadgeStatus", "resolveNativeBadgeText"],
     // pre-existing at origin dev 4686e425b5: unused export(s) OWNERLESS_CLAIM_STALE_MS
     "packages/omo-senpi/src/components/onboarding/claim-owner.ts": ["OWNERLESS_CLAIM_STALE_MS"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ONBOARDING_SCAN_RUNTIME_FILE
-    "packages/omo-senpi/src/components/onboarding/scan-component.ts": ["ONBOARDING_SCAN_RUNTIME_FILE"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) sessionHistoryRuntimeLoadFailure
-    "packages/omo-senpi/src/components/onboarding/session-history-runtime-loader.ts": ["sessionHistoryRuntimeLoadFailure"],
     // pre-existing at origin dev 4686e425b5: unused export(s) normalizeGitRemoteUrl, parseOriginUrlFromGitConfig, parseGitHubRepositoryNameWithOwnerFromRemoteUrl
     "packages/omo-senpi/src/components/onboarding/session-history/git-identity.ts": ["normalizeGitRemoteUrl", "parseOriginUrlFromGitConfig", "parseGitHubRepositoryNameWithOwnerFromRemoteUrl"],
     // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_RECENT_WINDOW_MS, MAX_DISCOVERY_OPERATIONS_PER_SOURCE, MAX_IMPORT_TRANSCRIPTS, MAX_METADATA_BYTES_PER_SOURCE, MAX_SESSION_DIGEST_BYTES, createSessionDigestStore, parseAgentSessionTranscript
