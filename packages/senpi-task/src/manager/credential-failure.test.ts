@@ -57,7 +57,7 @@ describe("isCredentialFailure", () => {
   )
 
   // Every wording senpi emits when a provider has no credential at request time (#10806), enumerated from the
-  // pinned senpi runtime (2026.10.27-1, paths under its dist/). The provider is signed out, so its sibling models
+  // pinned senpi runtime (2026.11.23, paths under its dist/). The provider is signed out, so its sibling models
   // fail the same way.
   test.each([
     [
