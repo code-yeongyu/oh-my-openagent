@@ -36,3 +36,14 @@ function describeMarkdownEncodingIssue(root: string, relativePath: string): stri
   if (bytes.includes(0)) return `${relativePath} contains NUL bytes, possibly UTF-16`
   return null
 }
+
+const DIRTY_PARENT_DETAIL_MAX_CHARS = 400
+
+/** One line naming what makes the memory repository dirty, for a refusal or a `parent_dirty` record. */
+export function describeDirtyParent(porcelain: string): string {
+  const listing = porcelain.split(/\r?\n/).filter(Boolean).join("; ")
+  const detail = `memory repository has uncommitted changes: ${listing}`
+  return detail.length <= DIRTY_PARENT_DETAIL_MAX_CHARS
+    ? detail
+    : `${detail.slice(0, DIRTY_PARENT_DETAIL_MAX_CHARS - 3)}...`
+}

@@ -4,12 +4,26 @@
 // visually separate section (ultrabrain sec9). Output is read-only and never
 // enters model context.
 
-import { parseMemoryFile, type GitMemoryRepo } from "@oh-my-opencode/memory-core"
+import {
+  adoptExternalEdits,
+  createLockRecord,
+  memoryWriterLockPath,
+  parseMemoryFile,
+  withLock,
+  type GitMemoryRepo,
+} from "@oh-my-opencode/memory-core"
 
 import { parseCommandArgs } from "./args"
 import { runMemoryUnlock } from "./memory-unlock"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
-import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import {
+  requireIdentity,
+  respond,
+  sessionIdOf,
+  type MemoryCommandContext,
+  type MemoryCommandDeps,
+  type MemoryCommandIdentity,
+} from "./types"
 import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function isSystemMarkdown(path: string): boolean {
@@ -58,10 +72,13 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
       if (parsed.positionals[0] === "unlock") {
         return runMemoryUnlock(ctx, identity, parsed.positionals.slice(1).join(" "), parsed.flags.get("force") === true)
       }
+      if (parsed.positionals[0] === "adopt" && parsed.positionals.length === 1) {
+        return runMemoryAdopt(deps, ctx, identity)
+      }
       if (parsed.positionals.length > 0) {
         return respond(
           ctx,
-          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory or /memory unlock <lock path>`,
+          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory, /memory adopt or /memory unlock <lock path>`,
           "error",
         )
       }
@@ -105,4 +122,34 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
       return respond(ctx, lines.join("\n"))
     },
   })
+}
+
+async function runMemoryAdopt(
+  deps: MemoryCommandDeps,
+  ctx: MemoryCommandContext,
+  identity: MemoryCommandIdentity,
+): Promise<string> {
+  if (!hasGitRepo(identity)) {
+    return respond(ctx, `no memory repository for ${identity.identity} at ${identity.identityPaths.repo}`, "error")
+  }
+  const sessionId = sessionIdOf(ctx)
+  try {
+    const result = await adoptExternalEdits({
+      repo: openRepo(deps, identity),
+      author: { agentId: identity.identity, authorName: "Human" },
+      ...(sessionId === undefined ? {} : { sessionId }),
+      lock: async (domain, operation) => {
+        if (domain !== "memory-write") throw new Error(`unsupported lock domain '${domain}'`)
+        const record = await createLockRecord(`/memory adopt (${identity.identity})`)
+        return withLock(memoryWriterLockPath(identity.identityPaths.locks), record, operation, { waitTimeoutMs: 5_000 })
+      },
+    })
+    if (result.status === "clean") return respond(ctx, "memory repository is clean; nothing to adopt")
+    return respond(
+      ctx,
+      [`adopted the external edit as ${shortSha(result.sha)}:`, ...result.paths.map((path) => `- ${path}`)].join("\n"),
+    )
+  } catch (error) {
+    return respond(ctx, error instanceof Error ? error.message : String(error), "error")
+  }
 }

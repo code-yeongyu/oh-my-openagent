@@ -55,7 +55,7 @@ export class DirtyRepoError extends GitError {
     const encoding =
       encodingDiagnostics.length > 0 ? ` Dirty markdown encoding issue(s): ${encodingDiagnostics.join("; ")}.` : ""
     super(
-      `Memory repo has uncommitted changes. Commit, discard, or sync them before using memory tools.\n${porcelain.trimEnd()}${encoding}`,
+      `Memory repo has uncommitted changes. Commit, discard, or sync them, or run /memory adopt to commit them as an external edit, before using memory tools.\n${porcelain.trimEnd()}${encoding}`,
     )
   }
 }

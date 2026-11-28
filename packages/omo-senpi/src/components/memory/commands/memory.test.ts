@@ -131,4 +131,29 @@ describe("/memory", () => {
     expect(text).toContain("not bound")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
   })
+
+  test("#given an edit another process left in the repo #when /memory adopt runs #then it is committed as an external edit and the tree is clean (#15411)", async () => {
+    // given
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    const repo = await seededRepo(identity, SEEDS)
+    await writeFile(join(identity.identityPaths.repo, "system/persona.md"), "appended outside the tool\n", {
+      flag: "a",
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    registerMemoryCommand(pi, fakeDeps(identity))
+    const ctx = fakeCommandContext()
+
+    // when
+    const text = await invoke(pi, "memory", "adopt", ctx)
+    const again = await invoke(pi, "memory", "adopt", ctx)
+
+    // then
+    expect(text).toContain("- system/persona.md")
+    expect(ctx.ui.notifications.at(-2)?.level).toBe("info")
+    expect(await repo.status()).toBe("")
+    expect((await repo.log({ limit: 1 }))[0]?.trailers["Omo-Writer"]).toBe("external")
+    expect(await repo.show("HEAD", "system/persona.md")).toContain("appended outside the tool")
+    expect(again).toContain("nothing to adopt")
+  })
 })

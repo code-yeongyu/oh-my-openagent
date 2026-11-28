@@ -71,6 +71,24 @@ function nextRecord(
   detail: string | undefined,
 ): FactsFailureRecord {
   const at = input.now.toISOString()
+  // A dirty memory repo is the repo's state, not this endpoint's (#15412): it neither grows the streak nor parks, it only
+  // waits the first backoff step. The wire format needs a streak of at least 1, so a first-ever record holds 1. A record that is already parked
+  // stays parked: parking is absorbing.
+  if (input.reason === "parent_dirty" && previous?.state !== "parked") {
+    return {
+      conversationId: target.conversationId,
+      end_message_id: target.endMessageId,
+      end_snapshot_line: target.endSnapshotLine,
+      state: "backoff",
+      streak: previous?.streak ?? 1,
+      firstFailureAt: previous?.firstFailureAt ?? at,
+      lastFailureAt: at,
+      lastReason: input.reason,
+      lastFailureId: input.failureId,
+      nextEligibleAt: new Date(input.now.getTime() + BACKOFF_MS[0]).toISOString(),
+      ...(detail === undefined ? {} : { lastDetail: detail }),
+    }
+  }
   // The streak counts CONSECUTIVE terminal failures for this endpoint regardless of reason:
   // a batch that fails four different ways is no healthier than one failing the same way.
   const streak = (previous?.streak ?? 0) + 1

@@ -10,6 +10,7 @@ import { claimReceiptTrailers } from "../provenance"
 import type { MemoryToolProvenance } from "./memory"
 import { provenanceStrippedTrailers } from "./claim-frontmatter"
 import { undoBehindKeptLock } from "./rollback-behind-lock"
+import { undoFailedCommit } from "./rollback-failed-commit"
 import { MemoryToolError } from "./tool-errors"
 
 export interface CommitMemoryWriteOptions {
@@ -76,7 +77,7 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
         throw new MemoryToolError(error.message, { cause: error })
       }
       if (error instanceof StrandedGitLockError) return undoBehindKeptLock(repo, paths, error)
-      throw error
+      return undoFailedCommit(repo, paths, error)
     }
     const shortSha = result.sha.slice(0, 7)
     const local = !(await hasConfiguredRemote(repo))
