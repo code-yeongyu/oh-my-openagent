@@ -17,6 +17,7 @@ import { replyData } from "./remote-ops"
 import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, engineNotReady, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
+import { promptDeliveryId } from "./prompt-delivery-id"
 import { reopenParkedRow } from "./reopen-parked"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
 import { reconcileRemoteReceipt } from "./receipt"
@@ -135,15 +136,6 @@ function engineStateOf(reply: JsonObject): EngineState {
 }
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
-
-/** The id a prompt's reply names it by (senpi client-input admission, #15093): its clientMessageId, top level or admission. */
-function promptIdOf(reply: JsonObject): string | undefined {
-  const admission = reply["admission"]
-  const nested =
-    typeof admission === "object" && admission !== null ? (admission as JsonObject)["clientMessageId"] : undefined
-  const id = reply["clientMessageId"] ?? nested
-  return typeof id === "string" && id.length > 0 ? id : undefined
-}
 
 type SteerRefusal = "turn_conflict" | "not_steerable"
 
@@ -800,7 +792,7 @@ export function createRelayTransport(
   ): Promise<SendOutcome> => {
     const online = await resolveTypedDevice(remote.client, row.device, { exactId: true })
     if (online.kind === "error") return online
-    // #15093: the id the engine keeps the prompt under (the one sent, else the one it minted), once its reply names it.
+    // #15093, #15374: the id the prompt answers by (the one sent, else a bounded one the engine minted), once replied.
     let promptId: string | undefined
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
       kind: "ok",
@@ -880,7 +872,7 @@ export function createRelayTransport(
     )
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
-    promptId = promptIdOf(reply) ?? delivery.client_message_id
+    promptId = promptDeliveryId(reply, delivery.client_message_id)
     const turnId = reply["turnId"]
     if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0)
       return ok({ kind: "started", turn_id: turnId })
