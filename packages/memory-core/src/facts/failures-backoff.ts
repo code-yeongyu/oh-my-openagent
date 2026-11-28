@@ -8,9 +8,6 @@ const BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000, 120 * 60_000] as const
 
 const PARK_AT_STREAK = 5
 
-/** How long an endpoint held only by a dirty memory repo waits before it is tried again (#15412). */
-const PARENT_DIRTY_WAIT_MS = 5 * 60_000
-
 const DETAIL_MAX_BYTES = 512
 
 /** One queue endpoint the failure applies to; the store maps batches onto these. */
@@ -75,7 +72,7 @@ function nextRecord(
 ): FactsFailureRecord {
   const at = input.now.toISOString()
   // A dirty memory repo is the repo's state, not this endpoint's (#15412): it neither grows the streak nor parks, it only
-  // waits. The wire format needs a streak of at least 1, so a first-ever record holds 1. A record that is already parked
+  // waits the first backoff step. The wire format needs a streak of at least 1, so a first-ever record holds 1. A record that is already parked
   // stays parked: parking is absorbing.
   if (input.reason === "parent_dirty" && previous?.state !== "parked") {
     return {
@@ -88,7 +85,7 @@ function nextRecord(
       lastFailureAt: at,
       lastReason: input.reason,
       lastFailureId: input.failureId,
-      nextEligibleAt: new Date(input.now.getTime() + PARENT_DIRTY_WAIT_MS).toISOString(),
+      nextEligibleAt: new Date(input.now.getTime() + BACKOFF_MS[0]).toISOString(),
       ...(detail === undefined ? {} : { lastDetail: detail }),
     }
   }

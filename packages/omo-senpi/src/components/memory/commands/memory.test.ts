@@ -137,7 +137,9 @@ describe("/memory", () => {
     const { root, identity } = await tempIdentity()
     tempDirs.push(root)
     const repo = await seededRepo(identity, SEEDS)
-    await writeFile(join(identity.identityPaths.repo, "system/persona.md"), "appended outside the tool\n", { flag: "a" })
+    await writeFile(join(identity.identityPaths.repo, "system/persona.md"), "appended outside the tool\n", {
+      flag: "a",
+    })
     const pi = new MemoryFakeExtensionAPI()
     registerMemoryCommand(pi, fakeDeps(identity))
     const ctx = fakeCommandContext()

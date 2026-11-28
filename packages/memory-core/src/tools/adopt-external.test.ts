@@ -44,7 +44,14 @@ describe("adopting edits another writer left in the memory repo (#15411)", () =>
     const write = await runMemoryTool({
       repo,
       lock,
-      params: { command: "create", reason: "after adopt", file_path: "notes/after.md", description: "After", file_text: "x", author: AUTHOR },
+      params: {
+        command: "create",
+        reason: "after adopt",
+        file_path: "notes/after.md",
+        description: "After",
+        file_text: "x",
+        author: AUTHOR,
+      },
     })
 
     // then

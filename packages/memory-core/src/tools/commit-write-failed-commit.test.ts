@@ -122,9 +122,11 @@ describe("a memory write whose commit fails without landing (#15411)", () => {
     ].join("\n")
 
     // when
-    const failure = await runMemoryApplyPatch({ repo, lock, params: { reason: "patch that fails", input, author: AUTHOR } }).catch(
-      (error: unknown) => error,
-    )
+    const failure = await runMemoryApplyPatch({
+      repo,
+      lock,
+      params: { reason: "patch that fails", input, author: AUTHOR },
+    }).catch((error: unknown) => error)
 
     // then
     expect(String(failure)).toContain("simulated hook failure")

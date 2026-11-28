@@ -274,7 +274,7 @@ describe("facts failure clearing", () => {
 })
 
 describe("facts failure backoff on a dirty memory repo (#15412)", () => {
-  test("#given an endpoint held only by a dirty repo #when parent_dirty repeats past the park streak #then it never parks and waits five minutes each time", () => {
+  test("#given an endpoint held only by a dirty repo #when parent_dirty repeats past the park streak #then it never parks and waits one minute each time", () => {
     // given / when
     const entries = streak(12, "parent_dirty")
 
@@ -282,7 +282,7 @@ describe("facts failure backoff on a dirty memory repo (#15412)", () => {
     expect(entries[0]?.state).toBe("backoff")
     expect(entries[0]?.streak).toBe(1)
     expect(entries[0]?.parkedAt).toBeUndefined()
-    expect(entries[0]?.nextEligibleAt).toBe(new Date(T0.getTime() + 11 * 60_000 + 5 * 60_000).toISOString())
+    expect(entries[0]?.nextEligibleAt).toBe(new Date(T0.getTime() + 11 * 60_000 + 60_000).toISOString())
   })
 
   test("#given a real failure streak #when parent_dirty interleaves #then only the real failures count toward the park", () => {

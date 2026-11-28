@@ -43,5 +43,7 @@ const DIRTY_PARENT_DETAIL_MAX_CHARS = 400
 export function describeDirtyParent(porcelain: string): string {
   const listing = porcelain.split(/\r?\n/).filter(Boolean).join("; ")
   const detail = `memory repository has uncommitted changes: ${listing}`
-  return detail.length <= DIRTY_PARENT_DETAIL_MAX_CHARS ? detail : `${detail.slice(0, DIRTY_PARENT_DETAIL_MAX_CHARS - 3)}...`
+  return detail.length <= DIRTY_PARENT_DETAIL_MAX_CHARS
+    ? detail
+    : `${detail.slice(0, DIRTY_PARENT_DETAIL_MAX_CHARS - 3)}...`
 }

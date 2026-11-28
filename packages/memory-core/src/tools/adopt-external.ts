@@ -10,8 +10,7 @@ export interface AdoptExternalOptions {
 }
 
 export type AdoptExternalResult =
-  | { readonly status: "clean" }
-  | { readonly status: "adopted"; readonly sha: string; readonly paths: readonly string[] }
+  { readonly status: "clean" } | { readonly status: "adopted"; readonly sha: string; readonly paths: readonly string[] }
 
 // Porcelain v1 "XY path" or "XY old -> new": every path the change touches, deletions and both sides of a rename included.
 function dirtyPaths(porcelain: string): string[] {
