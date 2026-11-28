@@ -21,6 +21,15 @@ export interface MaintenanceGit {
  */
 const MAX_PACKS_BEFORE_REPACK = 16
 
+/**
+ * Reflogs and unreachable objects are dropped only past these grace periods (#15418), so the fresh
+ * objects of a writer committing during the pass are never pruned. Pruning comes before the loose pass:
+ * that pass packs every loose object, unreachable ones included, and `git prune` deletes loose objects only.
+ */
+export const REFLOG_EXPIRE = "30.days.ago"
+export const REFLOG_EXPIRE_UNREACHABLE = "1.day.ago"
+export const PRUNE_EXPIRE = "2.weeks.ago"
+
 export async function runMemoryRepoMaintenance(
   git: MaintenanceGit,
   options: GitMaintenanceOptions,
@@ -30,6 +39,14 @@ export async function runMemoryRepoMaintenance(
     await git(["repack", "-d", "-l", "--geometric=2", "--quiet"], options.timeoutMs, options.signal)
     options.signal?.throwIfAborted()
   }
+  await git(
+    ["reflog", "expire", `--expire=${REFLOG_EXPIRE}`, `--expire-unreachable=${REFLOG_EXPIRE_UNREACHABLE}`, "--all"],
+    options.timeoutMs,
+    options.signal,
+  )
+  options.signal?.throwIfAborted()
+  await git(["prune", `--expire=${PRUNE_EXPIRE}`], options.timeoutMs, options.signal)
+  options.signal?.throwIfAborted()
   if (looseObjectsBefore < options.minLooseObjects)
     return { status: "skipped", looseObjects: looseObjectsBefore, packsBefore: packs, packsAfter: await countPacks(git) }
   await git(["maintenance", "run", "--task=loose-objects", "--quiet"], options.timeoutMs, options.signal)

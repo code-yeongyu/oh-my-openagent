@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -55,8 +55,61 @@ describe("runMemoryRepoMaintenance pack fold (#15139, #15420)", () => {
     const result = await runMemoryRepoMaintenance(git, OPTIONS)
 
     expect(result).toEqual({ status: "skipped", looseObjects: 10, packsBefore: 15, packsAfter: 15 })
-    expect(calls.filter((argv) => argv[0] !== "count-objects")).toEqual([])
+    expect(calls.filter((argv) => argv[0] === "repack" || argv[0] === "maintenance")).toEqual([])
   })
+})
+
+describe("runMemoryRepoMaintenance reflog expiry and prune (#15418)", () => {
+  test("#given an amended-away commit with an old reflog entry and a fresh unreachable blob #when maintenance runs #then the old objects are pruned and the fresh one survives", async () => {
+    // given
+    const dir = mkdtempSync(join(tmpdir(), "memory-prune-"))
+    const DAY_MS = 24 * 60 * 60 * 1000
+    const oldDate = new Date(Date.now() - 60 * DAY_MS)
+    const git = (args: readonly string[], env: Record<string, string> = {}, input?: string) =>
+      execFileSync("git", args, {
+        cwd: dir,
+        encoding: "utf8",
+        env: { ...process.env, ...env },
+        input,
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim()
+    const exists = (oid: string) => {
+      try {
+        git(["cat-file", "-e", oid])
+        return true
+      } catch {
+        return false
+      }
+    }
+    try {
+      git(["init", "-q", "--initial-branch=main"])
+      disableFixtureAutoMaintenance(dir)
+      const identity = { GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.org", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.org" }
+      const old = { ...identity, GIT_AUTHOR_DATE: oldDate.toISOString(), GIT_COMMITTER_DATE: oldDate.toISOString() }
+      writeFileSync(join(dir, "draft.md"), "abandoned draft\n")
+      git(["add", "draft.md"])
+      git(["commit", "-qm", "draft"], old)
+      const abandoned = git(["rev-parse", "HEAD"])
+      const abandonedObjects = [abandoned, git(["rev-parse", "HEAD^{tree}"]), git(["rev-parse", "HEAD:draft.md"])]
+      writeFileSync(join(dir, "draft.md"), "kept memory\n")
+      git(["add", "draft.md"])
+      git(["commit", "--amend", "-qm", "kept"], old)
+      for (const oid of abandonedObjects)
+        utimesSync(join(dir, ".git", "objects", oid.slice(0, 2), oid.slice(2)), oldDate, oldDate)
+      const fresh = git(["hash-object", "-w", "--stdin"], {}, "written by a concurrent writer\n")
+
+      // when
+      await runMemoryRepoMaintenance(async (args) => ({ stdout: git(args) }), { ...OPTIONS, minLooseObjects: 1 })
+
+      // then
+      expect(abandonedObjects.map(exists)).toEqual([false, false, false])
+      expect(exists(fresh)).toBe(true)
+      expect(git(["show", "main:draft.md"])).toBe("kept memory")
+      expect(git(["reflog", "show", "--format=%H", "main"])).not.toContain(abandoned)
+    } finally {
+      await removeTree(dir)
+    }
+  }, 60_000)
 })
 
 test("repeated transfers of rewritten history keep pack count and size bounded after maintenance", async () => {
