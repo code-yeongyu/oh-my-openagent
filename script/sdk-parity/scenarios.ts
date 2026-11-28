@@ -38,6 +38,9 @@ export type SdkScenario = {
   readonly member: string
   // Paths relative to the sandbox home; "project/..." lands in the project directory the call runs in.
   readonly files: Readonly<Record<string, string>>
+  // `process`: the root is built with an environment that names no home, so it resolves from the child's own
+  // (sandbox) environment. Absent keeps the sandbox home named in the root's env (#15220).
+  readonly environment?: "process"
 }
 
 export type Scenario = CliScenario | ToolScenario | LoopParseScenario | SdkScenario
@@ -58,6 +61,7 @@ export function callPart(scenario: Scenario): Readonly<Record<string, unknown>> 
         capability: scenario.capability,
         member: scenario.member,
         files: scenario.files,
+        ...(scenario.environment === undefined ? {} : { environment: scenario.environment }),
       }
   }
 }

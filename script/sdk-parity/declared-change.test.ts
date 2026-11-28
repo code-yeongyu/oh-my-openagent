@@ -46,6 +46,45 @@ describe("the declared form: what a declaration admits", () => {
   })
 })
 
+// #15220: a security ruling turns a base answer into a head refusal; the declared kind admits exactly that envelope
+// change and the tracking issue is bound into the mark as the kind's argument.
+describe("the declared form: refusal by security ruling (#15220)", () => {
+  const ruling = "SDK-Parity-Changed: s1 refusal-by-ruling 15220\n"
+  const answer = { result: { kind: "ok", value: { state: "ready" } }, exit: 0, stdout: "ok\n", stderr: "" }
+  const refusal = { result: refused(ERROR).result, exit: 2, stdout: "", stderr: "" }
+
+  test("#given a base answer and a head refusal in the same envelope #then the declaration is exempt", () => {
+    const report = gateReport(withOutcomes(answer, refusal, ruling))
+    expect(report.failures).toEqual([])
+    expect(report.exempted).toEqual([expect.stringMatching(/^s1#exempt=declared:refusal-by-ruling 15220@/)])
+  })
+
+  test("#given no declaration #then the authority matrix still fails", () => {
+    expect(failuresOf(withOutcomes(answer, refusal, "")).join("\n")).toContain("answers differently")
+  })
+
+  test("#given the head answers instead of refusing #then the declaration fails", () => {
+    expect(failuresOf(withOutcomes(ok(1), ok(2), ruling)).join("\n")).toContain("needs the head to refuse")
+  })
+
+  test("#given another outcome field moved #then the declaration fails", () => {
+    const after = { ...refusal, result: { kind: "error", error: ERROR, extra: 1 } }
+    expect(failuresOf(withOutcomes(answer, after, ruling)).join("\n")).toContain(
+      "differ outside the answer becoming a refusal",
+    )
+  })
+
+  test("#given the control answer kind is not ok #then the declaration fails", () => {
+    const before = { result: { kind: "queued" } }
+    expect(failuresOf(withOutcomes(before, refusal, ruling)).join("\n")).toContain("answer is not ok")
+  })
+
+  test("#given a declared kind without the tracking issue #then the parser refuses it", () => {
+    const report = gateReport(withOutcomes(ok(1), refused(ERROR), "SDK-Parity-Changed: s1 refusal-by-ruling\n"))
+    expect(report.failures.join("\n")).toContain("takes 1 argument(s), not 0")
+  })
+})
+
 describe("the declared form: controls that must fail", () => {
   const body = (line: string) => `${line}\n`
   const cases: readonly (readonly [string, GateInput, RegExp])[] = [
