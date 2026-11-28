@@ -387,17 +387,20 @@ describe("which engine waits keep a queued delivery from the session (#15279)", 
     ["approval", "waiting"],
     ["interrupted_run", "waiting"],
     ["a_kind_the_engine_adds_later", "waiting"],
-  ] as const)("#given the only human wait is %s, no dialog #when a queued row wakes it #then the carrier answers %s", async (kind, expected) => {
-    const { fake, store, carrier, path } = await setup()
-    fake.setSnapshot(path("s1"), humanWait(kind))
+  ] as const)(
+    "#given the only human wait is %s, no dialog #when a queued row wakes it #then the carrier answers %s",
+    async (kind, expected) => {
+      const { fake, store, carrier, path } = await setup()
+      fake.setSnapshot(path("s1"), humanWait(kind))
 
-    expect(await carrier.wake("s1")).toMatchObject({ kind: expected })
-    expect(sent(fake, "wake")).toHaveLength(expected === "open" ? 1 : 0)
-    // The carrier records the wait it declined for, so the sender's answer can name it; a drained session records none.
-    expect(await store.sessionWait.read({ durable_id: "s1" })).toEqual(
-      expected === "open" ? null : expect.objectContaining({ wait: "waiting", hold_kinds: [kind] }),
-    )
-  })
+      expect(await carrier.wake("s1")).toMatchObject({ kind: expected })
+      expect(sent(fake, "wake")).toHaveLength(expected === "open" ? 1 : 0)
+      // The carrier records the wait it declined for, so the sender's answer can name it; a drained session records none.
+      expect(await store.sessionWait.read({ durable_id: "s1" })).toEqual(
+        expected === "open" ? null : expect.objectContaining({ wait: "waiting", hold_kinds: [kind] }),
+      )
+    },
+  )
 
   test("#given a goal wait beside a person's question #when a queued row wakes it #then the question blocks and only it is recorded", async () => {
     const { fake, store, carrier, path } = await setup()
@@ -407,7 +410,10 @@ describe("which engine waits keep a queued delivery from the session (#15279)", 
   })
 
   test("#given a goal-paused session #when two rows arrive one after the other #then each is woken for, the second after the first's turn parked it again", async () => {
-    const { fake, carrier, path, intakeRow } = await setup({ remoteWake: () => true, admitIntake: async () => "admitted" })
+    const { fake, carrier, path, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+    })
     const file = path("s1")
     fake.setSnapshot(file, humanWait("goal_paused", "stalled"))
     await intakeRow("s1", "d-first")
