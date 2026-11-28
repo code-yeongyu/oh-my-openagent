@@ -32,6 +32,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/bunshin-ts/sdk.js",
   // omo thread and omo daemon adopt import it (bin/lib/thread.js).
   "plugin/runtime/thread-sdk/sdk.js",
+  // Eval cells and seat tools import the omo SDK from the installed plugin root.
+  "plugin/runtime/omo-sdk/sdk.js",
   // omo doctor / omo setup classify task-category coverage through it (bin/lib/category-coverage.js).
   "plugin/runtime/category-coverage/index.js",
   // That bundle inlines the computer-use doctor, which reads the prelude assets from beside itself (#9193).
@@ -75,15 +77,17 @@ function packedPaths() {
     ...npmSpawnOptions(),
   })
   const [result] = JSON.parse(raw)
-  if (!result) return { paths: [], unpackedSize: 0 }
+  if (!result) return { paths: [], sizes: new Map(), unpackedSize: 0 }
   return {
     paths: result.files.map((file) => file.path),
+    sizes: new Map(result.files.map((file) => [file.path, file.size])),
     unpackedSize: result.unpackedSize ?? 0,
   }
 }
 
 const errors = []
 let paths = []
+let sizes = new Map()
 let unpackedSize = 0
 
 try {
@@ -93,7 +97,7 @@ try {
   if (!existsSync(resolve(pkgDir, "package.json"))) {
     throw new Error(`package.json not found in ${pkgDir}`)
   }
-  ;({ paths, unpackedSize } = packedPaths())
+  ;({ paths, sizes, unpackedSize } = packedPaths())
 } catch (err) {
   errors.push(`npm pack failed: ${err.message}`)
 }
@@ -103,12 +107,17 @@ const pathSet = new Set(paths)
 for (const artifact of REQUIRED_ARTIFACTS) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
+  } else if (sizes.get(artifact) === 0) {
+    // A build step that wrote nothing still leaves the path in the pack list.
+    errors.push(`empty artifact: ${artifact}`)
   }
 }
 
 for (const artifact of releaseMode ? RELEASE_EXECUTABLE_ARTIFACTS : []) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
+  } else if (sizes.get(artifact) === 0) {
+    errors.push(`empty artifact: ${artifact}`)
   } else if ((statSync(resolve(pkgDir, artifact)).mode & 0o100) === 0) {
     errors.push(`not executable (u+x): ${artifact}`)
   }

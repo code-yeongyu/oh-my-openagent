@@ -37,6 +37,7 @@ const PACKED_ARTIFACTS = [
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
   "plugin/runtime/bunshin-ts/sdk.js",
   "plugin/runtime/thread-sdk/sdk.js",
+  "plugin/runtime/omo-sdk/sdk.js",
   "plugin/runtime/category-coverage/index.js",
   "plugin/runtime/category-coverage/assets.generated.json",
   "plugin/runtime/task-config/index.js",
@@ -121,6 +122,23 @@ describe("omo-ai payload verifier", () => {
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
   })
 
+  test("#given a payload missing only the omo SDK #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/runtime/omo-sdk/sdk.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("missing artifact: plugin/runtime/omo-sdk/sdk.js")
+  })
+
+  test("#given a payload whose thread SDK is packed empty #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)], {
+      "plugin/runtime/thread-sdk/sdk.js": "",
+    })
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("empty artifact: plugin/runtime/thread-sdk/sdk.js")
+  })
+
   test("#given a payload missing only the device-account extension #when verified #then it fails naming that artifact", () => {
     const run = runVerifierOnPayload([
       ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/extensions/omo-device-account.js"),
@@ -161,6 +179,19 @@ describe("omo-ai payload verifier", () => {
       expect(run.output).not.toContain(KEYCHAIN_HELPER)
       expect(run.exitCode).toBe(0)
     })
+
+    test.skipIf(process.platform === "win32")(
+      "#when the helper is packed empty with mode 0755 #then it fails as empty",
+      () => {
+        const run = runVerifierOnPayload(
+          [...complete, KEYCHAIN_HELPER],
+          { [KEYCHAIN_HELPER]: "" },
+          { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } },
+        )
+        expect(run.output).toContain(`empty artifact: ${KEYCHAIN_HELPER}`)
+        expect(run.exitCode).toBe(1)
+      },
+    )
 
     test("#when the PR lane verifies without --release #then the helper is not required", () => {
       const run = runVerifierOnPayload(complete)
