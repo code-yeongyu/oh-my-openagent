@@ -3,6 +3,7 @@ import { openHostSessionConnection } from "./session-client-opening"
 
 export interface PermissionPushPorts {
   readonly socketPath: string
+  readonly keyRoot: string
   readonly createClient: HostRpcClientFactory
   readonly probeProtocolInfo: HostProtocolProbe
   readonly socketAccepts: (socketPath: string) => Promise<boolean>

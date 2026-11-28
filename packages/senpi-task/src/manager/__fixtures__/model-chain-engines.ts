@@ -72,7 +72,9 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   }
   try {
     const engine =
-      kind === "process" ? processEngine(env, input.hiddenCapabilities ?? []) : await hostEngine(input.root, env)
+      kind === "process"
+        ? processEngine(env, input.hiddenCapabilities ?? [])
+        : await hostEngine(input.root, env, agentDir)
     return {
       runner: engine.runner,
       calls: providers.calls,
@@ -187,17 +189,22 @@ export async function startSocketHost(root: string, engineEnv: Readonly<Record<s
   return { socket, pid: host.pid ?? 0, stop }
 }
 
-async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
+async function hostEngine(
+  root: string,
+  engineEnv: Readonly<Record<string, string>>,
+  agentDir: string,
+): Promise<Engine> {
   const { socket, pid, stop } = await startSocketHost(root, engineEnv)
   const clients: HostSessionClient[] = []
   const runner = new RpcHostRunner({
-    createClient: (socketPath) => {
-      const client = new HostSessionClient({ socketPath })
+    createClient: (socketPath, _taskId, keyRoot) => {
+      const client = new HostSessionClient({ socketPath, keyRoot })
       clients.push(client)
       return client
     },
     policy: "upgrade",
-    agentDir: join(root, "host-index"),
+    // As in production, the runner's agent dir is the one its host was launched in (and wrote its launch key to).
+    agentDir,
     env: {},
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,
