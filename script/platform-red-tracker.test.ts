@@ -76,6 +76,7 @@ interface PriorRun {
 function windowsJob(run: PriorRun) {
   const testsRan = run.windows !== "skipped-tests"
   return {
+    id: Number(run.id),
     name: "test (windows-latest, 1/2)",
     conclusion: testsRan ? run.windows : "success",
     html_url: `https://job/${run.id}`,
@@ -233,4 +234,16 @@ describe("#given the platform-red writer", () => {
     expect(calls.some((call) => call.startsWith("issue comment"))).toBe(false)
     expect(calls.some((call) => call.startsWith("issue close"))).toBe(false)
   })
+})
+
+test("the closer can read check-run annotations with its workflow token", () => {
+  const workflow = load(
+    readFileSync(new URL("../.github/workflows/platform-red-tracker.yml", import.meta.url), "utf8"),
+  ) as {
+    permissions: Record<string, string>
+    jobs: Record<string, { permissions?: Record<string, string> }>
+  }
+  const permissions = workflow.jobs["close-when-green"]!.permissions ?? workflow.permissions
+  expect(permissions.checks).toBe("read")
+  expect(permissions.issues).toBe("write")
 })

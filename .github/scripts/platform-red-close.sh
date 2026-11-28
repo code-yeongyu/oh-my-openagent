@@ -74,9 +74,9 @@ while IFS=$'\t' read -r job red_run red_sha; do
       candidate_id="$(awk -F '\t' -v n="$job" '$1 == n && !found { print $5; found = 1 }' "$jobs")"
       annotations="$OUT_DIR/annotations-$candidate_id"
       if [ -n "$candidate_id" ]; then
-        gh api "repos/$GH_REPO/check-runs/$candidate_id/annotations" \
-          --jq '[.[] | select(.message | test("exceeded the maximum execution time"))] | length' > "$annotations"
-        if [ "$(cat "$annotations")" -gt 0 ]; then
+        gh api "repos/$GH_REPO/check-runs/$candidate_id/annotations" --paginate \
+          --jq '.[] | select(.message | contains("exceeded the maximum execution time")) | .message' > "$annotations"
+        if [ -s "$annotations" ]; then
           candidate_result="timed_out"
         fi
       fi

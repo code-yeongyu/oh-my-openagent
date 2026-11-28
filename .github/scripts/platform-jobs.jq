@@ -1,4 +1,4 @@
-# One TSV row per macOS/Windows job of a workflow run's jobs response: name, result, url, labels.
+# One TSV row per macOS/Windows job of a workflow run's jobs response: name, result, url, labels, job/check-run id.
 # A job that succeeded without running a test step proved nothing. Action steps (`uses:`, listed as "Run <action>@<ref>")
 # and bookkeeping steps never run tests. Such a job's result is "no-tests", never "success", with one exception: ci.yml's
 # macOS required contexts are Linux status jobs that report their own parts of "macos-combined-1" and "macos-combined-2",
