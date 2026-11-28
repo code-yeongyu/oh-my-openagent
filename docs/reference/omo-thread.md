@@ -283,6 +283,33 @@ per table, so it never adds a write when nothing else writes.
 | A sender's rate bucket | until it is idle for a full refill (40 s), which is exactly a fresh bucket |
 | A session's sequence counter and incarnation | while any delivery names the session; rebuilt on its next use |
 
+## Hosts that do not authenticate
+
+Each launch of an rpc host publishes a key record under `<agent dir>/rpc/keys/<launch id>`. Engines publish it from 2026.10.24-3 on (code-yeongyu/senpi#3795). `omo thread` and the thread tools use that record to check which host answers a socket before they send it anything. A host that cannot be proven is sent no commands.
+
+- `host_identity_unproven`: the host answered with a challenge for a launch whose key record cannot be found under the key root.
+  - An agent session (the thread tools) is told only the code and one fixed sentence: `the thread host's launch has no key record under the key root`. In `thread_list` and in `omo thread list --json`, its threads show as `inactive`, with that text as `error_note`.
+  - `omo thread` and the SDK, used by a person at a terminal, may add the socket and the key-record path to their error message, to help find the right agent directory.
+  - `read`, `close` and the other control calls answer the same refusal.
+  - A `send` is stored and answers `queued`, with `waiting_on.kind` set to `host_identity_unproven`. It is never `queued_offline`, and no wake is requested. The host that holds the thread takes the message from the local store itself, so nothing is lost.
+- A host that does not authenticate at all (an engine older than 2026.10.24-3): this release still serves it and announces the change, except in two cases where it is already refused:
+  - a key record under the key root names the endpoint it serves: `host_identity_unproven` (`the thread host did not authenticate, and a key record names its endpoint`);
+  - a record under the key root is empty, damaged, or names no absolute endpoint: `unsafe_key_record` (`a key record under the key root cannot be used`).
+
+  The next release refuses every host that does not authenticate, with `host_unauthenticated`.
+
+### What to do
+
+1. Update omo: `omo update`.
+2. Stop the old host: `omo daemon stop`. The next thread call starts one from the updated engine.
+3. If the host runs under another agent directory (another profile), point the key root at it: `SENPI_RPC_KEY_ROOT=<that agent dir> omo thread ...`.
+
+Do not delete or edit files under `rpc/keys`. A host removes its own record when it exits. The records of processes that died are collected by `senpi host gc` and by the cleanup pass a host start runs (code-yeongyu/senpi `gcRpcPublicKeys`); a record whose process cannot be identified is kept.
+
+### Windows
+
+Windows named pipes use the older `<socket>.secret` handshake. It proves the client to the host, but nothing proves the host to the client. This is an accepted gap until the launch-key challenge is extended to pipes (code-yeongyu/senpi#7571).
+
 ## JSON
 
 With `--json`, stdout is exactly one JSON value, also on failure. `list` prints the thread array;
