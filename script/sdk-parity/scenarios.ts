@@ -38,8 +38,8 @@ export type SdkScenario = {
   readonly member: string
   // Paths relative to the sandbox home; "project/..." lands in the project directory the call runs in.
   readonly files: Readonly<Record<string, string>>
-  // `process`: the root is built with an environment that names no home, so it resolves from the child's own
-  // (sandbox) environment. Absent keeps the sandbox home named in the root's env (#15220).
+  // `process`: the root is built with an environment that names no home, while the child retains its isolated
+  // sandbox home. Absent keeps the sandbox home named in the root's env (#15220).
   readonly environment?: "process"
 }
 
@@ -153,6 +153,14 @@ export const SCENARIOS: readonly Scenario[] = [
   }),
   tool("tool-archive-missing", "threads.archive", "thread_archive", { thread: "missing-thread" }),
   tool("tool-handoff-missing", "threads.handoff", "thread_handoff", { thread: "missing-thread", message: "hi" }),
+  {
+    id: "deviceService.status/env-without-home",
+    capability: "deviceService.status",
+    surface: "sdk",
+    member: "deviceService.status",
+    files: {},
+    environment: "process",
+  },
   {
     id: "sdk-config-status-diagnostics",
     capability: "config.status",

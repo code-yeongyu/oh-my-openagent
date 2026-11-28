@@ -100,13 +100,13 @@ async function runSdk(tree: string, scenario: SdkScenario): Promise<Outcome> {
         ...(scenario.environment === undefined ? [] : [scenario.environment]),
       ],
       {
-      cwd,
-      env: { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, TMPDIR: sandbox, NO_COLOR: "1" },
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: CLI_BUDGET_MS,
-      killSignal: "SIGKILL",
+        cwd,
+        env: { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, TMPDIR: sandbox, NO_COLOR: "1" },
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: CLI_BUDGET_MS,
+        killSignal: "SIGKILL",
       },
     )
     const [stdout, stderr, exit] = await Promise.all([
@@ -155,7 +155,7 @@ async function runLoopParse(tree: string, scenario: LoopParseScenario): Promise<
   return { brief: parser.positionalText(scenario.argv) }
 }
 
-async function runScenarios(
+export async function runScenarios(
   tree: string,
   scenarios: readonly Scenario[] = SCENARIOS,
 ): Promise<Record<string, Outcome>> {

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test"
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -8,7 +8,7 @@ import { sha256 } from "./baseline"
 import { type ExemptionProvider, loadBaseScenarioTable } from "./declared-change"
 import { candidateDigest, EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
 import { HEAD, input, rows, text, unresolved } from "./gate-fixture"
-import type { Outcome } from "./scenario-run"
+import { runScenarios, type Outcome } from "./scenario-run"
 import { SCENARIOS, type Scenario } from "./scenarios"
 import { readDeclaredVersions } from "./version-mask"
 import { verifyReview } from "./verify-review"
@@ -50,8 +50,8 @@ describe("the declared form: what a declaration admits", () => {
 // change and the tracking issue is bound into the mark as the kind's argument.
 describe("the declared form: refusal by security ruling (#15220)", () => {
   const ruling = "SDK-Parity-Changed: s1 refusal-by-ruling 15220\n"
-  const answer = { result: { kind: "ok", value: { state: "ready" } }, exit: 0, stdout: "ok\n", stderr: "" }
-  const refusal = { result: refused(ERROR).result, exit: 2, stdout: "", stderr: "" }
+  const answer = { result: { kind: "ok", value: { state: "ready" } }, exit: 0, stdout: "", stderr: "" }
+  const refusal = { result: refused(ERROR).result, exit: 0, stdout: "", stderr: "" }
 
   test("#given a base answer and a head refusal in the same envelope #then the declaration is exempt", () => {
     const report = gateReport(withOutcomes(answer, refusal, ruling))
@@ -59,6 +59,43 @@ describe("the declared form: refusal by security ruling (#15220)", () => {
     expect(report.exempted).toEqual([expect.stringMatching(/^s1#exempt=declared:refusal-by-ruling 15220@/)])
   })
 
+  test("the SDK driver envelope admits only the answer-to-error replacement", () => {
+    const sdkOk = { answer: { kind: "ok", value: { state: "not_running" } } }
+    const sdkRefusal = { answer: { kind: "error", error: ERROR } }
+    expect(failuresOf(withOutcomes(sdkOk, sdkRefusal, ruling))).toEqual([])
+    expect(
+      failuresOf(withOutcomes(sdkOk, { ...sdkRefusal, stderr: "unexpected output" }, ruling)).length,
+    ).toBeGreaterThan(0)
+    expect(failuresOf(withOutcomes(sdkOk, sdkRefusal, ruling.replace("15220", "bogus"))).length).toBeGreaterThan(0)
+    expect(failuresOf(withOutcomes(sdkRefusal, sdkOk, ruling)).length).toBeGreaterThan(0)
+    expect(
+      failuresOf(
+        withOutcomes(sdkRefusal, { answer: { kind: "error", error: { ...ERROR, code: "different" } } }, ruling),
+      ).length,
+    ).toBeGreaterThan(0)
+  })
+  test("the SDK root gets no home while its isolated child retains one", async () => {
+    const tree = mkdtempSync(join(tmpdir(), "sdk-parity-env-"))
+    const entry = join(tree, "packages/omo-senpi/src/components/omo-sdk")
+    try {
+      mkdirSync(entry, { recursive: true })
+      writeFileSync(
+        join(entry, "index.ts"),
+        `export const createOmoSdk = ({ env }) => ({
+        deviceService: { status: () => ({ kind: "ok", value: [Boolean(env.HOME), Boolean(process.env.HOME)] }) }
+      })`,
+      )
+      const scenario = SCENARIOS.find((item) => item.id === "deviceService.status/env-without-home")
+      if (scenario?.surface !== "sdk") throw new Error("missing no-home SDK scenario")
+      const control = { ...scenario, id: "named-home", environment: undefined }
+      expect(await runScenarios(tree, [scenario, control])).toEqual({
+        [scenario.id]: { answer: { kind: "ok", value: [false, true] } },
+        [control.id]: { answer: { kind: "ok", value: [true, true] } },
+      })
+    } finally {
+      rmSync(tree, { recursive: true, force: true })
+    }
+  })
   test("#given no declaration #then the authority matrix still fails", () => {
     expect(failuresOf(withOutcomes(answer, refusal, "")).join("\n")).toContain("answers differently")
   })

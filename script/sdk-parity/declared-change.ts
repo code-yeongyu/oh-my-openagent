@@ -82,22 +82,15 @@ const KINDS: Readonly<Record<string, { readonly args: number; readonly check: Ki
   // issue of the ruling (#15220); it is bound into the exemption detail like any other argument.
   "refusal-by-ruling": {
     args: 1,
-    check: (_declaration, _scenario, before, after, context) => {
+    check: (declaration, _scenario, before, after) => {
+      if (!/^#?[1-9]\d*$/.test(declaration.args[0] ?? "")) return "its argument must name a public issue number"
       if (!answers(before)) return "the kind refusal-by-ruling needs the merge base to answer"
-      if (!refuses(after)) return "the kind refusal-by-ruling needs the head to refuse"
-      const baseResult = resultOf(before)
-      if (baseResult?.["kind"] !== "ok") return "the merge base's answer is not ok"
-      // The answer and the refusal replace each other, and an answer turning into a refusal changes the exit and the
-      // streams by definition; every other key of the outcome and the result must be equal.
-      const envelope = (outcome: Outcome): string => {
-        const result = resultOf(outcome) ?? {}
-        const { value: _value, answer: _answer, error: _error, kind: _kind, ...rest } = result
-        const { exit: _exit, stdout: _stdout, stderr: _stderr, ...outcomeRest } = outcome
-        return JSON.stringify({ ...outcomeRest, result: rest })
-      }
-      return envelope(before) === envelope(after)
-        ? undefined
-        : "the outcomes differ outside the answer becoming a refusal"
+      if (!refuses(after) || Array.isArray(resultOf(after)?.error))
+        return "the kind refusal-by-ruling needs the head to refuse"
+      if (resultOf(before)?.kind !== "ok") return "the merge base's answer is not ok"
+      const oldEnvelope = without(before, ({ kind: _kind, value: _value, ...rest }) => rest)
+      const newEnvelope = without(after, ({ kind: _kind, error: _error, ...rest }) => rest)
+      return oldEnvelope === newEnvelope ? undefined : "the outcomes differ outside the answer becoming a refusal"
     },
   },
   // Both trees refuse with an error object, and the outcomes are byte-equal apart from error.next_action and
