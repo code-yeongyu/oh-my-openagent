@@ -20,6 +20,7 @@ const builtMemoryMemfsExtensionPath = join(packageRoot, "plugin", "extensions", 
 const builtMemoryPalaceExtensionPath = join(packageRoot, "plugin", "extensions", "omo-memory-palace.js")
 const builtMemoryCommandsExtensionPath = join(packageRoot, "plugin", "extensions", "omo-memory-commands.js")
 const builtDeviceAccountExtensionPath = join(packageRoot, "plugin", "extensions", "omo-device-account.js")
+const builtMemorySyncRpcExtensionPath = join(packageRoot, "plugin", "extensions", "omo-memory-sync-rpc.js")
 const builtSessionHistoryExtensionPath = join(packageRoot, "plugin", "extensions", "omo-session-history.js")
 const builtRecallStoreExtensionPath = join(packageRoot, "plugin", "extensions", "omo-recall-store.js")
 const builtDeviceServiceExtensionPath = join(packageRoot, "plugin", "extensions", "omo-device-service.js")
@@ -110,6 +111,7 @@ describe("omo-senpi bundle purity", () => {
       builtMemoryPalaceExtensionPath,
       builtMemoryCommandsExtensionPath,
       builtDeviceAccountExtensionPath,
+      builtMemorySyncRpcExtensionPath,
       builtSessionHistoryExtensionPath,
       builtRecallStoreExtensionPath,
       builtDeviceServiceExtensionPath,

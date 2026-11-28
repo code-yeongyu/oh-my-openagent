@@ -29,6 +29,7 @@ const BUNDLE_FILES = [
   "omo-telemetry-posthog.js",
   "omo-telemetry-otlp.js",
   "omo-memory-sync.js",
+  "omo-memory-sync-rpc.js",
   "omo-thread-client.js",
   "omo-wake.js",
   "omo-telemetry-recovery.js",

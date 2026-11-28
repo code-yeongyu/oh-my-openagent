@@ -40,12 +40,38 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # A release-state pull request changes nothing but versions over its pinned source, and this gate reads a version bump
+      # as goldens drift, so the bot-written stamp PR could never pass and publish.yml refuses a stamp PR with a failing
+      # check. Same proof as ci.yml's release-stamp skip (#14847): same-repo release/v*-source-state head, ONE stamp commit
+      # on a pin that is on the base branch, and release-stamp-strict.mjs printing STRICT_STAMP_OK.
+      - name: Release stamp proof
+        id: stamp
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          strict=false
+          if [[ "$HEAD_REF" =~ ^release/v.+-source-state$ ]] && [ "$PR_HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            STAMP_PARENTS="$(git show -s --format=%P "$HEAD_SHA")"
+            if [ "$(wc -w <<< "$STAMP_PARENTS")" -eq 1 ] &&
+               git merge-base --is-ancestor "$STAMP_PARENTS" "origin/$BASE_REF" &&
+               [ "$(node script/release-stamp-strict.mjs "$STAMP_PARENTS" "$HEAD_SHA")" = STRICT_STAMP_OK ]; then
+              strict=true
+              echo "::notice::Release stamp over ${STAMP_PARENTS}: versions only, so the parity gate does not apply."
+            fi
+          fi
+          echo "strict=$strict" >> "$GITHUB_OUTPUT"
+
       - name: Registry, inventories, import family and negative controls
+        if: steps.stamp.outputs.strict != 'true'
         env:
           SDK_PARITY_BASE: origin/${{ github.base_ref }}
         run: bun test --timeout 20000 script/sdk-parity script/remote-import-guard.test.ts
 
       - name: Changed-capability gate
+        if: steps.stamp.outputs.strict != 'true'
         env:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}

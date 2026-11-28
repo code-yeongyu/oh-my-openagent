@@ -96,7 +96,7 @@
   },
   "native-version": {
     "exit": 0,
-    "stdout": "omo 5.1.84 (engine: senpi 2026.11.28-1)\n",
+    "stdout": "omo 5.1.85 (engine: senpi 2026.11.28-1)\n",
     "stderr": ""
   },
   "opencode-help": {
@@ -141,7 +141,7 @@
   },
   "opencode-version": {
     "exit": 0,
-    "stdout": "oh-my-openagent v5.1.84\n",
+    "stdout": "oh-my-openagent v5.1.85\n",
     "stderr": ""
   },
   "opencode-local-version-help": {
