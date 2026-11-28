@@ -4,6 +4,23 @@ import * as NodePath from "node:path"
 import * as NodeProcess from "node:process"
 
 import { parseSync } from "oxc-parser"
+import { sourceBudgets } from "./lint-ratchet-budget"
+
+import {
+  argumentsOf,
+  child,
+  configCall,
+  configTimeoutKeys,
+  keyName,
+  propertiesOf,
+  testCall,
+  timeoutKeys,
+} from "./oxlint/no-flake-masking"
+
+type Node = {
+  readonly type: string
+  readonly [key: string]: unknown
+}
 
 // The strictness rules every repo enforces, plus the landmines testing rules (ported from
 // interfere-inc/landmines, MIT; no-module-mock extends its no-test-doubles to bun's mock.module). This repo still has hundreds of old sites, so they ratchet: each
@@ -66,7 +83,8 @@ export type Change = {
 export const compare = (baseline: Counts, current: Counts) => {
   const increases: Change[] = []
   const decreases: Change[] = []
-  const files = new Set([...Object.keys(baseline), ...Object.keys(current)])
+  // "#flake-values" is the #15114 value section, not a file: counts and values compare separately.
+  const files = new Set([...Object.keys(baseline), ...Object.keys(current)].filter((key) => !key.startsWith("#")))
   for (const file of [...files].toSorted()) {
     for (const rule of [...RATCHET_RULES, SUPPRESSION]) {
       const before = baseline[file]?.[rule] ?? 0
@@ -76,6 +94,115 @@ export const compare = (baseline: Counts, current: Counts) => {
     }
   }
   return { increases, decreases }
+}
+
+// --- no-flake-masking VALUES (#15114) ---------------------------------------------------------------------
+// A count does not see an existing timeout or retry argument raised. For files the count rule
+// already tracks, the value of every reported argument is compared against the baseline: any
+// raise fails with the file, the line, the old value and the new one; lowering passes.
+
+export type Site = {
+  readonly key: string
+  readonly line: number
+  readonly value: number | null
+  readonly windows?: number
+}
+
+const isNodeLike = (value: unknown): value is Node =>
+  typeof value === "object" && value !== null && typeof (value as Record<string, unknown>)["type"] === "string"
+
+export const flakeMaskingSites = (file: string, source: string): readonly Site[] => {
+  const sites: Site[] = []
+  const budget = sourceBudgets(file, source)
+  const slice = (node: Node) => source.slice(Number(node["start"]), Number(node["end"]))
+  const add = (key: string, node: Node, call?: Node): void => {
+    const start = Number(node["start"])
+    const value =
+      node.type === "Literal" && typeof node["value"] === "number"
+        ? { value: node["value"] }
+        : budget(
+            start,
+            Number(node["end"]),
+            call === undefined ? undefined : Number(call["start"]),
+            call === undefined ? undefined : Number(call["end"]),
+          )
+    if (value === undefined) return
+    sites.push({ key, line: source.slice(0, start).split("\n").length, ...value })
+  }
+  const inspect = (key: string, object: Node, keys: ReadonlySet<string>): void => {
+    for (const property of propertiesOf(object)) {
+      const name = keyName(property)
+      const value = child(property, "value")
+      if (value !== undefined && name !== null && (name === "retry" || keys.has(name))) add(key + "/" + name, value)
+    }
+  }
+  const visit = (node: Node, parent: string): void => {
+    let key = parent
+    if (node.type === "CallExpression" && configCall(node)) {
+      const [arg] = argumentsOf(node)
+      if (arg?.type === "ObjectExpression") inspect(parent + "/vi.setConfig", arg, configTimeoutKeys)
+    } else if (node.type === "CallExpression" && testCall(node)) {
+      const [name, second, third] = argumentsOf(node)
+      const callee = child(node, "callee")
+      if (name !== undefined && callee !== undefined) {
+        key = parent + "/" + JSON.stringify(name.type === "Literal" ? name["value"] : slice(name))
+        for (const arg of [second, third]) if (arg?.type === "ObjectExpression") inspect(key, arg, timeoutKeys)
+        if (
+          third !== undefined &&
+          second?.type !== "ObjectExpression" &&
+          third.type !== "ObjectExpression" &&
+          third.type !== "ArrowFunctionExpression" &&
+          third.type !== "FunctionExpression"
+        )
+          add(key + "/timeout", third, node)
+      }
+    } else if (node.type === "Property" && keyName(node) === "test") {
+      const value = child(node, "value")
+      if (value?.type === "ObjectExpression") inspect(parent + "/test", value, new Set())
+    }
+    for (const value of Object.values(node)) {
+      if (isNodeLike(value)) visit(value, key)
+      else if (Array.isArray(value)) for (const item of value) if (isNodeLike(item)) visit(item, key)
+    }
+  }
+  visit(parseSync(file, source).program as unknown as Node, "")
+  return sites
+}
+
+export type ValueChange = {
+  readonly file: string
+  readonly before: number
+  readonly after: number
+  readonly line: number
+  readonly unresolvable?: boolean
+}
+
+export const compareValues = (
+  baseline: Readonly<Record<string, readonly Site[]>>,
+  current: Readonly<Record<string, readonly Site[]>>,
+): ValueChange[] => {
+  const raises: ValueChange[] = []
+  for (const [file, sites] of Object.entries(current)) {
+    const previous = Map.groupBy(baseline[file] ?? [], (site) => site.key)
+    for (const site of sites) {
+      if (site.value === null) {
+        raises.push({ file, line: site.line, before: 0, after: 0, unresolvable: true })
+        continue
+      }
+      const old = previous.get(site.key)?.shift()
+      if (old === undefined) {
+        raises.push({ file, line: site.line, before: 0, after: site.value })
+        continue
+      }
+      if (old.value === null) continue
+      const windowsBefore = old.windows ?? old.value
+      const windowsAfter = site.windows ?? site.value
+      if (site.value > old.value) raises.push({ file, line: site.line, before: old.value, after: site.value })
+      else if (windowsAfter > windowsBefore)
+        raises.push({ file, line: site.line, before: windowsBefore, after: windowsAfter })
+    }
+  }
+  return raises
 }
 
 const sorted = (counts: Counts): Counts =>
@@ -175,36 +302,77 @@ const main = () => {
     )
     NodeProcess.exit(1)
   }
+  const storedBaseline: Counts & { readonly "#flake-values"?: Readonly<Record<string, readonly Site[]>> } =
+    NodeFS.existsSync(baselinePath) ? JSON.parse(NodeFS.readFileSync(baselinePath, "utf8")) : {}
+  // First adoption: a baseline without the values section records whatever the tree holds.
+  const valuesAdopted = NodeFS.existsSync(baselinePath) && "#flake-values" in storedBaseline
+  const baseValues = storedBaseline["#flake-values"] ?? {}
+  const watched = new Set([...Object.keys(baseValues)])
+  for (const [file, rules] of Object.entries(current))
+    if ((rules["omo-testing/no-flake-masking"] ?? 0) > 0 || (baseValues[file]?.length ?? 0) > 0) watched.add(file)
+  const currentValues: Record<string, readonly Site[]> = {}
+  const unresolved: string[] = []
+  for (const file of [...watched].toSorted()) {
+    const path = NodePath.join(root, file)
+    if (!NodeFS.existsSync(path)) continue
+    const sites = flakeMaskingSites(file, NodeFS.readFileSync(path, "utf8"))
+    currentValues[file] = sites
+    for (const site of sites)
+      if (site.value === null)
+        unresolved.push(
+          `${file}:${site.line}: no-flake-masking value cannot be resolved statically; use a statically known numeric budget`,
+        )
+  }
+  if (unresolved.length > 0) {
+    for (const message of unresolved) console.error(message)
+    NodeProcess.exit(1)
+  }
   if (NodeProcess.argv.includes("--update")) {
     // Lowering is the only routine update: raising a count needs the explicit flag, so following
     // the "lower the baseline" advice can never also lock in new findings.
     if (NodeFS.existsSync(baselinePath) && !NodeProcess.argv.includes("--allow-increase")) {
-      const { increases } = compare(JSON.parse(NodeFS.readFileSync(baselinePath, "utf8")), current)
+      const { increases } = compare(storedBaseline, current)
       for (const { file, rule, before, after } of increases)
         console.error(`${file}: ${rule} went up from ${before} to ${after}`)
-      if (increases.length > 0) {
-        console.error("lint-ratchet: --update only lowers counts; fix the new findings (or pass --allow-increase).")
+      const raises = valuesAdopted ? compareValues(baseValues, currentValues) : []
+      for (const { file, line, before, after } of raises)
+        console.error(`${file}:${line}: no-flake-masking value went up from ${before} to ${after}`)
+      if (increases.length > 0 || raises.length > 0) {
+        console.error(
+          "lint-ratchet: --update only lowers counts and values; fix the findings (or pass --allow-increase).",
+        )
         NodeProcess.exit(1)
       }
     }
-    NodeFS.writeFileSync(baselinePath, `${JSON.stringify(sorted(current), null, 2)}\n`)
+    NodeFS.writeFileSync(
+      baselinePath,
+      `${JSON.stringify({ ...sorted(current), "#flake-values": currentValues }, null, 2)}\n`,
+    )
     console.log(`lint-ratchet: baseline written for ${Object.keys(current).length} files`)
     return
   }
-  const baseline: Counts = JSON.parse(NodeFS.readFileSync(baselinePath, "utf8"))
-  const { increases, decreases } = compare(baseline, current)
-  for (const { file, rule, before, after } of increases)
-    console.error(`${file}: ${rule} went up from ${before} to ${after}`)
+  const { increases, decreases } = compare(storedBaseline, current)
+  const valueRaises = valuesAdopted ? compareValues(baseValues, currentValues) : []
+  for (const { file, line, before, after, unresolvable } of valueRaises)
+    console.error(
+      unresolvable === true
+        ? `${file}:${line}: no-flake-masking value cannot be resolved statically`
+        : `${file}:${line}: no-flake-masking value went up from ${before} to ${after}`,
+    )
+  if (increases.length > 0 || valueRaises.length > 0) {
+    for (const { file, rule, before, after } of increases)
+      console.error(`${file}: ${rule} went up from ${before} to ${after}`)
+    console.error("lint-ratchet: new code must not add a ratcheted finding or raise one of its values.")
+    NodeProcess.exit(1)
+  }
   for (const { file, rule, before, after } of decreases)
     console.error(`${file}: ${rule} went down from ${before} to ${after}; lower the baseline in this change`)
-  if (increases.length > 0)
-    console.error(`lint-ratchet: new code must not add ${RATCHET_RULES.join(", ")} or a disable comment for them.`)
-  if (decreases.length > 0 && increases.length === 0)
+  if (decreases.length > 0)
     console.error(
       "lint-ratchet: run `bun run lint:ratchet:update` and commit the baseline, so removed sites cannot come back.",
     )
-  if (increases.length > 0 || decreases.length > 0) NodeProcess.exit(1)
-  console.log("lint-ratchet: every count matches the baseline")
+  if (decreases.length > 0) NodeProcess.exit(1)
+  console.log("lint-ratchet: every count and value matches the baseline")
 }
 
 if (import.meta.main) main()
