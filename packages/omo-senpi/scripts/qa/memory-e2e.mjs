@@ -221,6 +221,31 @@ async function scenario1() {
   return { sandbox }
 }
 
+async function scenarioNoopDescription() {
+  const sandbox = scenarioSandbox()
+  writeOmoConfig(sandbox)
+  const file = { file_path: "knowledge/fixture.md", description: "Fixture" }
+  writeMockScript(sandbox, {
+    parentSteps: [
+      { type: "tool_call", name: "memory", arguments: { command: "create", ...file, file_text: "Test", reason: "Seed" } },
+      { type: "tool_call", id: "noop", name: "memory", arguments: { command: "update_description", ...file, reason: "Confirm" } },
+      { type: "text", text: "Description already set." },
+    ],
+    retryPreviousToolOnErrorOrNudge: "noop",
+    childSteps: [],
+  })
+  const run = runSenpi(sandbox, { prompt: "Confirm the fixture description.", env: { PI_OFFLINE: "1", OMO_SENPI_QA: "1" } })
+  const writes = run.stdout.split("\n").filter((line) => line.startsWith("{")).map((line) => JSON.parse(line))
+    .filter((event) => event.type === "tool_execution_end" && event.toolName === "memory")
+  const noop = writes.find((event) => event.toolCallId === "noop")
+  record(
+    "a redundant edit succeeds and the next model turn receives no retry prompt",
+    run.status === 0 && writes.length === 2 && noop?.isError === false &&
+      noop.result.content.some((part) => part.text?.includes("made no changes")),
+    `memory executions=${writes.length}, noop.isError=${noop?.isError}, exit=${run.status}`,
+  )
+}
+
 async function scenario2() {
   const sandbox = scenarioSandbox()
   writeOmoConfig(sandbox, { trigger: { step_count: 1, on_compaction: false } })
@@ -447,10 +472,13 @@ async function scenario5() {
 
 async function main() {
   console.log(`senpi: ${senpiBin}`)
-  await scenario1()
-  await scenario2()
-  await scenario3And4()
-  await scenario5()
+  await scenarioNoopDescription()
+  if (!process.argv.includes("--noop-description")) {
+    await scenario1()
+    await scenario2()
+    await scenario3And4()
+    await scenario5()
+  }
 
   const realSenpiAfter = hashDir(join(homedir(), ".senpi", "agent"), isolationExclude)
   const realOmoMemoryAfter = hashDir(join(homedir(), ".omo", "memory"))

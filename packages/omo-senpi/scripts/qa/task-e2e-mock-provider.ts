@@ -54,6 +54,7 @@ type MockStep =
     }
 
 interface MockScript {
+  retryPreviousToolOnErrorOrNudge?: string
   parentSteps: MockStep[]
   childSteps: MockStep[]
   models?: readonly string[]
@@ -74,6 +75,8 @@ interface Model<TApi extends string = Api> {
 }
 
 interface Message {
+  toolCallId?: string
+  isError?: boolean
   role: string
   content: string | Array<{ type?: string; text?: string }>
 }
@@ -267,7 +270,15 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
   }
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount
-  const step = steps[Math.min(index, steps.length - 1)]
+  let step = steps[Math.min(index, steps.length - 1)]
+  const previous = steps[index - 1]
+  if (!isChild && previous?.type === "tool_call" && previous.id && previous.id === script.retryPreviousToolOnErrorOrNudge) {
+    const messages = context.messages ?? []
+    const resultIndex = messages.findIndex((m) => m.role === "toolResult" && m.toolCallId === previous.id)
+    if (resultIndex >= 0 && (messages[resultIndex].isError || messages.slice(resultIndex + 1).some((m) => m.role === "user"))) {
+      step = { ...previous, id: `${previous.id}-retry` }
+    }
+  }
   if (isChild) childCallCount += 1
   else parentCallCount += 1
   const message = stepToAssistantMessage(step, index + 1, streamModel.id)
