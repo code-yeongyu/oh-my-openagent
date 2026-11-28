@@ -3,13 +3,11 @@ import { spawn, type StdioOptions } from "node:child_process"
 import { once } from "node:events"
 import { mkdtempSync } from "node:fs"
 import { createRequire } from "node:module"
-// Windows holds a just-exited engine.exe image open briefly (unmapping, on-access scanning); the held root
-// is deferred with a holder diagnostic (#11190) instead of failing the run or retrying (#15177).
-import { removeTestRootBestEffort } from "../../../../../../test-support/held-test-root.mjs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Duplex } from "node:stream"
 import { z } from "zod"
+import { removeTestRootBestEffort } from "../../../../../../test-support/held-test-root.mjs"
 import { readFrames, writeFrame } from "./framing"
 
 // #11997 row 5. The newest pinned senpi known to refuse every win32 pair: senpi#5125 records the Bun 1.4.4
@@ -30,7 +28,9 @@ function newerThan(version: string, than: string): boolean {
 }
 const senpiCarriesWindowsPair = newerThan(senpiVersion, SENPI_WITHOUT_WINDOWS_PAIR)
 
-const root = mkdtempSync(join(tmpdir(), "omo-memsync-compiled-"))
+// A Windows runner owns RUNNER_TEMP until job teardown, after the compiled image has been unmapped.
+const runnerTemp = process.platform === "win32" ? process.env.RUNNER_TEMP : undefined
+const root = mkdtempSync(join(runnerTemp || tmpdir(), "omo-memsync-compiled-"))
 const engine = join(root, process.platform === "win32" ? "engine.exe" : "engine")
 
 beforeAll(async () => {
@@ -47,7 +47,9 @@ beforeAll(async () => {
   if (code !== 0) throw new Error(`bun build --compile failed: ${errors}`)
 }, 150_000)
 
-afterAll(() => removeTestRootBestEffort(root))
+afterAll(() => {
+  if (!runnerTemp) removeTestRootBestEffort(root)
+})
 
 async function launch(table: string, slots: number) {
   const stdio: StdioOptions = ["ignore", "pipe", "pipe", "ignore", "ignore"]
