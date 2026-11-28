@@ -180,6 +180,9 @@ function probeBase(name: string, legs: readonly Leg[] | null): string {
             },
           ],
   })
+  answer(`${repo}/actions/workflows/ci.yml/runs?event=workflow_dispatch&status=completed&head_sha=abc&per_page=20`, {
+    workflow_runs: [],
+  })
   answer(`${repo}/actions/runs/5/jobs?filter=latest&per_page=100`, {
     jobs: [
       { name: "test (ubuntu-latest, 1/2)", conclusion: "failure", html_url: "u", labels: ["ubuntu-26.04"], steps: [] },

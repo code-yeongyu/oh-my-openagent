@@ -96,6 +96,25 @@ describe("sharedSkillsRootPath", () => {
     expect(resolve(resolved)).toBe(resolve(join(root, "dist", "skills")))
   })
 
+  test.each([
+    ["dist/index.js", ["dist"]],
+    ["dist/cli/index.js", ["dist", "cli"]],
+  ] as const)(
+    "#given the published package layout with no dist/skills #when %s resolves the root #then the one shipped packages/shared-skills/skills copy is used",
+    async (_bundle, bundleSegments) => {
+      // given: the npm tarball ships packages/shared-skills/skills and excludes dist/skills (#15400)
+      const root = createFixtureRoot()
+      mkdirSync(join(root, "packages", "shared-skills", "skills", "ast-grep"), { recursive: true })
+
+      // when
+      const loaded = await loadFrom(join(root, ...bundleSegments))
+      const resolved = loaded.sharedSkillsRootPath()
+
+      // then
+      expect(resolve(resolved)).toBe(resolve(join(root, "packages", "shared-skills", "skills")))
+    },
+  )
+
   test("#given no skills directory beside or above the module #when the root is resolved #then the sibling path is still returned", async () => {
     // given
     const root = createFixtureRoot()

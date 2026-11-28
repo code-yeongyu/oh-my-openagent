@@ -44,6 +44,7 @@ type Case = {
   readonly fork?: boolean
   readonly runHeadSha?: "pin" | "other"
   readonly silentChecker?: boolean
+  readonly releaseCiRun?: "none" | "success" | "human"
 }
 
 function runClassify(name: string, input: Case): { readonly fullMatrix: string; readonly log: string } {
@@ -56,6 +57,7 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
     fork = false,
     runHeadSha = "pin",
     silentChecker = false,
+    releaseCiRun = "none",
   } = input
   const dir = join(root, name)
   const repo = join(dir, "repo")
@@ -122,6 +124,20 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
     "api-error": [],
   }[pinRun]
   writeFileSync(join(dir, "runs.json"), JSON.stringify({ workflow_runs: runs }))
+  const releaseCiRecord = {
+    id: 46118401486,
+    created_at: "2026-11-22T01:00:00Z",
+    conclusion: "success",
+    head_sha: pin,
+    head_branch: `release-ci/${pin}-46118333194-1`,
+    event: "workflow_dispatch",
+    status: "completed",
+    triggering_actor: { login: releaseCiRun === "human" ? "someone" : "github-actions[bot]" },
+  }
+  writeFileSync(
+    join(dir, "dispatch-runs.json"),
+    JSON.stringify({ workflow_runs: releaseCiRun === "none" ? [] : [releaseCiRecord] }),
+  )
   writeFileSync(
     join(dir, "jobs.json"),
     JSON.stringify({
@@ -144,6 +160,7 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
       // Answers the runs query only for the pin's dev push runs, so a probe at any other commit fails the case.
       'case "$2" in',
       '  *"/jobs?"*) f="$FAKE_DIR/jobs.json" ;;',
+      `  *"/runs?"*event=workflow_dispatch*) [[ "&\${2#*\\?}&" == *"&head_sha=${pin}&"* ]] || { echo "gh: unexpected query $2" >&2; exit 1; }; f="$FAKE_DIR/dispatch-runs.json" ;;`,
       `  *"/runs?"*) for want in head_sha=${pin} branch=dev event=push; do [[ "&\${2#*\\?}&" == *"&$want&"* ]] || { echo "gh: unexpected query $2" >&2; exit 1; }; done; f="$FAKE_DIR/runs.json" ;;`,
       '  *) echo "gh: unexpected endpoint $2" >&2; exit 1 ;;',
       "esac",
@@ -193,6 +210,15 @@ posixBashTest(
   },
 )
 
+posixBashTest(
+  "#given the pin's dev push run failed but the release's own CI run on its release-ci ref is green #then it stays on Linux and names that run",
+  () => {
+    const result = runClassify("release-ci-green", { pinRun: "failure", releaseCiRun: "success" })
+    expect(result.fullMatrix).toBe("false")
+    expect(result.log).toContain("proof run 46118401486 (release CI run)")
+  },
+)
+
 posixBashTest.each([
   ["the stamp sits on an extra commit", "extra", { extraCommit: true }],
   ["the stamp changes source", "source", { sourceChange: true }],
@@ -205,6 +231,11 @@ posixBashTest.each([
   ["the pin is not on the base branch", "off-base", { pinOffBase: true }],
   ["the returned run is for another commit", "other-sha", { runHeadSha: "other" }],
   ["the strict checker exits 0 without its sentinel", "silent-checker", { silentChecker: true }],
+  [
+    "the dev push run failed and the release-ci run was dispatched by a person",
+    "human-release-ci",
+    { pinRun: "failure", releaseCiRun: "human" },
+  ],
 ] as const)("#given %s #then the run keeps the full matrix", (_name, dir, input) => {
   expect(runClassify(dir, input).fullMatrix).toBe("true")
 })

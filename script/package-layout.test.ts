@@ -110,8 +110,13 @@ function collectSkillAssetPaths(rootRelativePath: string): string[] {
   return expectedPaths.sort()
 }
 
+// Test files never ship: the root package.json excludes every *.test.* file from the tarball (#15400).
+const SHIPS_NO_TESTS = (assetPath: string) => !/\.test\.[^/]+$/.test(assetPath)
+
 function collectExpectedAssetPaths(): string[] {
-  return [...commandRoots.flatMap(collectCommandAssetPaths), ...skillRoots.flatMap(collectSkillAssetPaths)].sort()
+  return [...commandRoots.flatMap(collectCommandAssetPaths), ...skillRoots.flatMap(collectSkillAssetPaths)]
+    .filter(SHIPS_NO_TESTS)
+    .sort()
 }
 
 function parsePackedPaths(output: string): Set<string> {

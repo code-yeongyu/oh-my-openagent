@@ -11,9 +11,18 @@ import { fileURLToPath } from "node:url"
 //                                                       `plugins/omo/` and the root CLI
 //                                                       runtimes are bundled into
 //                                                       `plugins/omo/dist/cli`)
+// The published npm package ships ONE skills copy, packages/shared-skills/skills (the Codex installer
+// reads it from there), and no dist/skills, so the bundles fall back to that copy from dist/ and
+// dist/cli/ (#15400).
 // Probes run nearest-first so a closer skills directory always wins, and the sibling path is
 // returned unchanged when nothing matches, keeping the previous not-found behavior.
-const SKILLS_PROBE_SPECIFIERS = ["./skills/", "../skills/", "../../skills/"]
+const SKILLS_PROBE_SPECIFIERS = [
+  "./skills/",
+  "../skills/",
+  "../../skills/",
+  "../packages/shared-skills/skills/",
+  "../../packages/shared-skills/skills/",
+]
 
 export function sharedSkillsRootPath() {
   const candidates = SKILLS_PROBE_SPECIFIERS.map((specifier) => fileURLToPath(new URL(specifier, import.meta.url)))

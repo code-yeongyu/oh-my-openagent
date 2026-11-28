@@ -159,8 +159,9 @@ describe("publish.yml post-publish-verify registry readiness", () => {
     () => {
       const outcome = runReadiness({ metadataReadyAfterViews: 0, tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER })
       expect(outcome.status).not.toBe(0)
-      expect(outcome.curlCalls).toBe(240)
-      expect(outcome.sleeps).toBe(239)
+      // 360 x 15 s = 90 minutes: npm's slow processing step lands at 55.3-56 min (#15400).
+      expect(outcome.curlCalls).toBe(360)
+      expect(outcome.sleeps).toBe(359)
       expect(outcome.stdout + outcome.stderr).toContain("metadata and tarball did not become ready")
       expect(outcome.stdout + outcome.stderr).toContain("tarball availability")
     },
