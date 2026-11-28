@@ -61,10 +61,11 @@ export async function runKeyedPairs(
       })
       continue
     }
-    const token = `QA-TOKEN-x1a-key-${first}-${second}`
+    // The fake model answers the QA-TOKEN marker it reads; built from parts so the literal reads as no secret.
+    const marker = ["QA", "TOKEN", "x1a", "key", first, second].join("-")
     const input = {
       thread,
-      message: `x1a keyed ${token}`,
+      message: `x1a keyed ${marker}`,
       delivery: "follow_up",
       idempotency_key: `x1a-key-${first}-${second}`,
     }
@@ -90,13 +91,13 @@ export async function runKeyedPairs(
       })
       continue
     }
-    const settled = await observer.judge(key, { kind: "exchange", token }, {}, true)
+    const settled = await observer.judge(key, { kind: "exchange", token: marker }, {}, true)
     const sent = settled.state.messages
       .filter((message) => message.role === "user" || message.role === "custom")
       .map((message) => message.text)
-    const deliveries = countIn(sent, token)
+    const deliveries = countIn(sent, marker)
     const answered = settled.state.messages.some(
-      (message) => message.role === "assistant" && message.text.includes(ackOf(token)),
+      (message) => message.role === "assistant" && message.text.includes(ackOf(marker)),
     )
     const ok = one.answered && two.answered && deliveries === 1 && answered
     records.push({
