@@ -14,7 +14,7 @@ Opt-in: requires `goal.enabled: true` (config) AND the `goal` hook enabled. Wire
 
 | File | Purpose |
 |------|---------|
-| `index.ts` | `createGoalHook(ctx, options) -> GoalHook`. `event` handler for `session.idle` (continuation) and `session.deleted` (clear). Re-entry guarded by `inFlightContinuations` Set |
+| `index.ts` | `createGoalHook(ctx, options) -> GoalHook`. `event` handler for `session.idle` (continuation), `session.error` (abort detection) and `session.deleted` (clear). Re-entry guarded by `inFlightContinuations` Set |
 | `controller.ts` | `createGoalController({projectDir})`. CRUD: set/get/pause/resume/clear/markComplete + `accountUsage` (token/time accrual, controller-only) + `updateTui`. Writes TUI mirror |
 | `store.ts` | File persistence. Atomic write (tmp + rename). `readGoal` returns null on ENOENT or parse/schema failure. `STORE_VERSION = 1` |
 | `types.ts` | Zod schemas: `GoalSchema`, `GoalStatusSchema` (`active|paused|complete`), `GoalFileSchema` (v1), tool snapshot/response schemas |
@@ -45,7 +45,9 @@ interface GoalHook {
 
 ## CONTINUATION DISPATCH
 
-`session.idle` -> `buildContinuationPrompt(goal)` -> `dispatchInternalPrompt` (async gate, `settleMs: 150`, `queueBehavior: "defer"`, source `goal:idle-continuation`). Dispatch failures log via `console.warn` only; the prompt may still be accepted by another route. `inFlightContinuations` prevents re-entrant dispatches per session.
+`session.idle` -> skip guards -> `buildContinuationPrompt(goal)` -> `dispatchInternalPrompt` (async gate, `settleMs: 150`, `queueBehavior: "defer"`, source `goal:idle-continuation`). Dispatch failures log via `console.warn` only; the prompt may still be accepted by another route. `inFlightContinuations` prevents re-entrant dispatches per session.
+
+Skip guards (#12976) are the ones `todo-continuation-enforcer` uses, shared through `../shared/idle-continuation-guards.ts`: an abort seen on `session.error` within `ABORT_WINDOW_MS`, then the transcript checks (last assistant message aborted, unanswered question tool, latest assistant turn still blocking an internal prompt). A failed `session.messages` fetch also skips. Each skip logs `[goal] Skipped idle continuation` with a `reason`. The goal stays `active`; the user's next turn resumes continuation. OpenCode V1 cannot tell a user abort from a plugin-initiated one, so an abort never persists a status change here (Senpi's goal engine blocks only on `abortSource: "user"`).
 
 ## NOTES
 
