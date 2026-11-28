@@ -192,14 +192,44 @@ describe("redactUrl", () => {
 
     // Catastrophic-backtracking guard for the regex passes (secret patterns, seams, split credentials), which run inside
     // V8's regex engine where no work can be counted (#14860). Here time is the behaviour under test, and the bound sits
-    // far from both sides: redactUrl on this 400k-character input takes ~15-25 ms on a fast Mac (~65 ms at the 2.7x of
-    // the slowest macOS runner measured), and one quadratic pattern ("A+X") makes it ~9.7 s. The bound is 2 s.
+    // far from both sides: redactUrl on this 400k-character input measured 15-25 ms on a MacBook, ~65 ms on the hosted
+    // macOS run and 117.53 ms in the slower review container, and one quadratic pattern ("A+X") makes it ~9.7 s. The
+    // bound is 2 s, ~17x above the slowest measurement.
     it("#then the regex passes finish far below a catastrophic-backtracking bound", () => {
       const input = `-----BEGIN ${"A".repeat(200_000)}-----${"B".repeat(200_000)}`
       const started = performance.now()
       expect(redactUrl(input)).toBe(input)
       expect(performance.now() - started).toBeLessThan(2_000)
     })
+
+    // #14863: the A/B input above only reaches the delimiter characters. Every class in SECRET_PATTERN_SOURCES is keyed on
+    // its own trigger characters, and the seam and split-credential passes on zero-width drops and spaced letters, so each
+    // family gets a hostile input built from those triggers, all under the same absolute bound.
+    it("#then every secret pattern family finishes far below the same backtracking bound", () => {
+      const hostile: ReadonlyArray<readonly [string, string]> = [
+        ["aws_access_key", ("AKIA" + "Z".repeat(15) + "-").repeat(20_000)],
+        ["credential_assignment", ("token" + " ".repeat(24) + "=" + " ".repeat(24) + "\"").repeat(10_000)],
+        [
+          "authorization_header",
+          ("Authorization" + " ".repeat(24) + ":" + " ".repeat(24) + "Bearer" + " ".repeat(24) + "\"").repeat(5_000),
+        ],
+        ["openai_key", ("sk-" + "_-".repeat(24) + " ").repeat(13_000)],
+        ["vendor_token", ("ghp_" + "_-".repeat(24) + " ").repeat(13_000)],
+        ["seam", ("t\u200Boken" + " ".repeat(24) + "=" + " ".repeat(24) + "\"").repeat(10_000)],
+        ["split_credential_assignment", ("t o k e n" + " ".repeat(24) + "=" + " ".repeat(24)).repeat(8_000)],
+      ]
+      for (const [family, input] of hostile) {
+        // A 400k-character minimum keeps every input a real scan, not a short-circuit.
+        if (input.length < 400_000) throw new Error(`${family}: hostile input is only ${input.length} characters`)
+        const started = performance.now()
+        const redacted = redactUrl(input)
+        const elapsed = performance.now() - started
+        // aws/credential/authorization/seam/split inputs complete a trigger but never a value tail, so they stay unchanged;
+        // the two unbounded-tail families match, which is fine because only the time bound is asserted for them.
+        if (family !== "openai_key" && family !== "vendor_token") expect(redacted).toBe(input)
+        expect({ family, bounded: elapsed < 2_000 }).toEqual({ family, bounded: true })
+      }
+    }, 30_000)
   })
 
   describe("#given an empty url", () => {
