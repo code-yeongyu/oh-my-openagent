@@ -4,12 +4,19 @@
 //   bun script/qa/computer/pool/macos-vm.ts --down <15|26> --run-id <id>   (always, after the job)
 //   bun script/qa/computer/pool/macos-vm.ts --sweep                        (deletes this pool's stopped guests; running ones are kept)
 //
-// The hypervisor command is POOL_HYPERVISOR (clone, run --no-graphics, list --format json, stop, delete); base images are
+// The hypervisor command is POOL_HYPERVISOR (clone, run --no-graphics --no-clipboard, list --format json, stop, delete); base images are
 // POOL_BASE_IMAGE_15 / POOL_BASE_IMAGE_26. Every run ends with the measured teardown receipts of macos-vm-ops.ts.
 
 import { type Hypervisor, sweepGuests, teardown } from "./macos-vm-ops.ts"
-import { type GuestListing, MACOS_MAJORS, type MacosMajor, planGuest, type PoolHost } from "./macos-vm-plan.ts"
-import { bringUp, UP_HOLD_TAG, type UpSteps } from "./macos-vm-up.ts"
+import {
+  type GuestListing,
+  guestRunArgv,
+  MACOS_MAJORS,
+  type MacosMajor,
+  planGuest,
+  type PoolHost,
+} from "./macos-vm-plan.ts"
+import { bringUp, guestProcessPattern, UP_HOLD_TAG, type UpSteps } from "./macos-vm-up.ts"
 
 type Ran = { readonly code: number; readonly stdout: string; readonly stderr: string }
 
@@ -75,9 +82,8 @@ function commandHypervisor(command: string): Hypervisor {
   }
 }
 
-// Live processes for a guest: an --up's hold, the clone that creates it and the run that boots it (all end in its name).
 function guestProcesses(name: string): number | null {
-  const found = run("/usr/bin/pgrep", ["-f", `(${UP_HOLD_TAG}|clone [^ ]+|run --no-graphics) ${name}$`])
+  const found = run("/usr/bin/pgrep", ["-f", guestProcessPattern(name)])
   if (found.code === 1) return 0
   if (found.code !== 0) return null
   return found.stdout.split("\n").filter((line) => line !== "").length
@@ -103,7 +109,7 @@ async function up(host: PoolHost, which: MacosMajor, runId: string): Promise<num
     },
     clone: (baseImage, guestName) => run(command, ["clone", baseImage, guestName]),
     startRun: (guestName) => {
-      const started = Bun.spawn([command, "run", "--no-graphics", guestName], { stdout: "ignore", stderr: "ignore" })
+      const started = Bun.spawn([command, ...guestRunArgv(guestName)], { stdout: "ignore", stderr: "ignore" })
       started.unref()
       return started.pid
     },
@@ -116,7 +122,7 @@ async function up(host: PoolHost, which: MacosMajor, runId: string): Promise<num
 }
 
 function down(host: PoolHost, which: MacosMajor, runId: string): number {
-  const plan = planGuest({ ...host, consoleUser: null }, which, runId)
+  const plan = planGuest(host, which, runId)
   if (plan.kind === "refused") {
     console.error(`macos-vm: refused: ${plan.reason}`)
     return 2

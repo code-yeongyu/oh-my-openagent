@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { guestName, isPoolGuest, planGuest, type PoolHost, RUNNER_LABEL } from "./macos-vm-plan.ts"
+import { guestName, guestRunArgv, isPoolGuest, planGuest, type PoolHost, RUNNER_LABEL } from "./macos-vm-plan.ts"
 
 const host: PoolHost = {
   platform: "darwin",
@@ -16,6 +16,7 @@ describe("guest plan", () => {
       major: "26",
       baseImage: "base-macos26",
       guestName: "omo-cu-macos26-43209825336",
+      consoleHost: null,
       labels: [RUNNER_LABEL, "macos-26"],
     })
   })
@@ -28,17 +29,19 @@ describe("guest plan", () => {
     })
   })
 
-  test("a host whose console session belongs to the pool user is refused: no guest in a person's session", () => {
-    const plan = planGuest({ ...host, consoleUser: "qa-pool" }, "15", "1")
-    expect(plan.kind).toBe("refused")
+  test("a console user no longer refuses the plan: it is recorded as the guest's console host (R-S4-1)", () => {
+    expect(planGuest({ ...host, consoleUser: "someone" }, "15", "1")).toEqual({
+      kind: "plan",
+      major: "15",
+      baseImage: "base-macos15",
+      guestName: "omo-cu-macos15-1",
+      consoleHost: "someone",
+      labels: [RUNNER_LABEL, "macos-15"],
+    })
   })
 
-  test("a host where any person is signed in at the console is refused, not only the pool user", () => {
-    const plan = planGuest({ ...host, consoleUser: "someone" }, "15", "1")
-    expect(plan).toEqual({
-      kind: "refused",
-      reason: "someone is signed in at the console; guests run only on a host nobody is using",
-    })
+  test("every guest start argv is headless with clipboard bridging off (R-S4-1)", () => {
+    expect(guestRunArgv("omo-cu-macos15-1")).toEqual(["run", "--no-graphics", "--no-clipboard", "omo-cu-macos15-1"])
   })
 
   test("Linux, an Intel Mac and a host without a hypervisor are refused", () => {
