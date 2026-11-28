@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { statSync } from "node:fs"
 import path from "node:path"
 import {
   type AllowlistEntry,
@@ -12,6 +13,33 @@ import {
   readSourceFile,
   WORKSPACE_ROOT,
 } from "./no-raw-tls-client-scan"
+
+// A chunk's cost grows with its bytes and with its file count (many small files cost as much as one large one), so a
+// chunk closes at either bound. Measured on one core: a single 1.5 MB generated bundle, the floor no chunking can split,
+// is about 2 s.
+const CHUNK_BYTES = 400_000
+const CHUNK_FILES = 64
+
+function chunkBySize(files: readonly string[], budget: number, maxFiles: number): string[][] {
+  const chunks: string[][] = []
+  let current: string[] = []
+  let size = 0
+  for (const file of files) {
+    let bytes = 0
+    try {
+      bytes = statSync(path.join(WORKSPACE_ROOT, file)).size
+    } catch {}
+    if (current.length > 0 && (size + bytes > budget || current.length >= maxFiles)) {
+      chunks.push(current)
+      current = []
+      size = 0
+    }
+    current.push(file)
+    size += bytes
+  }
+  if (current.length > 0) chunks.push(current)
+  return chunks
+}
 
 // Reviewed allowlist. Each entry pins one exact call: the repo-relative
 // file, the detected call's normalized text (whitespace collapsed outside
@@ -28,20 +56,6 @@ import {
 // destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
 // This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
-  {
-    file: "packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js",
-    call: "t.connect()",
-    count: 1,
-    reason:
-      'no TLS and no remote host: `t` is the SDK\'s relay transport, whose connect() opens the local device service through node:net createConnection({ path: <stateDir>/<socket> }) or, on Windows, { host: "127.0.0.1", port } (vendor/bunshin-ts-relay/index.js:766); the bundle imports no node:tls/https/http2 and has no wss URL (#12258, senpi#3078).',
-  },
-  {
-    file: "packages/omo-senpi/plugin/runtime/omo-sdk/sdk.js",
-    call: "t.connect",
-    count: 1,
-    reason:
-      "no TLS and no remote host: the remote module's client (components/remote/client.ts, bundled since the SDK's devices.list goes through it, #13413) calls its `connect` dependency, defaulting to device-service-core connectDeviceService, which opens the local device service through node:net createConnection on <stateDir>/<socket> or, on Windows, 127.0.0.1; the bundle imports no node:tls/https/http2.",
-  },
   ...["omo-codex", "omo-senpi"].flatMap((edition) =>
     ["https", "tls"].map((module) => ({
       file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
@@ -318,26 +332,53 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     })
   })
 
-  test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
-    const files = collectShippedSourceFiles()
-    expect(files.length).toBeGreaterThan(1000)
-    const scan: ScanItem[] = []
-    for (const file of files) {
-      const content = readSourceFile(path.join(WORKSPACE_ROOT, file))
-      if (content !== null) scan.push({ path: file, content })
-    }
-    // Built-runtime entries are skipped when no build ran: the omowright
-    // runtime is gitignored build output, and CI always builds before
-    // running tests, so absence locally means there is nothing to guard.
-    const effective = ALLOWLIST.filter(
-      (entry) => scan.some((item) => item.path === entry.file) || !isKnownBuiltRuntime(entry.file),
-    )
-    const verdict = evaluateShippedSource(scan, effective)
-    expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
-    expect(verdict.stale, STALE_GUIDANCE).toEqual([])
+  // The whole shipped tree is scanned in chunks of at most CHUNK_BYTES of source, one case per chunk, at the default
+  // test limit. Measured 2026-11-26: about 0.5 ms per KB on a calm host, so a chunk is about half a second; the
+  // largest single file (1.5 MB) is about 1.4 s. The partition and coverage cases below prove no file is skipped.
+  const corpus = collectShippedSourceFiles()
+  const chunks = chunkBySize(corpus, CHUNK_BYTES, CHUNK_FILES)
+  const chunkCases = chunks.map((files, index) => [index + 1, files] as const)
+
+  test("#given the shipped tree #when it is chunked #then every file is in exactly one chunk", () => {
+    expect(corpus.length).toBeGreaterThan(1000)
+    expect(chunks.flat()).toEqual(corpus)
+    expect(new Set(chunks.flat()).size).toBe(corpus.length)
+  })
+
+  test("#given the reviewed allowlist #then every entry has a reason and names a scanned file or an unbuilt runtime", () => {
     for (const entry of ALLOWLIST) {
       expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
+      expect(
+        corpus.includes(entry.file) || isKnownBuiltRuntime(entry.file),
+        entry.file + ": stale allowlist entry (no longer scanned)",
+      ).toBe(true)
     }
-    // The whole-tree scan takes ~10 s; the preload's 20 s default reaches only the first file of a multi-file run.
-  }, 60_000)
+  })
+
+  test.each(chunkCases)(
+    "#given shipped production source chunk %i #when scanned #then no raw TLS client call exists outside the reviewed allowlist",
+    (_chunk, files) => {
+      const scan: ScanItem[] = []
+      for (const file of files) {
+        const content = readSourceFile(path.join(WORKSPACE_ROOT, file))
+        if (content !== null) scan.push({ path: file, content })
+      }
+      // Built-runtime entries are skipped when no build ran: the omowright runtime is gitignored build output, and
+      // CI always builds before running tests, so absence locally means there is nothing to guard.
+      const entries = ALLOWLIST.filter(
+        (entry) =>
+          files.includes(entry.file) &&
+          (scan.some((item) => item.path === entry.file) || !isKnownBuiltRuntime(entry.file)),
+      )
+      const verdict = evaluateShippedSource(scan, entries)
+      expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
+      expect(verdict.stale, STALE_GUIDANCE).toEqual([])
+    },
+  )
+
+  test("#given the chunk list #then one case is generated per chunk and the cases cover the whole shipped tree", () => {
+    expect(chunkCases.length).toBe(chunks.length)
+    expect(chunkCases.map(([index]) => index)).toEqual(chunks.map((_, index) => index + 1))
+    expect(chunkCases.flatMap(([, files]) => files)).toEqual(corpus)
+  })
 })
