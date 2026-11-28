@@ -22,9 +22,22 @@ export function createPaneAuthDirectory(): () => void {
   return cleanup
 }
 
-export function buildPaneAuthEnvironmentArgs(): string[] {
+export type PaneAuthHandoff = {
+  readonly file: string
+  readonly username?: string
+}
+
+/**
+ * Write one single-use 0600 password file for a pane to source via
+ * withPaneAuth. Shared by the tmux (`-e` argv) and herdr (`--env` argv)
+ * handoffs so the password itself never reaches a command line, where it
+ * would be world-readable in the process list. One call = one file = one
+ * pane; the consuming shell unlinks it before attaching. Returns null when
+ * no password auth is configured.
+ */
+export function createPaneAuthHandoff(): PaneAuthHandoff | null {
   const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) return []
+  if (!password) return null
   // Standalone, user-password-configured OpenCode also needs a private channel.
   if (!process.env.OPENCODE_SERVER_PASSWORD_DIR) createPaneAuthDirectory()
   const directory = process.env.OPENCODE_SERVER_PASSWORD_DIR
@@ -32,9 +45,15 @@ export function buildPaneAuthEnvironmentArgs(): string[] {
   const file = join(directory, `${randomUUID()}.sh`)
   const quotedPassword = `'${password.replaceAll("'", "'\\''")}'`
   writeFileSync(file, `export OPENCODE_SERVER_PASSWORD=${quotedPassword}\n`, { mode: 0o600, flag: "wx" })
-  const args = ["-e", `OPENCODE_SERVER_PASSWORD_FILE=${file}`]
   const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) args.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
+  return username !== undefined ? { file, username } : { file }
+}
+
+export function buildPaneAuthEnvironmentArgs(): string[] {
+  const handoff = createPaneAuthHandoff()
+  if (!handoff) return []
+  const args = ["-e", `OPENCODE_SERVER_PASSWORD_FILE=${handoff.file}`]
+  if (handoff.username !== undefined) args.push("-e", `OPENCODE_SERVER_USERNAME=${handoff.username}`)
   return args
 }
 

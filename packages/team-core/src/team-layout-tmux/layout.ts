@@ -4,7 +4,19 @@ import {
   escapeTmuxFormat,
   isServerRunning,
   runTmuxCommand,
+  herdrCreateWorkspace,
+  herdrCreateTab,
+  herdrRunPaneCommand,
+  herdrCloseWorkspace,
+  herdrClosePane,
+  herdrListAgents,
+  isHerdrPaneId,
+  HERDR_TEAM_WORKSPACE_LABEL_PREFIX,
+  buildHerdrPaneAuthEnv,
+  defaultHerdrOpsDeps,
+  type MultiplexerBackend,
   type TmuxCommandResult,
+  type HerdrOpsDeps,
 } from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
 import { shellSingleQuote } from "../shell-quote"
@@ -29,6 +41,7 @@ export type TeamLayoutDeps = {
   getTmuxPath: () => Promise<string | null | undefined>
   resolveCallerTmuxSession: typeof resolveCallerTmuxSession
   log: typeof log
+  herdrOps?: HerdrOpsDeps
 }
 
 const defaultDeps: TeamLayoutDeps = {
@@ -37,6 +50,7 @@ const defaultDeps: TeamLayoutDeps = {
   getTmuxPath: async () => "tmux",
   resolveCallerTmuxSession,
   log,
+  herdrOps: defaultHerdrOpsDeps,
 }
 
 export type TeamLayoutResult = {
@@ -161,12 +175,16 @@ export async function createTeamLayout(
   members: Array<TeamLayoutMember>,
   tmuxMgr: TmuxSessionManager,
   deps: TeamLayoutDeps = defaultDeps,
+  options: { multiplexer?: MultiplexerBackend } = {},
 ): Promise<TeamLayoutResult | null> {
-  if (!canVisualize()) {
-    deps.log("tmux visualization unavailable, skipping")
+  if (members.length === 0) {
     return null
   }
-  if (members.length === 0) {
+  if (options.multiplexer === "herdr") {
+    return await createTeamLayoutHerdr(teamRunId, members, tmuxMgr, deps)
+  }
+  if (!canVisualize()) {
+    deps.log("tmux visualization unavailable, skipping")
     return null
   }
 
@@ -230,8 +248,15 @@ export async function removeTeamLayout(
   tmuxMgrOrDeps?: TmuxSessionManager | TeamLayoutDeps,
   deps: TeamLayoutDeps = defaultDeps,
 ): Promise<void> {
-  if (!canVisualize()) return
   const resolvedDeps = isTeamLayoutDeps(tmuxMgrOrDeps) ? tmuxMgrOrDeps : deps
+  const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget) ? tmuxMgrOrCleanupTarget : undefined
+
+  if (cleanupTargetUsesHerdr(cleanupTarget)) {
+    await removeTeamLayoutHerdr(teamRunId, cleanupTarget, resolvedDeps)
+    return
+  }
+
+  if (!canVisualize()) return
   try {
     const tmuxPath = await resolvedDeps.getTmuxPath()
     if (!tmuxPath) return
@@ -285,4 +310,136 @@ function isTeamLayoutCleanupTarget(
   value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined,
 ): value is TeamLayoutCleanupTarget {
   return value !== undefined && "ownedSession" in value && "targetSessionId" in value
+}
+
+// ---------------------------------------------------------------------------
+// Herdr backend
+// ---------------------------------------------------------------------------
+
+/**
+ * Herdr visualization: one workspace per team, one tab per member, the same
+ * `opencode attach` line delivered through `pane run`. The workspace owns the
+ * panes, so teardown closes the workspace (no caller-window arithmetic).
+ */
+async function createTeamLayoutHerdr(
+  teamRunId: string,
+  members: Array<TeamLayoutMember>,
+  tmuxMgr: TmuxSessionManager,
+  deps: TeamLayoutDeps,
+): Promise<TeamLayoutResult | null> {
+  const herdrOps = deps.herdrOps
+  if (!herdrOps) {
+    deps.log("herdr visualization configured but herdr ops unavailable, skipping")
+    return null
+  }
+  let workspaceId: string | undefined
+  try {
+    const serverUrl = tmuxMgr.getServerUrl()
+    if (!(await deps.isServerRunning(serverUrl))) {
+      deps.log("opencode server not reachable, skipping herdr team layout", { teamRunId, serverUrl })
+      return null
+    }
+
+    const workspace = await herdrCreateWorkspace(
+      process.cwd(),
+      `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}${teamRunId}`,
+      herdrOps,
+    )
+    workspaceId = workspace.workspaceId
+
+    const panesByMember: Record<string, string> = {}
+    for (const member of members) {
+      const tab = await herdrCreateTab(
+        workspace.workspaceId,
+        getPaneWorkingDirectory(member),
+        member.name,
+        // fresh single-use password file per tab: each pane shell sources and
+        // unlinks its own file before attaching
+        buildHerdrPaneAuthEnv(),
+        herdrOps,
+      )
+      panesByMember[member.name] = tab.paneId
+      await herdrRunPaneCommand(tab.paneId, buildAttachCommand(member, serverUrl), herdrOps)
+    }
+
+    return {
+      focusWindowId: workspace.workspaceId,
+      gridWindowId: undefined,
+      focusPanesByMember: panesByMember,
+      gridPanesByMember: {},
+      targetSessionId: workspace.workspaceId,
+      ownedSession: true,
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    deps.log("herdr team layout unavailable, skipping", { teamRunId, error: errorMessage })
+    await closeHerdrWorkspaceIfClean(workspaceId, herdrOps, deps, teamRunId)
+    return null
+  }
+}
+
+/**
+ * Best-effort rollback after a partial layout failure: a half-built team
+ * otherwise leaves the workspace and its already-created tabs behind with no
+ * runtime state pointing at them. Close the workspace only when no live
+ * agent remains in it - a tab whose attach is already running is the user's
+ * window into an in-flight team and must survive.
+ */
+async function closeHerdrWorkspaceIfClean(
+  workspaceId: string | undefined,
+  herdrOps: HerdrOpsDeps,
+  deps: TeamLayoutDeps,
+  teamRunId: string,
+): Promise<void> {
+  if (!workspaceId) return
+  try {
+    const agents = await herdrListAgents(herdrOps)
+    if (agents.some((agent) => agent.paneId.startsWith(`${workspaceId}:`))) return
+    await herdrCloseWorkspace(workspaceId, herdrOps)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    deps.log("herdr team layout failure cleanup skipped", { teamRunId, workspaceId, error: errorMessage })
+  }
+}
+
+/** Herdr panes in a cleanup target (or a workspace-id target) mean herdr teardown. */
+function cleanupTargetUsesHerdr(cleanupTarget: TeamLayoutCleanupTarget | undefined): boolean {
+  if (!cleanupTarget) return false
+  if (cleanupTarget.paneIds?.some((paneId) => isHerdrPaneId(paneId))) return true
+  return /^[wW][0-9a-z]+$/i.test(cleanupTarget.targetSessionId ?? "")
+}
+
+async function removeTeamLayoutHerdr(
+  teamRunId: string,
+  cleanupTarget: TeamLayoutCleanupTarget | undefined,
+  deps: TeamLayoutDeps,
+): Promise<void> {
+  const herdrOps = deps.herdrOps
+  if (!herdrOps) return
+  try {
+    // Closing the workspace reaps every member pane; fall back to per-pane
+    // closes only when the workspace target is unknown.
+    const workspaceId = cleanupTarget?.targetSessionId
+    if (workspaceId && /^[wW][0-9a-z]+$/i.test(workspaceId)) {
+      await herdrCloseWorkspace(workspaceId, herdrOps)
+      return
+    }
+    for (const paneId of cleanupTarget?.paneIds ?? []) {
+      if (!isHerdrPaneId(paneId)) continue
+      try {
+        await herdrClosePane(paneId, herdrOps)
+      } catch (error) {
+        deps.log("herdr team pane cleanup failed", {
+          teamRunId,
+          paneId,
+          error: error instanceof Error ? String(error) : String(error),
+        })
+      }
+    }
+  } catch (error) {
+    deps.log("herdr team layout cleanup failed", {
+      teamRunId,
+      error: error instanceof Error ? String(error) : String(error),
+    })
+  }
 }
