@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import { NextRequest } from "next/server"
 
 import { locales } from "../i18n/config"
-import proxy from "../proxy"
+import proxy, { config } from "../proxy"
 
 const proxySource = readFileSync(resolve(import.meta.dir, "../proxy.ts"), "utf8")
 
@@ -83,4 +83,32 @@ describe("installation redirects in every locale", () => {
       })
     },
   )
+})
+
+// #12579: omo.dev/install and /install.sh returned 404; they hand the installer scripts over to get.omo.dev.
+describe("installer script paths on omo.dev", () => {
+  test.each([
+    ["/install", "https://get.omo.dev/install.sh"],
+    ["/install.sh", "https://get.omo.dev/install.sh"],
+    ["/install.ps1", "https://get.omo.dev/install.ps1"],
+  ])("#given %s #when requested #then it redirects permanently to %s", (path, location) => {
+    expect(redirectOf(path)).toEqual({ status: 308, location })
+  })
+
+  // Next.js runs the proxy only for paths the exported matcher accepts: a literal entry, or the generic
+  // pattern, which excludes every path with a dot. Checked on the exported value, not the source text.
+  const matcherAccepts = (path: string) =>
+    config.matcher.some((entry) => entry === path || (entry.startsWith("/(") && new RegExp(`^${entry}$`).test(path)))
+
+  test.each(["/install", "/install.sh", "/install.ps1"])(
+    "#given the active matcher #when %s is requested #then the proxy runs for it",
+    (path) => {
+      expect(matcherAccepts(path)).toBe(true)
+    },
+  )
+
+  test("#given the active matcher #when another dotted path is requested #then the proxy stays out of it", () => {
+    expect(matcherAccepts("/favicon.ico")).toBe(false)
+    expect(matcherAccepts("/install.txt")).toBe(false)
+  })
 })
