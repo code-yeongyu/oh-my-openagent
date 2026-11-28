@@ -41,6 +41,7 @@
     "packages/omo-senpi/plugin/extensions/omo-memory-memfs.js",
     "packages/omo-senpi/plugin/extensions/omo-memory-palace.js",
     "packages/omo-senpi/plugin/extensions/omo-memory-sync.js",
+    "packages/omo-senpi/plugin/extensions/omo-memory-sync-rpc.js",
     "packages/omo-senpi/plugin/extensions/omo-recall-store.js",
     "packages/omo-senpi/plugin/extensions/omo-session-history.js",
     "packages/omo-senpi/plugin/extensions/omo-task.js",

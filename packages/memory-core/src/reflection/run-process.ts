@@ -1,7 +1,7 @@
 import {
   getPidLiveness,
   getProcessStartIdentity,
-  startIdentitiesComparable,
+  startIdentitiesProveReuse,
   type ProcessLiveness,
 } from "../locks/process-identity"
 
@@ -25,7 +25,7 @@ async function startVerdict(
 ): Promise<RecordedProcessVerdict> {
   const actualStart = await (seams.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)
   if (recordedStart === null || actualStart === null) return "unknown"
-  return startIdentitiesComparable(recordedStart, actualStart) && recordedStart !== actualStart ? "dead" : "alive"
+  return startIdentitiesProveReuse(recordedStart, actualStart) ? "dead" : "alive"
 }
 
 /**

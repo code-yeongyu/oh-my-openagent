@@ -192,12 +192,13 @@ export function startIdentitiesConflict(recorded: string, actual: string): boole
 }
 
 /**
- * Two start identities can be compared byte-for-byte only when the same reader produced them.
- * Scheme-less legacy values compare as raw strings so records written before schemes existed
- * keep their original meaning.
+ * Whether a live pid's recorded start proves the pid was reused, for the run and launcher liveness callers: the lock
+ * path's rule (`startIdentitiesConflict`, which also judges a legacy `ps-lstart:` record by the zone bound, #15362), plus
+ * the meaning scheme-less records were written with: two values from before schemes existed compare by their bytes.
  */
-export function startIdentitiesComparable(recorded: string, actual: string): boolean {
-  return identityScheme(recorded) === identityScheme(actual)
+export function startIdentitiesProveReuse(recorded: string, actual: string): boolean {
+  if (identityScheme(recorded) === null && identityScheme(actual) === null) return recorded !== actual
+  return startIdentitiesConflict(recorded, actual)
 }
 
 export type ProcessLiveness = "alive" | "dead" | "unknown"
