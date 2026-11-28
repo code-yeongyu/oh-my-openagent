@@ -10,8 +10,10 @@ import { stripT2Blocks } from "./hub-trace"
 
 import { applyPlan, holdsValue, renderedFacts, soleRegisters, t2Block } from "./test-support"
 
-// 2,000 generated cases are CPU-bound; under host load they exceed bun's 5 s default.
+// Generated cases are CPU-bound; under host load a full run exceeds the per-test budget. The default suite runs
+// 150 cases, and OMO_MEMORY_LONG_TESTS=1 restores the full 1,500 (#15261).
 const PROPERTY_TIMEOUT_MS = 60_000
+const ITERATIONS = process.env["OMO_MEMORY_LONG_TESTS"] === "1" ? 1500 : 150
 
 // The oracle never parses a source with the code under test: every source is built from
 // facts the test already knows, so a strip bug cannot hide in both sides of the check.
@@ -209,7 +211,7 @@ for (const seed of [20261016, 0x5eed4a11]) {
     `R1 every known fact of a deleted source survives: glued, malformed and hand-edited blocks, shared register and list keys, CRLF, duplicates, lossy merges; committed read-back; seed=${seed}`,
     async () => {
       const rand = mulberry32(seed)
-      for (let iteration = 0; iteration < 1500; iteration++) {
+      for (let iteration = 0; iteration < ITERATIONS; iteration++) {
         const base = "base line\n"
         const main = build(rand, `m${iteration}`)
         const sides = Array.from({ length: 1 + Math.floor(rand() * 2) }, (_, n) => ({
