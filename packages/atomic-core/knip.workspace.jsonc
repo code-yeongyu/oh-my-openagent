@@ -1,0 +1,15 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/atomic-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) plus the package's public barrel.
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+    }
+  }
+}

@@ -19,6 +19,7 @@ export const corePackagePaths = [
   "packages/openclaw-core",
   "packages/boulder-state",
   "packages/isolation-core",
+  "packages/atomic-core",
   "packages/memory-core",
   "packages/device-service-core",
   "packages/telemetry-core",

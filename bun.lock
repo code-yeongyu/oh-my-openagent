@@ -16,6 +16,7 @@
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
+        "@oh-my-opencode/atomic-core": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -120,6 +121,14 @@
       },
       "devDependencies": {
         "bun-types": "1.4.4",
+      },
+    },
+    "packages/atomic-core": {
+      "name": "@oh-my-opencode/atomic-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-config-core": "workspace:*",
+        "zod": "^4.6.6",
       },
     },
     "packages/boulder-state": {
@@ -927,6 +936,8 @@
     "@oh-my-opencode/agents-md-core": ["@oh-my-opencode/agents-md-core@workspace:packages/agents-md-core"],
 
     "@oh-my-opencode/ast-grep-mcp": ["@oh-my-opencode/ast-grep-mcp@workspace:packages/ast-grep-mcp"],
+
+    "@oh-my-opencode/atomic-core": ["@oh-my-opencode/atomic-core@workspace:packages/atomic-core"],
 
     "@oh-my-opencode/boulder-state": ["@oh-my-opencode/boulder-state@workspace:packages/boulder-state"],
 
