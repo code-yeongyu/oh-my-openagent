@@ -87,6 +87,7 @@
     "packages/shared-skills/skill-source-filter.d.ts",
     "packages/shared-skills/skill-source-filter.mjs",
     "packages/shared-skills/skills",
+    "!dist/skills",
     "packages/omo-codex/THIRD-PARTY-NOTICES.md",
     "packages/omo-codex/marketplace.json",
     "packages/omo-codex/lazycodex-repository",
@@ -110,7 +111,10 @@
     "!packages/omo-codex/plugin/**/node_modules",
     "!packages/omo-codex/plugin/components/workflow-selector",
     "packages/omo-codex/scripts",
-    "!packages/omo-codex/scripts/install"
+    "!packages/omo-codex/scripts/install",
+    "!**/*.test.*",
+    "!**/__tests__/**",
+    "!**/scripts/tests/**"
   ],
   "exports": {
     ".": {
