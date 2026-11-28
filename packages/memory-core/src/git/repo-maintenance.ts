@@ -12,30 +12,44 @@ export interface MaintenanceGit {
  * never held up by a repack), so without this a long-lived repo collects tens of thousands of loose
  * objects and every history walk slows down. git's `loose-objects` task writes them into a new pack
  * (it deletes loose copies only of objects that were already packed before it ran), then
- * `prune-packed` deletes the loose copies of everything now in a pack. `repack -A -d -l` keeps
- * unreachable objects (as loose, never pruned) and deletes only redundant packs, so it is safe while
- * other processes keep committing. Overlapping passes are kept apart by the caller's lock, not by
- * git. (`incremental-repack` is left out: it needs a multi-pack-index and fails on a repo that never
- * had one.)
+ * `prune-packed` deletes the loose copies of everything now in a pack. The fold is a geometric
+ * repack (#15420): it rolls the packs that break a factor-2 size progression, so equal-sized
+ * duplicate transfer packs merge into one, and it carries every object of the packs it rolls
+ * (unreachable ones included, none loosened), so it is safe while other processes keep committing.
+ * Overlapping passes are kept apart by the caller's lock, not by git. (`incremental-repack` is left
+ * out: it needs a multi-pack-index and fails on a repo that never had one.)
  */
-const MAX_PACKS_BEFORE_REPACK = 64
+const MAX_PACKS_BEFORE_REPACK = 16
+
+/**
+ * Reflogs and unreachable objects are dropped only past these grace periods (#15418), so the fresh
+ * objects of a writer committing during the pass are never pruned. Pruning comes before the loose pass:
+ * that pass packs every loose object, unreachable ones included, and `git prune` deletes loose objects only.
+ */
+export const REFLOG_EXPIRE = "30.days.ago"
+export const REFLOG_EXPIRE_UNREACHABLE = "1.day.ago"
+export const PRUNE_EXPIRE = "2.weeks.ago"
 
 export async function runMemoryRepoMaintenance(
   git: MaintenanceGit,
   options: GitMaintenanceOptions,
 ): Promise<GitMaintenanceResult> {
-  const { looseObjects: looseObjectsBefore, packs } = await countObjects(git)
+  const { packs } = await countObjects(git)
   if (packs >= MAX_PACKS_BEFORE_REPACK) {
-    await git(["repack", "-A", "-d", "-l", "--quiet"], options.timeoutMs, options.signal)
+    await git(["repack", "-d", "-l", "--geometric=2", "--quiet"], options.timeoutMs, options.signal)
     options.signal?.throwIfAborted()
   }
+  await git(
+    ["reflog", "expire", `--expire=${REFLOG_EXPIRE}`, `--expire-unreachable=${REFLOG_EXPIRE_UNREACHABLE}`, "--all"],
+    options.timeoutMs,
+    options.signal,
+  )
+  options.signal?.throwIfAborted()
+  await git(["prune", `--expire=${PRUNE_EXPIRE}`], options.timeoutMs, options.signal)
+  options.signal?.throwIfAborted()
+  const { looseObjects: looseObjectsBefore, packs: packsAfter } = await countObjects(git)
   if (looseObjectsBefore < options.minLooseObjects)
-    return {
-      status: "skipped",
-      looseObjects: looseObjectsBefore,
-      packsBefore: packs,
-      packsAfter: await countPacks(git),
-    }
+    return { status: "skipped", looseObjects: looseObjectsBefore, packsBefore: packs, packsAfter }
   await git(["maintenance", "run", "--task=loose-objects", "--quiet"], options.timeoutMs, options.signal)
   options.signal?.throwIfAborted()
   await git(["prune-packed", "--quiet"], options.timeoutMs, options.signal)
@@ -47,10 +61,6 @@ async function countObjects(git: MaintenanceGit): Promise<{ looseObjects: number
   const loose = /^count: (\d+)$/m.exec(stdout)?.[1]
   const packs = /^packs: (\d+)$/m.exec(stdout)?.[1]
   return { looseObjects: loose === undefined ? 0 : Number(loose), packs: packs === undefined ? 0 : Number(packs) }
-}
-
-async function countPacks(git: MaintenanceGit): Promise<number> {
-  return (await countObjects(git)).packs
 }
 
 async function countLooseObjects(git: MaintenanceGit): Promise<number> {

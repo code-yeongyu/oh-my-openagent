@@ -83,9 +83,9 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   git, is what keeps two passes apart.
  * - At most once per interval: the stamp lives in the repo's own config and is read and written while
  *   holding that lock, so many sessions starting together still produce one pass.
- * - Safe with concurrent commits: `GitMemoryRepo.maintain()` only packs and then deletes loose copies of
- *   objects a pack already holds (`prune-packed`); it never prunes unreachable objects, so an object a
- *   writer has just created is never removed.
+ * - Safe with concurrent commits: `GitMemoryRepo.maintain()` packs, deletes loose copies of objects a pack
+ *   already holds (`prune-packed`), and prunes unreachable objects only past a two-week grace (#15418), so
+ *   an object a writer has just created is never removed.
  * - Off the hot path: it starts after a delay, the timer never keeps a process alive, `dispose()` (session
  *   exit) cancels it and stops a running git, and every failure is logged, never raised.
  * - Runtime retention (#10144) runs inside the same gate, after the pack: one pass per identity per
@@ -195,6 +195,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       memoryRoot,
       ...(host.settings === undefined ? {} : { settings: host.settings }),
       isHostedIdentity: (name) => hosted.has(name),
+      repoMaintenance: { minLooseObjects, timeoutMs },
       signal,
       now,
       ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger) }),

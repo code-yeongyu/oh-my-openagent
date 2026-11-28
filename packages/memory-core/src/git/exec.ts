@@ -17,6 +17,12 @@ export interface GitExecOptions {
   killGraceMs?: number
   /** After git exits normally, how long to wait for its pipes to close (default GIT_EXIT_DRAIN_MS). */
   exitDrainMs?: number
+  /**
+   * POSIX only: run git in its own process group and send the timeout/abort signals to the whole group,
+   * so the git processes it starts (`pack-objects` under `repack`) stop with it (#15429). Off by default:
+   * a commit's post-commit hook backgrounds the mirror push, which must outlive a stopped commit.
+   */
+  processGroup?: boolean
 }
 
 // A timed-out git first gets SIGTERM, on which it removes its own lock and temp files; SIGKILL
@@ -121,6 +127,7 @@ function spawnGitCommand(
   return new Promise((resolve, reject) => {
     const startedAt = Date.now()
     const hasStdin = options.stdin !== undefined
+    const ownGroup = options.processGroup === true && process.platform !== "win32"
     // git.exe is a console-subsystem binary: without windowsHide every memory auto-commit and
     // sync allocates a fresh console window that Windows foregrounds, stealing the user's focus
     // (#8501). Inert on posix, load-bearing on win32 - do not drop it.
@@ -131,7 +138,19 @@ function spawnGitCommand(
       // fd 3 carries the git-activity lock into git and every process it starts (omo #10322).
       stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe", ...(activityFd === undefined ? [] : [activityFd])],
       windowsHide: true,
+      detached: ownGroup,
     })
+    const stop = (signal: NodeJS.Signals): void => {
+      if (ownGroup && child.pid !== undefined) {
+        try {
+          process.kill(-child.pid, signal)
+          return
+        } catch {
+          // The group is gone or unreachable; fall through to the direct child.
+        }
+      }
+      child.kill(signal)
+    }
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
     let settled = false
@@ -142,13 +161,13 @@ function spawnGitCommand(
     const timer = setTimeout(() => {
       timedOut = true
       recordGitTimeout(environment, child.pid, argv, options.cwd, options.timeoutMs)
-      child.kill("SIGTERM")
-      killTimer = setTimeout(() => child.kill("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
+      stop("SIGTERM")
+      killTimer = setTimeout(() => stop("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
     }, options.timeoutMs)
     let aborted = false
     const onAbort = () => {
       aborted = true
-      child.kill("SIGTERM")
+      stop("SIGTERM")
     }
     if (options.signal?.aborted === true) onAbort()
     else options.signal?.addEventListener("abort", onAbort, { once: true })

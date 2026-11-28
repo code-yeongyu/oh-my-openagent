@@ -233,7 +233,10 @@ export class GitMemoryRepo {
 
   /** Packs loose objects off the hot path; see `runMemoryRepoMaintenance`. */
   maintain(options: GitMaintenanceOptions): Promise<GitMaintenanceResult> {
-    return runMemoryRepoMaintenance((argv, timeoutMs, signal) => this.git(argv, timeoutMs, signal), options)
+    return runMemoryRepoMaintenance(
+      (argv, timeoutMs, signal) => this.git(argv, timeoutMs, signal, { processGroup: true }),
+      options,
+    )
   }
 
   async worktreeAdd(path: string, branch: string, startPoint = "HEAD"): Promise<void> {
@@ -302,8 +305,13 @@ export class GitMemoryRepo {
     return head
   }
 
-  private async git(argv: readonly string[], timeoutMs?: number, signal?: AbortSignal): Promise<GitExecResult> {
-    const result = await this.gitResult(argv, undefined, timeoutMs, signal)
+  private async git(
+    argv: readonly string[],
+    timeoutMs?: number,
+    signal?: AbortSignal,
+    spawn: { readonly processGroup?: boolean } = {},
+  ): Promise<GitExecResult> {
+    const result = await this.gitResult(argv, undefined, timeoutMs, signal, spawn)
     if (result.code !== 0) throw commandError(argv, result)
     return result
   }
@@ -313,10 +321,12 @@ export class GitMemoryRepo {
     stdin?: string,
     timeoutMs = GIT_TIMEOUT_MS,
     signal?: AbortSignal,
+    spawn: { readonly processGroup?: boolean } = {},
   ): Promise<GitExecResult> {
     return this.exec.run(argv, {
       cwd: this.dir,
       timeoutMs,
+      ...spawn,
       ...(signal === undefined ? {} : { signal }),
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       ...(stdin === undefined ? {} : { stdin }),

@@ -18,6 +18,9 @@ export const LOG_NAME = "memory-repository-push.log"
 /** Set to `1` to run the post-commit push in the foreground (tests, CI). */
 export const SYNC_PUSH_ENV = "OMO_MEMORY_PUSH_SYNC"
 
+/** The post-commit hook trims the push log to this many newest lines after each attempt (#15421). */
+export const PUSH_LOG_MAX_LINES = 1000
+
 /** The mirror only ever tracks `main`; reflection branches must not mirror. */
 const BRANCH = "main"
 const INITIAL_PUSH_TIMEOUT_MS = 10_000
@@ -199,6 +202,10 @@ push_to_mirror() {
     git push --quiet "$url" "$branch:$branch" 2>&1
     echo "exit=$?"
   } >> "$log" 2>&1
+  # A concurrent push's append can be lost to the trim; the log is diagnostics only.
+  if [ $(( $(wc -l < "$log") )) -gt ${PUSH_LOG_MAX_LINES} ]; then
+    tail -n ${PUSH_LOG_MAX_LINES} "$log" > "$log.tmp.$$" && mv -f "$log.tmp.$$" "$log"
+  fi
 }
 
 if [ "$${SYNC_PUSH_ENV}" = "1" ]; then
