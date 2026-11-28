@@ -20,6 +20,8 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { compiledUpdate } from "../compiled-update"
 import { BinaryUpdateError, installReleaseBinary } from "../compiled-update-install"
+import { buildChecksumsRelease } from "@oh-my-opencode/release-signing/checksums-release"
+import { publicKeyOfSeed, signMinisignEd } from "@oh-my-opencode/release-signing/sign"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -334,7 +336,8 @@ describe("verified standalone binary installation", () => {
         calls.push(file)
         if (file === "/usr/bin/codesign") {
           expect(args.slice(0, 2)).toEqual(["--verify", "--strict"])
-          expect(await readFile(args[2], "utf8")).toBe("new executable")
+          expect(args[2]).toContain('certificate leaf[subject.OU] = "523JNR86LZ"')
+          expect(await readFile(args[3], "utf8")).toBe("new executable")
           expect(await readFile(f.destination, "utf8")).toBe("old executable")
           return { code: 0, stdout: "" }
         }
@@ -386,5 +389,111 @@ describe("verified standalone binary installation", () => {
     expect(result.exitCode).toBe(0)
     expect(result.output).toBe("omo updated 9.9.9 -> 9.9.10")
     expect(await readFile(f.destination, "utf8")).toBe("new executable")
+  })
+})
+
+describe("signed release gate (#14916)", () => {
+  const seed = Buffer.alloc(32, 7)
+  const stranger = Buffer.alloc(32, 3)
+  const keys = [publicKeyOfSeed(seed)]
+
+  const signedFixture = async (over: {
+    readonly version?: string
+    readonly headerVersion?: string
+    readonly channel?: "stable" | "beta"
+    readonly signer?: Buffer
+    readonly omitSig?: boolean
+    readonly tamperSums?: boolean
+  }) => {
+    const f = await fixture()
+    const version = over.version ?? "9.9.10"
+    const headerVersion = over.headerVersion ?? version
+    const channel = over.channel ?? "stable"
+    const sums = buildChecksumsRelease(headerVersion, channel, [["omo-linux-x64", createHash("sha256").update(f.bytes).digest("hex")]])
+    const served = over.tamperSums ? new Uint8Array([...sums.slice(0, 120), sums[120]! ^ 1, ...sums.slice(121)]) : sums
+    const sigFile = over.omitSig ? undefined : signMinisignEd(over.signer ?? seed, sums, `omo release ${headerVersion} ${channel}`, over.signer === stranger ? [] : keys)
+    const fetchAsset = async (url: string) => {
+      if (url.endsWith("SHA256SUMS.sig")) {
+        if (sigFile === undefined) return new Response("not found", { status: 404 })
+        return new Response(sigFile)
+      }
+      if (url.endsWith("SHA256SUMS")) return new Response(served)
+      return new Response(f.bytes)
+    }
+    return { ...f, options: { ...f.options, version, fetchAsset, releaseKeys: keys, vSign: "9.9.5" } }
+  }
+
+  test("#given a valid ED signature #then the signed release installs", async () => {
+    const f = await signedFixture({})
+    await installReleaseBinary(f.options)
+    expect(await readFile(f.destination, "utf8")).toBe("new executable")
+    expect(f.probes.length).toBeGreaterThan(0)
+  })
+
+  test("#given a missing signature at or after V_sign #then the update refuses", async () => {
+    const f = await signedFixture({ omitSig: true })
+    const error = await installReleaseBinary(f.options).catch((value: unknown) => value)
+    expect((error as BinaryUpdateError).code).toBe("integrity_failed")
+    expect((error as BinaryUpdateError).message).toContain("signature missing")
+    expect(await readFile(f.destination, "utf8")).toBe("old executable")
+  })
+
+  test("#given a missing signature before V_sign #then the historical release still installs through the lenient parse", async () => {
+    const f = await signedFixture({ omitSig: true, version: "9.9.1", headerVersion: "9.9.1" })
+    const legacySums = new TextEncoder().encode(`${createHash("sha256").update(f.bytes).digest("hex")}  omo-linux-x64\n`)
+    const fetchAsset = async (url: string) => {
+      if (url.endsWith("SHA256SUMS.sig")) return new Response("not found", { status: 404 })
+      return url.endsWith("SHA256SUMS") ? new Response(legacySums) : new Response(f.bytes)
+    }
+    await installReleaseBinary({
+      ...f.options,
+      fetchAsset,
+      run: async (path: string, _args: readonly string[]) => {
+        f.probes.push(path)
+        expect(await readFile(path, "utf8")).toBe("new executable")
+        return { code: 0, stdout: "omo 9.9.1 (engine: senpi test)\n" }
+      },
+    })
+    expect(await readFile(f.destination, "utf8")).toBe("new executable")
+  })
+
+  test("#given a tampered checksum list #then the signature refuses it", async () => {
+    const f = await signedFixture({ tamperSums: true })
+    const error = await installReleaseBinary(f.options).catch((value: unknown) => value)
+    expect((error as BinaryUpdateError).code).toBe("integrity_failed")
+    expect((error as BinaryUpdateError).message).toContain("signature")
+  })
+
+  test("#given a signature by a key outside the pinned set #then the update refuses", async () => {
+    const f = await signedFixture({ signer: stranger })
+    const error = await installReleaseBinary(f.options).catch((value: unknown) => value)
+    expect((error as BinaryUpdateError).code).toBe("integrity_failed")
+  })
+
+  test("#given a signed header naming a different version than requested #then the update refuses", async () => {
+    const f = await signedFixture({ headerVersion: "9.9.9" })
+    const error = await installReleaseBinary(f.options).catch((value: unknown) => value)
+    expect((error as BinaryUpdateError).code).toBe("integrity_failed")
+    expect((error as BinaryUpdateError).message).toContain("version mismatch")
+  })
+
+  test("#given a signed header on a different channel than expected #then the update refuses", async () => {
+    const f = await signedFixture({ channel: "beta" })
+    const error = await installReleaseBinary({ ...f.options, expectedChannel: "stable" }).catch((value: unknown) => value)
+    expect((error as BinaryUpdateError).code).toBe("integrity_failed")
+    expect((error as BinaryUpdateError).message).toContain("channel mismatch")
+  })
+
+  test("#given a valid signature but tampered artifact bytes #then the checksum comparison refuses", async () => {
+    const f = await signedFixture({})
+    const tampered = new Uint8Array([...f.bytes.slice(0, 3), f.bytes[3]! ^ 1, ...f.bytes.slice(4)])
+    const fetchAsset = async (url: string) => {
+      if (url.endsWith("SHA256SUMS.sig")) return new Response(signMinisignEd(seed, buildChecksumsRelease("9.9.10", "stable", [["omo-linux-x64", createHash("sha256").update(f.bytes).digest("hex")]]), "omo release", keys))
+      if (url.endsWith("SHA256SUMS")) return new Response(buildChecksumsRelease("9.9.10", "stable", [["omo-linux-x64", createHash("sha256").update(f.bytes).digest("hex")]]))
+      return new Response(tampered)
+    }
+    const error = await installReleaseBinary({ ...f.options, fetchAsset }).catch((value: unknown) => value)
+    expect((error as BinaryUpdateError).code).toBe("integrity_failed")
+    expect((error as BinaryUpdateError).message).toContain("checksum mismatch")
   })
 })

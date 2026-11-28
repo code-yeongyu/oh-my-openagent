@@ -4,6 +4,9 @@ import { access, chmod, constants, link, open, realpath, rename, rm } from "node
 import { dirname } from "node:path"
 import { promisify } from "node:util"
 import { acquireBinaryUpdateLock, BINARY_UPDATE_TIMEOUT_MS } from "./compiled-update-lock"
+import { compareReleaseVersion, parseChecksumsRelease } from "@oh-my-opencode/release-signing/checksums-release"
+import { verifyMinisignEd } from "@oh-my-opencode/release-signing/minisign"
+import { RELEASE_SIGNING_ACTIVE, RELEASE_SIGNING_V_SIGN, releaseSigningKeyBytes } from "@oh-my-opencode/release-signing/keys"
 
 // omo-ai publishes `5.0.0-0.beta.90` while its GitHub release is tagged `v5.0.0-beta.90`.
 export function releaseVersionOf(omoAiVersion: string): string {
@@ -78,11 +81,67 @@ async function download(version: string, asset: string, fetchAsset: FetchAsset):
   throw new BinaryUpdateError("download_failed", `could not download ${asset} ${version}`, { cause })
 }
 
+// #14916 signed-checksums gate for the compiled self-update. H1: once the pinned set and V_SIGN are live, a missing
+// SHA256SUMS.sig refuses except for a historical version older than V_SIGN, which keeps today's lenient parse (the
+// accepted residual for explicitly pinned pre-signing releases). H2: a signed list must name the exact requested
+// version and channel, so a replayed older signed release cannot ride the update path.
+const expectedChecksumFor = async (
+  version: string,
+  asset: string,
+  fetch: (url: string) => Promise<Response>,
+  policy: Readonly<{ releaseKeys?: readonly Uint8Array[]; vSign?: string | null; expectedChannel?: "stable" | "beta" }>,
+): Promise<string> => {
+  const keys = policy.releaseKeys ?? (RELEASE_SIGNING_ACTIVE ? releaseSigningKeyBytes() : [])
+  const vSign = policy.vSign !== undefined ? policy.vSign : RELEASE_SIGNING_V_SIGN
+  const sums = new Uint8Array(await (await download(version, "SHA256SUMS", fetch)).arrayBuffer())
+  let sigFile: Uint8Array | undefined
+  if (keys.length > 0) {
+    try {
+      sigFile = new Uint8Array(await (await download(version, "SHA256SUMS.sig", fetch)).arrayBuffer())
+    } catch {
+      sigFile = undefined
+    }
+  }
+  if (sigFile !== undefined) {
+    const verdict = await verifyMinisignEd(keys, sigFile, sums)
+    if (!verdict.ok)
+      throw new BinaryUpdateError("integrity_failed", `release signature ${verdict.refusal} for ${version}; refusing to install (possible tampering)`)
+    const parsed = parseChecksumsRelease(sums)
+    if (!parsed.ok)
+      throw new BinaryUpdateError("integrity_failed", `SHA256SUMS malformed (${parsed.refusal}); refusing to install`)
+    if (parsed.version !== version)
+      throw new BinaryUpdateError(
+        "integrity_failed",
+        `signed release version mismatch (asked ${version}, signature says ${parsed.version}); refusing to install`,
+      )
+    if (policy.expectedChannel !== undefined && parsed.channel !== policy.expectedChannel)
+      throw new BinaryUpdateError(
+        "integrity_failed",
+        `signed release channel mismatch (asked ${policy.expectedChannel}, signature says ${parsed.channel}); refusing to install`,
+      )
+    const signed = parsed.entries.get(asset)
+    if (signed === undefined) throw new BinaryUpdateError("integrity_failed", `SHA256SUMS must contain one checksum for ${asset}`)
+    return signed
+  }
+  const requiresSignature = keys.length > 0 && vSign !== null && compareReleaseVersion(version, vSign) >= 0
+  if (requiresSignature)
+    throw new BinaryUpdateError(
+      "integrity_failed",
+      `release signature missing (SHA256SUMS.sig) for ${version}; only an explicitly pinned version older than V_sign may be unsigned; refusing to install`,
+    )
+  const matches = [...new TextDecoder().decode(sums).matchAll(/^([a-fA-F0-9]{64}) [ *](.+)\r?$/gm)].filter((match) => match[2] === asset)
+  if (matches.length !== 1) throw new BinaryUpdateError("integrity_failed", `SHA256SUMS must contain one checksum for ${asset}`)
+  return matches[0][1].toLowerCase()
+}
+
 /** Preserve signed release bytes; a fetch-written file has no browser quarantine attribute. */
 export async function installReleaseBinary(
   options: BinaryInstallRequest & {
     readonly fetchAsset?: FetchAsset
     readonly run?: Run
+    readonly releaseKeys?: readonly Uint8Array[]
+    readonly vSign?: string | null
+    readonly expectedChannel?: "stable" | "beta"
   },
 ): Promise<void> {
   const { asset, version, platform } = options
@@ -110,10 +169,7 @@ export async function installReleaseBinary(
   let swapped = false
   let preserveBackup = false
   try {
-    const sums = await (await download(version, "SHA256SUMS", fetch)).text()
-    const matches = [...sums.matchAll(/^([a-fA-F0-9]{64}) [ *](.+)\r?$/gm)].filter((match) => match[2] === asset)
-    if (matches.length !== 1)
-      throw new BinaryUpdateError("integrity_failed", `SHA256SUMS must contain one checksum for ${asset}`)
+    const expected = await expectedChecksumFor(version, asset, fetch, options)
     const response = await download(version, asset, fetch)
     const file = await open(next, "wx", 0o600)
     const hash = createHash("sha256")
@@ -127,12 +183,12 @@ export async function installReleaseBinary(
     } finally {
       await file.close()
     }
-    if (hash.digest("hex") !== matches[0][1].toLowerCase())
+    if (hash.digest("hex") !== expected)
       throw new BinaryUpdateError("integrity_failed", `checksum mismatch for ${asset}`)
     await chmod(next, 0o755)
     if (platform === "darwin") {
       try {
-        const signature = await probe("/usr/bin/codesign", ["--verify", "--strict", next])
+        const signature = await probe("/usr/bin/codesign", ["--verify", "--strict", "-R==anchor apple generic and certificate leaf[subject.OU] = \"523JNR86LZ\"", next])
         if (signature.code !== 0) throw new Error("codesign verification failed")
       } catch (cause) {
         throw new BinaryUpdateError("verification_failed", "the macOS release signature could not be verified", {

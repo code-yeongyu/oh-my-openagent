@@ -44,6 +44,7 @@
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |
+| Desktop update signing hand-over (manifest-signature format for the desktop release lane, #14916) | [docs/reference/desktop-update-signing-handover.md](reference/desktop-update-signing-handover.md) |
 | Re-export shim inventory | [docs/reference/re-export-shim-inventory.md](reference/re-export-shim-inventory.md) |
 | Release process | [docs/reference/release-process.md](reference/release-process.md) |
 | Operator-built darwin release artifacts (replacing the hosted macOS legs, verification, provenance) | [docs/reference/operator-built-darwin-release.md](reference/operator-built-darwin-release.md) |

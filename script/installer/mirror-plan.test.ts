@@ -111,3 +111,33 @@ describe("signPut", () => {
     expect(other.headers.authorization).not.toBe(signed.headers.authorization)
   })
 })
+
+describe("planMirrorAssets release-signature gate (#14916)", () => {
+  const release = [
+    asset("omo-linux-x64", hash("a")),
+    asset("SHA256SUMS", hash("c")),
+  ]
+  const okSums = sums({ "omo-linux-x64": hash("a") })
+
+  test("mirrors SHA256SUMS.sig when the release carries it", () => {
+    const withSig = [...release, asset("SHA256SUMS.sig", hash("9"))]
+    const plan = planMirrorAssets(withSig, okSums, { version: "9.9.10", vSign: "9.9.5" })
+    expect(plan.map((a) => a.name)).toContain("SHA256SUMS.sig")
+  })
+
+  test("refuses a release at or after V_sign that carries no signature", () => {
+    expect(() => planMirrorAssets(release, okSums, { version: "9.9.10", vSign: "9.9.5" })).toThrow(
+      "release 9.9.10 is at or after V_sign 9.9.5 but has no SHA256SUMS.sig",
+    )
+  })
+
+  test("still mirrors a historical release below V_sign without a signature", () => {
+    const plan = planMirrorAssets(release, okSums, { version: "9.9.1", vSign: "9.9.5" })
+    expect(plan.map((a) => a.name)).toEqual(["omo-linux-x64", "SHA256SUMS"])
+  })
+
+  test("an inactive V_sign keeps every release mirrorable", () => {
+    expect(() => planMirrorAssets(release, okSums, { version: "99.0.0", vSign: null })).not.toThrow()
+    expect(() => planMirrorAssets(release, okSums)).not.toThrow()
+  })
+})
