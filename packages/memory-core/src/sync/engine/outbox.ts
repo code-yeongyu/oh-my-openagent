@@ -171,7 +171,12 @@ export class Outbox {
   async sweep(pending: PendingOps): Promise<void> {
     const keep = new Set([...pending.items, ...(pending.outgoing?.items ?? [])].map((i) => i.segment))
     if (pending.outgoing !== null) keep.add(`batch-${pending.outgoing.batchId}.bin`)
-    const names = await readdir(this.dir).catch(() => [] as string[])
+    // Only a missing directory means "nothing to clean"; any other failure (EACCES, EIO) surfaces, or every
+    // later cycle would silently skip cleanup and leak segment files again (#12506, as journal.ts does).
+    const names = await readdir(this.dir).catch((error: unknown) => {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return [] as string[]
+      throw error
+    })
     for (const name of names) if (!keep.has(name)) await rm(join(this.dir, name), { force: true })
   }
 
