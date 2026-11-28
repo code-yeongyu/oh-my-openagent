@@ -10,6 +10,7 @@ import {
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
 import { holderVersion } from "./tools/thread-state"
+import { engineEvidence } from "./tools/row-liveness"
 import { isIdentityRefusal } from "./tools/session-error"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -741,6 +742,7 @@ export function createLiveThreadSurface(
     try {
       // An rpc_host connection opens with get_protocol_info: this listing's own answer names the engine, at no extra call.
       let hostVersion: string | undefined
+      let rowHold = false
       const [listed, commands] = await Promise.all([
         callFrame(
           endpoint.socket,
@@ -752,6 +754,7 @@ export function createLiveThreadSurface(
           undefined,
           (protocol) => {
             hostVersion = engineVersionOf(protocol)
+            rowHold = Array.isArray(protocol.capabilities) && protocol.capabilities.includes("session_row_hold")
           },
         ),
         tui ? learnTuiCommands(endpoint.socket).catch(() => LEGACY_TUI_COMMANDS) : Promise.resolve(undefined),
@@ -761,6 +764,7 @@ export function createLiveThreadSurface(
       const controls = acceptedControls(endpoint.kind, commands)
       const tagged = sessions.map((session) => ({
         ...session,
+        row_evidence: engineEvidence(rowHold, session, Reflect.get(session, "hold")).row_evidence,
         socket: endpoint.socket,
         endpoint_kind: endpoint.kind,
         controls,
@@ -784,8 +788,11 @@ export function createLiveThreadSurface(
         disk: [],
       }
     } catch (error) {
-      // A terminal removes its socket when it exits, so a registered terminal whose socket is gone has ended.
-      if (tui && !exists(endpoint.socket)) return degraded(endpoint, new Error("dead"), "dead")
+      // A terminal or a host removes its socket when it exits, so an endpoint whose socket is gone has ended: it holds
+      // nothing (`dead`), never a host that did not answer. A host keeps its `host_unavailable:<socket>` error, which is
+      // the answer when nothing answers at all. A Windows pipe is no file, so only a terminal is judged by it there.
+      if ((tui || process.platform !== "win32") && !exists(endpoint.socket))
+        return degraded(endpoint, tui ? new Error("dead") : error, "dead")
       if (isIdentityRefusal(error)) return degraded(endpoint, error, "identity_unproven")
       const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
       return degraded(

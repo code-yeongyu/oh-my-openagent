@@ -8,6 +8,9 @@ type RowSource = Pick<ThreadSummary, "thread_id" | "name" | "status" | "cwd" | "
   Partial<
     Pick<
       ThreadResultSummary,
+      | "liveness"
+      | "verification"
+      | "hold"
       | "unnamed"
       | "model"
       | "activity"
@@ -55,6 +58,11 @@ export function threadRow(thread: RowSource, machine?: string): ThreadResultSumm
     ...(unnamed === undefined ? {} : { unnamed }),
     status: thread.status,
     state: thread.state,
+    ...(thread.verification === "unverified"
+      ? { verification: thread.verification }
+      : thread.liveness
+        ? { liveness: thread.liveness, ...(thread.liveness.kind === "held" ? { hold: thread.liveness.hold } : {}) }
+        : {}),
     ...(model === undefined ? {} : { model: { provider: model.provider, id: model.id } }),
     ...(activity === undefined ? {} : { activity }),
     ...(error_code === undefined ? {} : { error_code }),

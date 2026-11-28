@@ -17,6 +17,7 @@ import type { RemoteThreadSurface } from "../remote/ports"
 import type { SessionWatchHandlers, SessionWatchOutcome } from "../control/wait-settled"
 
 export type ThreadHostSession = {
+  readonly row_evidence?: import("./row-liveness").RowLiveness | undefined
   readonly sessionId: string
   readonly durableSessionId?: string
   readonly sessionPath?: string
