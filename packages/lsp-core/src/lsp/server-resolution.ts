@@ -92,6 +92,7 @@ export function findServerForExtension(ext: string, targetPath?: string): Server
           extensions: server.extensions,
         },
         installHint,
+        searchedFrom: workingDirectory,
       }
     }
   }
