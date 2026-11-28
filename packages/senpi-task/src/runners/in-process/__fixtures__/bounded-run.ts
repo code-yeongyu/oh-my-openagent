@@ -1,15 +1,26 @@
+import { spawn } from "node:child_process"
+
 export type BoundedRun = { readonly exit: number | "still running"; readonly stdout: string; readonly stderr: string }
 
 /** Runs one fixture script in a fresh process and kills it when it outlives the bound. */
 export async function runFixtureScript(script: string, arg: string, boundMs: number): Promise<BoundedRun> {
-  const child = Bun.spawn([process.execPath, script, arg], { stdout: "pipe", stderr: "pipe" })
+  // node:child_process, not Bun's process API: package sources outside test files stay off Bun's own APIs
+  // (packages/omo-opencode/src/shared/opencode-coupling-audit.test.ts).
+  const child = spawn(process.execPath, [script, arg], { stdio: ["ignore", "pipe", "pipe"] })
+  const stdout: Buffer[] = []
+  const stderr: Buffer[] = []
+  child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
+  const closed = new Promise<number>((resolve) => child.once("close", (code) => resolve(code ?? -1)))
   let watchdog: ReturnType<typeof setTimeout> | undefined
   const bound = new Promise<"still running">((resolve) => {
     watchdog = setTimeout(() => resolve("still running"), boundMs)
   })
-  const exit = await Promise.race([child.exited, bound])
+  const exit = await Promise.race([closed, bound])
   clearTimeout(watchdog)
-  if (exit === "still running") child.kill("SIGKILL")
-  const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
-  return { exit, stdout, stderr }
+  if (exit === "still running") {
+    child.kill("SIGKILL")
+    await closed
+  }
+  return { exit, stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8") }
 }
