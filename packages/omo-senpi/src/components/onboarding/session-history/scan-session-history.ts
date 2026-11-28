@@ -1,3 +1,4 @@
+import { describeReadFailure } from "../../../../../omo-native/bin/lib/read-failure.js"
 import type { SessionDigestStore } from "./digest-store"
 import { digestByteLength } from "./session-digest"
 import { createSessionHistoryScanner } from "./session-history-scanner"
@@ -29,14 +30,16 @@ export interface SessionHistoryScanEvent {
   /** A `ProjectCandidate` for `projects`, a `SessionScanItem` for `sessions`. */
   readonly item?: ProjectCandidate | SessionScanItem
   readonly counts?: ScanCounts
+  /**
+   * On `source_failed`: the failure's kind (`describeReadFailure`), never the error's own text, which can name
+   * local paths or quote a file. It reaches the onboarding RPC, the first-prompt context and the history tool.
+   */
   readonly error?: string
   readonly elapsedMs: number
 }
 
 export type ScanSessionHistoryOptions = SessionHistoryOptions &
   RecentSessionsQuery & { readonly scanId: string; readonly digestStore: SessionDigestStore }
-
-const errorMessage = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause))
 
 /**
  * Programmatic, read-only discovery: no model call and no network I/O. Projects are emitted first, then the
@@ -56,7 +59,13 @@ export async function* scanSessionHistory(options: ScanSessionHistoryOptions): A
       yield { scanId, kind: "item", source: "projects", item, elapsedMs: elapsedMs() }
     yield { scanId, kind: "source_done", source: "projects", counts: result.counts, elapsedMs: elapsedMs() }
   } catch (cause) {
-    yield { scanId, kind: "source_failed", source: "projects", error: errorMessage(cause), elapsedMs: elapsedMs() }
+    yield {
+      scanId,
+      kind: "source_failed",
+      source: "projects",
+      error: describeReadFailure(cause),
+      elapsedMs: elapsedMs(),
+    }
   }
 
   yield { scanId, kind: "source_started", source: "sessions", elapsedMs: elapsedMs() }
@@ -82,6 +91,12 @@ export async function* scanSessionHistory(options: ScanSessionHistoryOptions): A
     }
     yield { scanId, kind: "source_done", source: "sessions", counts: run.counts(), elapsedMs: elapsedMs() }
   } catch (cause) {
-    yield { scanId, kind: "source_failed", source: "sessions", error: errorMessage(cause), elapsedMs: elapsedMs() }
+    yield {
+      scanId,
+      kind: "source_failed",
+      source: "sessions",
+      error: describeReadFailure(cause),
+      elapsedMs: elapsedMs(),
+    }
   }
 }
