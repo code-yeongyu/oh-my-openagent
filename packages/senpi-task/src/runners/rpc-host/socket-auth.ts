@@ -194,7 +194,13 @@ function recordNaming(root: string, endpoint: string): string | undefined {
   return undefined
 }
 
-/** POSIX public endpoint authentication; raw terminal and Windows secret transports never call it. */
+/**
+ * Public endpoint authentication: the launch-key challenge, and for a host that sends none, the key-record lookup.
+ * Callers on every platform reach it. On win32 a host that sends no challenge is served without a host proof at this
+ * layer: the dial already went to the pipe named from `<socket>.secret` (`resolveRpcSocketTransport`), which only a
+ * process that can read that file can name or serve; the host itself is not proven until pipes carry the challenge
+ * (senpi#7571).
+ */
 export async function authenticateRpcHost(
   request: RpcRequest,
   endpoint: string,
@@ -207,8 +213,8 @@ export async function authenticateRpcHost(
   const data = object(reply.data) ? reply.data : undefined
   const root = typeof keyRoot === "function" ? keyRoot() : keyRoot
   if (data?.auth === undefined) {
-    // Windows pipes prove no host (senpi#7571) and their key root has no POSIX modes to check, so a host that sent no
-    // challenge there is served as before; the record lookup below is POSIX-only like the challenge itself.
+    // Windows pipes carry no challenge (senpi#7571) and their key root has no POSIX modes to check: a host that sent
+    // no challenge there is served as before, and the record lookup below is POSIX-only like the challenge itself.
     if (process.platform === "win32") return reply
     const named = recordNaming(root, endpoint)
     if (named !== undefined)
