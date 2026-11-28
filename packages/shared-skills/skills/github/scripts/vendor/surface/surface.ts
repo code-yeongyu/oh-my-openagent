@@ -134,12 +134,26 @@ export type Described = {
   readonly hint?: string;
 };
 
+// A thrown value can be hostile to reading it (a throwing getter, a Proxy trap, a cycle, a BigInt):
+// each read below falls back instead of throwing, so describing a failure never fails.
 const field = (error: object, key: string): string | undefined => {
-  const value: unknown = Reflect.get(error, key);
-  return typeof value === "string" && value !== "" ? value : undefined;
+  try {
+    const value: unknown = Reflect.get(error, key);
+    return typeof value === "string" && value !== "" ? value : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
-/** Any thrown value as `{ kind, message, hint }`, reading `kind` and `hint` where errors carry them. */
+const json = (value: object): string | undefined => {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
+};
+
+/** Any thrown value as `{ kind, message, hint }`, reading `kind` and `hint` where errors carry them; it never throws. */
 export const describeError = (error: unknown): Described => {
   if (typeof error !== "object" || error === null) {
     return { kind: "error", message: String(error) };
@@ -151,8 +165,37 @@ export const describeError = (error: unknown): Described => {
       field(error, "code") ??
       field(error, "name") ??
       "error",
-    message: field(error, "message") ?? JSON.stringify(error),
+    message:
+      field(error, "message") ??
+      json(error) ??
+      "a thrown value that could not be described",
     ...(hint === undefined ? {} : { hint }),
+  };
+};
+
+/**
+ * A thrown value that is not an Error (or cannot even be asked: `instanceof` throws for a revoked
+ * Proxy or a throwing getPrototypeOf trap), as the SurfaceError internal a boundary reports.
+ */
+export const internalError = (value: unknown): SurfaceError =>
+  new SurfaceError("internal", describeError(value).message);
+
+/**
+ * The secrets a skill has read, for its surface's `redact`: call `remember` where a secret is read
+ * and pass `redact` to `defineSurface`, so no answer the surface prints carries one.
+ */
+export const secretTally = () => {
+  const secrets = new Set<string>();
+  return {
+    remember: (secret: string): string => {
+      if (secret !== "") secrets.add(secret);
+      return secret;
+    },
+    // The longest first, so a secret that contains another is redacted whole.
+    redact: (text: string): string =>
+      [...secrets]
+        .toSorted((a, b) => b.length - a.length)
+        .reduce((out, secret) => out.split(secret).join("[redacted]"), text),
   };
 };
 

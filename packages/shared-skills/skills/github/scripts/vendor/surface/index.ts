@@ -12,8 +12,10 @@ export {
   defineSurface,
   describeError,
   entries,
+  internalError,
   isOp,
   op,
+  secretTally,
   SurfaceError,
 } from "./surface.ts";
 export type {
