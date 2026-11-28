@@ -271,6 +271,111 @@ describe("thread_create on another device survives a lost open reply", () => {
   })
 })
 
+// #15002: a create whose open was lost on the way (request_gone: the channel to b closed while it was in flight) may or
+// may not reach b's engine. The uncertain answer names the thread the key derives and says a same-key retry is safe; the
+// retry opens again under that id only when b's engine creates under it (durable_session_id) and holds nothing by it,
+// so b's own registry refuses a second session if the lost open lands after all.
+describe("thread_create on another device whose open was lost on the way (#15002)", () => {
+  test.each([
+    ["b made nothing", { openRequestGone: { count: 1 } }],
+    ["b made the session but cannot be listed", { openLosesReply: 1, listFailsAfterLostReply: true }],
+  ] as const)(
+    "#given %s #when thread_create answers uncertain #then the answer names the derived thread and that a same-key retry is safe",
+    async (_label, options) => {
+      const a = account(options)
+      const { run } = surface(a.remote)
+      const key = `remote-gone-hint-${"openRequestGone" in options ? "gone" : "lost"}`
+
+      expect(await run("thread_create", { device: "studio", name: "gone-hint", idempotency_key: key })).toMatchObject({
+        kind: "error",
+        error: {
+          code: "idempotency_uncertain",
+          details: { device: "b", thread: createdThreadId("dur-caller", key), retry_same_key_safe: true },
+        },
+      })
+    },
+  )
+
+  test("#given b made nothing for the lost open #when the create is retried under the same key #then the retry opens it under the derived id, names it and admits its prompt once", async () => {
+    const a = account({ openRequestGone: { count: 1 } })
+    const { run } = surface(a.remote)
+    const args = { device: "studio", name: "gone-once", prompt: "build it", idempotency_key: "remote-gone-1" }
+    const id = createdThreadId("dur-caller", "remote-gone-1")
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread: id, device: "b", name: "gone-once" })
+
+    expect(opens(a.sent).map((entry) => entry.rpc?.["durableSessionId"])).toEqual([id, id])
+    // The session the retry opened is addressed by the key its open names (its id), never a second one.
+    const admits = [id, `rk-${id}`].map(
+      (key) => toSession(a.sent, key, "admit_external_message") + toSession(a.sent, key, "prompt"),
+    )
+    expect(admits.reduce((sum, count) => sum + count, 0)).toBe(1)
+  })
+
+  test("#given the lost open reaches b just before the retry's open #when the create is retried under the same key #then b refuses the second open and the retry adopts the one session", async () => {
+    const a = account({ openRequestGone: { count: 1, landsLate: true } })
+    const { run } = surface(a.remote)
+    const args = { device: "studio", name: "gone-late", prompt: "build it", idempotency_key: "remote-gone-late" }
+    const id = createdThreadId("dur-caller", "remote-gone-late")
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread: id, device: "b", name: "gone-late" })
+
+    expect((await a.remote.sessions.sessions({ device: "b" })).filter((row) => row.durable_id === id)).toHaveLength(1)
+    expect(toSession(a.sent, `rk-${id}`, "admit_external_message") + toSession(a.sent, `rk-${id}`, "prompt")).toBe(1)
+  })
+
+  // The first run made a worktree on b and kept it in its uncertain answer: the retry opens in that worktree, never a second.
+  test.each([
+    ["b made nothing", "none", { count: 1 }],
+    ["the lost open reaches b just before the retry's open", "late", { count: 1, landsLate: true }],
+  ] as const)(
+    "#given a create with a worktree whose open was lost on the way and %s #when it is retried under the same key #then the retry answers the thread in the kept worktree and opens no second session",
+    async (_label, landing, openRequestGone) => {
+      const repo = kit.repository()
+      const a = account({ openRequestGone })
+      const { run } = surface(withFarWorktrees(a, kit.folder("thread-wt-gone-")))
+      const key = `remote-gone-wt-${landing}`
+      const args = {
+        device: "studio",
+        name: "gone-wt",
+        prompt: "build it",
+        cwd: repo,
+        worktree: { branch: "far-gone" },
+        idempotency_key: key,
+      }
+      const id = createdThreadId("dur-caller", key)
+
+      const first = await run("thread_create", args)
+      if (first.kind !== "error") throw new Error(`the first create did not fail: ${JSON.stringify(first)}`)
+      const kept = (first.error.details as { worktree: { path: string } }).worktree
+      expect(first).toMatchObject({
+        error: { code: "idempotency_uncertain", details: { thread: id, worktree: { branch: "far-gone" } } },
+      })
+      const setups = opens(a.sent).length - 1
+
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "ok",
+        thread: id,
+        device: "b",
+        worktree: { branch: "far-gone", path: kept.path },
+      })
+      // No second worktree's setup session: the retry's one open is the create's, in the kept worktree.
+      const creates = opens(a.sent).filter((entry) => entry.rpc?.["durableSessionId"] !== undefined)
+      expect(opens(a.sent).length - creates.length).toBe(setups)
+      expect(creates.map((entry) => [entry.rpc?.["durableSessionId"], entry.rpc?.["cwd"]])).toEqual([
+        [id, kept.path],
+        [id, kept.path],
+      ])
+      const admits = [id, `rk-${id}`].map(
+        (session) => toSession(a.sent, session, "admit_external_message") + toSession(a.sent, session, "prompt"),
+      )
+      expect(admits.reduce((sum, count) => sum + count, 0)).toBe(1)
+    },
+  )
+})
+
 // #14569: a same-key recovery answers what the first create would have, keeps the first uncertain cause, and an
 // adopted session its route does not reach is ended and never settles the receipt as a final answer.
 describe("thread_create same-key recovery on another device (#14569)", () => {

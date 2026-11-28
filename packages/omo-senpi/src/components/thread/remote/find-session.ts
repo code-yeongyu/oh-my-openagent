@@ -108,9 +108,17 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown"
  */
 export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
   // find_session looks a session up by its durable id; a row without one cannot be looked up.
-  const thread = row.durable_id ?? ""
+  return await deviceHolderView(remote, row.device, row.durable_id ?? "")
+}
+
+/** What `device` says of the session it would hold under `thread` (a durable id), by the same lookup as `holderView`. */
+export async function deviceHolderView(
+  remote: RemoteThreadSurface,
+  device: string,
+  thread: string,
+): Promise<HolderView> {
   if (thread === "") return "unknown"
-  const { outcome } = await findSession(remote, row.device, thread)
+  const { outcome } = await findSession(remote, device, thread)
   if (outcome.kind !== "ok") return "unknown"
   const data = replyData(outcome.response)
   const found = recordOf(data["found"])
