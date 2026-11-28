@@ -13,6 +13,7 @@ import {
   executeBackgroundTask,
   executeSyncTask,
 } from "./executor"
+import { executeFanOut } from "./fan-out"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
@@ -74,7 +75,27 @@ const delegateTaskArgsSchema = {
     .boolean()
     .optional()
     .describe(
-      "true is the standard spawn: returns a background task ID `bg_...` at once; the completion notification delivers the result, which background_output reads. false blocks this response until the child finishes; use it only for a short child whose result gates your very next call. Omitted counts as false.",
+      "Default true: returns a background task ID `bg_...` at once; a notification with the child's final answer arrives when it finishes (background_output reads it again). false blocks this response until the child finishes; use it only for a short child whose result gates your very next call.",
+    ),
+  wake: tool.schema
+    .enum(["each", "none"])
+    .optional()
+    .describe(
+      "When a finished background child reports. each (default): every finished child starts your next turn with its result. none: no turn is started; the result waits for your next turn. With items, omitting it reports the whole fan-out once, when the last child finishes.",
+    ),
+  items: tool.schema
+    .array(tool.schema.string())
+    .optional()
+    .describe(
+      "Fan-out: a list of work items to split across several background children, each given prompt plus its own contiguous slice. One call is one group.",
+    ),
+  split: tool.schema
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe(
+      "Fan-out: how many children share items (default: one per item). split=2 over 10 items gives 1-5 and 6-10.",
     ),
   category: tool.schema
     .string()
@@ -211,7 +232,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
         })
 
-        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
+        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse && !delegateTaskArgs.items?.length) {
           const systemContent = buildSystemContent({
             skillContent,
             skillContents,
@@ -260,6 +281,19 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableSkills,
         nativeSkillInfos,
       })
+
+      if (delegateTaskArgs.items && delegateTaskArgs.items.length > 0) {
+        return executeFanOut(
+          delegateTaskArgs,
+          ctx,
+          options,
+          parentContext,
+          agentToUse,
+          categoryModel,
+          systemContent,
+          fallbackChain,
+        )
+      }
 
       if (runInBackground) {
         return executeBackgroundTask(

@@ -2,6 +2,8 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
+export type BackgroundTaskWake = "each" | "none"
+
 export type BackgroundTaskStatus = "pending" | "running" | "completed" | "error" | "cancelled" | "interrupt"
 
 export interface ToolCallWindow {
@@ -71,6 +73,10 @@ export interface BackgroundTask {
   parentTools?: Record<string, boolean>
   skillContent?: string
   sessionPermission?: SessionPermissionRule[]
+  /** When the parent hears about the finished task: each (default) starts a parent turn, none leaves a note for its next turn. */
+  wake?: BackgroundTaskWake
+  /** A fan-out group whose members report together once all of them have finished. */
+  groupId?: string
   /** Marks if the task was launched from an unstable agent/category */
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
@@ -133,6 +139,8 @@ export interface LaunchInput {
   onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
   userPermission?: Record<string, "ask" | "allow" | "deny">
+  wake?: BackgroundTaskWake
+  groupId?: string
 }
 
 export interface ResumeInput {
@@ -143,4 +151,5 @@ export interface ResumeInput {
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
+  wake?: BackgroundTaskWake
 }
