@@ -1,6 +1,6 @@
-import { readFileSync, statSync } from "node:fs"
+import { readFileSync, realpathSync, statSync } from "node:fs"
 import { homedir } from "node:os"
-import { isAbsolute, join, resolve } from "node:path"
+import { isAbsolute, join, relative, resolve } from "node:path"
 
 import { resolveAgentHome } from "@oh-my-opencode/senpi-task/agent-home"
 import { findDiskSessions } from "../../thread/address-book"
@@ -39,14 +39,28 @@ const isFile = (path: string): boolean => {
   }
 }
 
-function resolveSessionFile(reference: string, context: ConfigContext): string | undefined {
-  const looksLikePath = reference.endsWith(".jsonl") || isAbsolute(reference) || /[\\/]/.test(reference)
-  if (looksLikePath) {
-    const path = resolve(context.cwd, reference)
-    return isFile(path) ? path : undefined
+const realPath = (path: string): string | undefined => {
+  try {
+    return realpathSync(path)
+  } catch {
+    return undefined
   }
+}
+
+/**
+ * A session record is read only from the agent dir's sessions tree: a path anywhere else answers as a missing record
+ * does, so the call cannot tell a caller whether some other file exists or parse it.
+ */
+function resolveSessionFile(reference: string, context: ConfigContext): string | undefined {
   const agentDir = resolveAgentHome({ env: context.env, homeDir: context.env["HOME"] ?? homedir() })
-  return findDiskSessions(join(agentDir, "sessions"), reference, { id_only: true })[0]?.session_path
+  const sessions = join(agentDir, "sessions")
+  const looksLikePath = reference.endsWith(".jsonl") || isAbsolute(reference) || /[\\/]/.test(reference)
+  if (!looksLikePath) return findDiskSessions(sessions, reference, { id_only: true })[0]?.session_path
+  const root = realPath(sessions)
+  const path = realPath(resolve(context.cwd, reference))
+  if (root === undefined || path === undefined || !isFile(path)) return undefined
+  const inside = relative(root, path)
+  return inside !== "" && !inside.startsWith("..") && !isAbsolute(inside) ? path : undefined
 }
 
 /** The record of `reference` (a path or an id), else of the calling session; undefined when none is found. */

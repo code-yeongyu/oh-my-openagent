@@ -21,7 +21,6 @@ const OMO_SDK_CODES = [
   "device_limit",
   "machine_exists",
   "accounts_unreachable",
-  "unknown_path",
   "path_not_allowed",
   "session_not_found",
   "internal_error",

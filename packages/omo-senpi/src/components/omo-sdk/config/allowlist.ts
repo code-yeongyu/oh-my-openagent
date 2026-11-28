@@ -6,7 +6,7 @@ import { ENGINE_DEFAULTS, type EngineDefaultKey, isEngineSettingValue, isRecord 
  * The security ruling's one exception: the keys whose path, value and scope an SDK caller may read. Everything else in
  * a config file (providers, URLs, headers, env, credentials, free-form text, unknown keys) never leaves the SDK.
  */
-export const ROUTING_KEYS = ["model", "models", "fallback_models", "variant", "reasoning"] as const
+const ROUTING_KEYS = ["model", "models", "fallback_models", "variant", "reasoning"] as const
 export type RoutingKey = (typeof ROUTING_KEYS)[number]
 const ENGINE_PATH_PREFIX = "engine:"
 const CHAINS_KEY = "retry.fallbackChains."
@@ -29,24 +29,34 @@ const ALLOWED_PATHS: readonly string[] = [
   `${ENGINE_PATH_PREFIX}${CHAINS_KEY}<model>`,
 ]
 
-const NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/
-const PROTOTYPE_NAMES: ReadonlySet<string> = new Set(["constructor", "prototype"])
 const TOKEN = /^[a-z0-9][a-z0-9_-]{0,31}$/
 const MODEL_ID = /^(?:[A-Za-z0-9._:-]+\/)?[A-Za-z0-9._:-]+$/
-const CREDENTIAL_PREFIX = /^(?:sk-|pk-|rk-|ghp_|gho_|ghs_|xox[abpr]-|AKIA|AIza)/i
-const CREDENTIAL_RUN = /[A-Za-z0-9_]{24,}/
+const CREDENTIAL_PREFIX = /^(?:sk-|pk-|rk-|ghp_|gho_|ghs_|github_pat_|glpat-|hf_|gsk_|xai-|xox[abpr]-|AKIA|AIza)/i
 const VERSION = /^[0-9A-Za-z.+-]{1,40}$/
 
-/** A category or agent name a caller may pass: every builtin name, or a short lowercase slug. */
-const isName = (name: string): boolean => NAME.test(name) && !PROTOTYPE_NAMES.has(name)
+// A model id is read as words, numbers and version tags between separators. Every part must have one of the shapes
+// below, so a random credential (a UUID, a hex group, an opaque run, a secret key) cannot pass by luck.
+const PART_SEPARATOR = /[-._:]/
+const MODEL_PARTS = [
+  /^[a-z]{1,12}$/, // gpt, claude, sonnet, instruct
+  /^[A-Z][a-z]{1,10}(?:[A-Z][a-z]{1,10})?$/, // Llama, Instruct, DeepSeek
+  /^[A-Z]{1,4}$/, // V, VL, AWQ, GGUF
+  /^[0-9]{1,8}$/, // 5, 0309, 20241022
+  /^[0-9]{1,4}[A-Za-z]$/, // 4o, 70B, 235b
+  /^(?:[a-z]{1,8}|[A-Z][a-z]{0,7}|[A-Z]{1,4})[0-9]{1,4}[bB]?$/, // qwen3, Qwen3, k3, v1, q4, A22B, system24
+  /^[0-9]{1,3}x[0-9]{1,3}[A-Za-z]?$/, // 8x7B
+] as const
+// A family name: a model part that starts with a word of two letters or more (claude, Llama, qwen3, DeepSeek).
+const FAMILY_WORD = /^(?:[a-z]{2}|[A-Z][a-z])/
+const MAX_PARTS = 12
 
 export const EMPTY_REGISTRY = { getAvailable: () => [], find: () => undefined }
 
 let builtins: { readonly categories: ReadonlySet<string>; readonly agents: ReadonlySet<string> } | undefined
 
 /**
- * The builtin category and task-agent names: the only names the SDK lists unasked (status routing, an unknown_path's
- * nearest paths). A name a config file defines is a key name from that file, so it stays out even when it is a slug.
+ * The builtin category and task-agent names: the only names the SDK lists in status routing or answers for in explain
+ * and check. A name a config file defines is a key name from that file, so it stays out even when it is a slug.
  */
 export function builtinNames(): { readonly categories: ReadonlySet<string>; readonly agents: ReadonlySet<string> } {
   if (builtins !== undefined) return builtins
@@ -58,13 +68,20 @@ export function builtinNames(): { readonly categories: ReadonlySet<string>; read
   return builtins
 }
 
-/** A model id that cannot be mistaken for a credential: provider prefix optional, no key prefix, no long opaque run. */
+/** One side of a model id (the provider or the model): only model-shaped parts, and at least one word. */
+function isModelSide(side: string): boolean {
+  if (CREDENTIAL_PREFIX.test(side)) return false
+  const parts = side.split(PART_SEPARATOR)
+  return (
+    parts.length <= MAX_PARTS &&
+    parts.every((part) => MODEL_PARTS.some((shape) => shape.test(part))) &&
+    parts.some((part) => FAMILY_WORD.test(part))
+  )
+}
+
+/** A model id that cannot be mistaken for a credential: an optional provider, then a model, both built of model parts. */
 export const isModelId = (value: unknown): value is string =>
-  typeof value === "string" &&
-  value.length <= 120 &&
-  MODEL_ID.test(value) &&
-  !CREDENTIAL_RUN.test(value) &&
-  value.split("/").every((part) => !CREDENTIAL_PREFIX.test(part))
+  typeof value === "string" && value.length <= 120 && MODEL_ID.test(value) && value.split("/").every(isModelSide)
 
 const isToken = (value: unknown): value is string => typeof value === "string" && TOKEN.test(value)
 
@@ -82,9 +99,10 @@ export function allowedPath(path: unknown): AllowedPath | undefined {
   }
   const segments: unknown = typeof path === "string" ? path.split(".") : path
   if (!Array.isArray(segments) || segments.length !== 3) return undefined
-  const [root, name, key] = segments
+  const [root, name, key] = segments as readonly unknown[]
   if (root !== "categories" && root !== "agents") return undefined
-  if (typeof name !== "string" || !isName(name)) return undefined
+  // Builtin names only: answering for a name a config file defines would confirm a guessed key of that file.
+  if (typeof name !== "string" || !builtinNames()[root].has(name)) return undefined
   const routingKey = ROUTING_KEYS.find((candidate) => candidate === key)
   return routingKey === undefined
     ? undefined

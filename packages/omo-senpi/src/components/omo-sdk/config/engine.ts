@@ -216,6 +216,7 @@ export function fallbackChainFor(
   model: string,
 ): readonly string[] | undefined {
   const bare = model.includes("/") ? model.slice(model.indexOf("/") + 1) : model
-  const chain = chains[model] ?? chains[bare]
+  const own = (key: string) => (Object.hasOwn(chains, key) ? chains[key] : undefined)
+  const chain = own(model) ?? own(bare)
   return chain === undefined || chain.length === 0 ? undefined : chain
 }
