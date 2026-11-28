@@ -56,7 +56,8 @@ const defaultRunCommand: RunVendoredLspCommand = async (command, args, options) 
 
 const defaultWatchDirectory: WatchBuildLockDirectory = (path, listener) => watch(path, { persistent: false }, listener)
 
-export async function ensureVendoredLspDaemonBuilt(options: EnsureVendoredLspDaemonOptions): Promise<void> {
+/** Returns true only when this caller created the build, so setup can stage that new output. */
+export async function ensureVendoredLspDaemonBuilt(options: EnsureVendoredLspDaemonOptions): Promise<boolean> {
   const outputPath = options.outputPath ?? join(options.packageDir, "dist", "cli.js")
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const pathExists = options.exists ?? existsSync
@@ -66,7 +67,7 @@ export async function ensureVendoredLspDaemonBuilt(options: EnsureVendoredLspDae
   const deadline = Date.now() + timeoutMs
 
   if (pathExists(outputPath)) {
-    return
+    return false
   }
 
   const lockPath = resolveBuildLockPath(options.packageDir, options.lockRoot ?? tmpdir())
@@ -80,7 +81,7 @@ export async function ensureVendoredLspDaemonBuilt(options: EnsureVendoredLspDae
 
     try {
       if (pathExists(outputPath)) {
-        return
+        return false
       }
 
       log("[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...")
@@ -99,11 +100,12 @@ export async function ensureVendoredLspDaemonBuilt(options: EnsureVendoredLspDae
       if (!pathExists(outputPath)) {
         throw new Error(`[test-setup] lsp-daemon build completed without ${outputPath}`)
       }
-      return
+      return true
     } finally {
       lock.release()
     }
   }
+  return false
 }
 
 function resolveBuildLockPath(packageDir: string, lockRoot: string): string {
