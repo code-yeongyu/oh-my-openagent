@@ -15,15 +15,15 @@ import { compareVersions } from "../../device-service-core/src/release/version.t
 import packageJson from "../package.json" with { type: "json" }
 import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
 
-// The signed entry files of the published device-service-v0.1.45 release (omo-relay-daemon), downloaded once from the
+// The signed entry files of the published device-service-v0.1.54 release (omo-relay-daemon), downloaded once from the
 // GitHub release and committed byte for byte. The binaries (90-116 MB each) are not fixtures; their digests are.
-const FIXTURE_DIR = join(import.meta.dir, "fixtures", "device-service-0.1.45")
-const PUBLISHED_CHECKSUMS_SHA256 = "ff6e320e5b897c38e2f8712a8fc6cbbad6d10e8b2201472ca49917f79bbbfa8a"
+const FIXTURE_DIR = join(import.meta.dir, "fixtures", "device-service-0.1.54")
+const PUBLISHED_CHECKSUMS_SHA256 = "593e06f32fd8bee3d89c58edf3c414d53dd615206c81c74cdf3e7b1c4440de31"
 const PUBLISHED_BINARY_SHA256 = {
-  "omo-device-service-darwin-arm64": "6ff9448659a06fba9da47b0ba059eeb580c57bb60e8837a4178af2b62855ecca",
-  "omo-device-service-darwin-x64": "edede80b8e146bd901cf738e766f6cd54a164b7fa98e947f16f5b06b62c7848f",
-  "omo-device-service-linux-x64": "6c4315a9942917fcb3f927afe97c9d7341d38121480643b55157f88156ff752f",
-  "omo-device-service-linux-arm64": "98af939c47b3ebf96d0a5f0c8d7f0e2d1aebd0c575309b10ae6ad7a03f68cb0c",
+  "omo-device-service-darwin-arm64": "4c001f985e57ec8be24e33b6a25bd909f2ffe4f789b456b62bf6c49460c16d4b",
+  "omo-device-service-darwin-x64": "b7634ecfd3f98dc7f679f73bcd786229e0dd497efef8d18d2f466a7280980096",
+  "omo-device-service-linux-x64": "d3c418cfa2431355dcda5586943c116a07168656e0e63c27c319ed097c084532",
+  "omo-device-service-linux-arm64": "5b703fc48e1be5c39debba37cead576ff78522ad6ddc4fa646608c9de47b24c2",
 }
 const SIGNED_ENTRY_FILES = ["checksums.txt", "checksums.txt.sig", "latest.json"] as const
 
@@ -39,7 +39,7 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-describe("the pinned device service release is the published 0.1.45", () => {
+describe("the pinned device service release is the published 0.1.54", () => {
   test("its published checksums.txt verifies under this build's compiled-in release key and names this pin", async () => {
     // given the published release's signed entry files
     const checksums = published("checksums.txt")
@@ -64,9 +64,9 @@ describe("the pinned device service release is the published 0.1.45", () => {
   })
 
   test("the start-up install fetches the pinned release and passes its signature check before asking for the binary", async () => {
-    // given a local origin serving the published 0.1.45 entry files, and no binary
+    // given a local origin serving the published 0.1.54 entry files, and no binary
     const requested: string[] = []
-    const prefix = "/stable/device-service/0.1.45/"
+    const prefix = "/stable/device-service/0.1.54/"
     const server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
@@ -107,7 +107,7 @@ describe("the pinned device service release is the published 0.1.45", () => {
         (file) => `${prefix}${file}`,
       ),
     )
-    expect(setup.pinVersion).toBe("0.1.45")
+    expect(setup.pinVersion).toBe("0.1.54")
     expect(outcome).toEqual({
       ok: false,
       state: "service_degraded",
