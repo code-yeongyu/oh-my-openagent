@@ -3,7 +3,15 @@
  *
  * Strict JSON is tried first, so a plain `opencode.json` never pays for the scan. The scan itself
  * is string-aware: a `//` inside a quoted value is data, not a comment, and so is a `,}` or `,]`.
+ * It blanks instead of deleting: a comment's characters and a trailing comma become spaces and line
+ * breaks stay, so the stripped text has the source's length and lines, and a parse error's position
+ * points into the file the user wrote.
  */
+
+// `text` with every character except a line break replaced by a space.
+function blank(text) {
+  return text.replace(/[^\r\n]/g, " ")
+}
 
 function strip(text) {
   let out = ""
@@ -23,16 +31,20 @@ function strip(text) {
       continue
     }
     if (character === "/" && text[index + 1] === "/") {
+      const start = index
       while (index < text.length && text[index] !== "\n") index += 1
+      out += blank(text.slice(start, index))
       continue
     }
     if (character === "/" && text[index + 1] === "*") {
       const end = text.indexOf("*/", index + 2)
-      index = end === -1 ? text.length : end + 2
+      const stop = end === -1 ? text.length : end + 2
+      out += blank(text.slice(index, stop))
+      index = stop
       continue
     }
     if ((character === "}" || character === "]") && pendingComma !== -1) {
-      out = out.slice(0, pendingComma) + out.slice(pendingComma + 1)
+      out = `${out.slice(0, pendingComma)} ${out.slice(pendingComma + 1)}`
     }
     if (character === ",") pendingComma = out.length
     else if (!/\s/.test(character)) pendingComma = -1

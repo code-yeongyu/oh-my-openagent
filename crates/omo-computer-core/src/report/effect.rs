@@ -52,8 +52,8 @@ impl From<backend::Route> for Route {
     fn from(route: backend::Route) -> Self {
         match route {
             backend::Route::Ax => Self::Ax,
-            backend::Route::BackgroundWindow => Self::BackgroundWindow,
-            backend::Route::BackgroundPid => Self::BackgroundPid,
+            backend::Route::BackgroundWindow { .. } => Self::BackgroundWindow,
+            backend::Route::BackgroundPid { .. } => Self::BackgroundPid,
             backend::Route::ForegroundHid => Self::ForegroundHid,
         }
     }

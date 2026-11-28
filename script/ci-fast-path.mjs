@@ -144,8 +144,10 @@ export function classifyCiMode({
   changedFiles = 0,
   basePlatformGreen = false,
 }) {
-  // Queue commits never use generated-release push policy.
-  const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
+  // Queue commits never use generated-release push policy. A dispatched run validates one exact commit for a release
+  // (publish.yml pins its source SHA that way, #15094), so it runs everything a push runs.
+  const classificationEvent =
+    eventName === "merge_group" ? "pull_request" : eventName === "workflow_dispatch" ? "push" : eventName
   const subject = headCommitMessage.split("\n", 1)[0] ?? ""
   // Provenance is machine-derived, never prose alone: an actual merge commit
   // (exactly two parents) whose subject matches the generated release shape.

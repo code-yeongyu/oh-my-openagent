@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "5.1.84",
+  "version": "5.1.85",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -194,13 +194,14 @@
   },
   "homepage": "https://github.com/code-yeongyu/oh-my-openagent#readme",
   "dependencies": {
-    "@opentui/solid": "^0.5.11",
+    "@opentui/solid": "^0.9.9",
     "detect-libc": "^2.1.2",
+    "solid-js": "^1.9.20",
     "zod": "^4.6.6"
   },
   "devDependencies": {
     "@clack/prompts": "^1.8.1",
-    "@code-yeongyu/senpi": "2026.11.23",
+    "@code-yeongyu/senpi": "2026.11.28-1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
@@ -248,8 +249,8 @@
     "@opencode-ai/plugin": "1.18.31",
     "@opencode-ai/sdk": "1.18.31",
     "@opencode/plugin": "2.0.32",
-    "@opentui/core": "^0.5.11",
-    "@opentui/keymap": "^0.5.11",
+    "@opentui/core": "^0.9.9",
+    "@opentui/keymap": "^0.9.9",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "26.6.2",
     "@types/picomatch": "^4.0.3",
@@ -275,18 +276,18 @@
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "5.1.84",
-    "oh-my-opencode-darwin-x64": "5.1.84",
-    "oh-my-opencode-darwin-x64-baseline": "5.1.84",
-    "oh-my-opencode-linux-arm64": "5.1.84",
-    "oh-my-opencode-linux-arm64-musl": "5.1.84",
-    "oh-my-opencode-linux-x64": "5.1.84",
-    "oh-my-opencode-linux-x64-baseline": "5.1.84",
-    "oh-my-opencode-linux-x64-musl": "5.1.84",
-    "oh-my-opencode-linux-x64-musl-baseline": "5.1.84",
-    "oh-my-opencode-windows-arm64": "5.1.84",
-    "oh-my-opencode-windows-x64": "5.1.84",
-    "oh-my-opencode-windows-x64-baseline": "5.1.84"
+    "oh-my-opencode-darwin-arm64": "5.1.85",
+    "oh-my-opencode-darwin-x64": "5.1.85",
+    "oh-my-opencode-darwin-x64-baseline": "5.1.85",
+    "oh-my-opencode-linux-arm64": "5.1.85",
+    "oh-my-opencode-linux-arm64-musl": "5.1.85",
+    "oh-my-opencode-linux-x64": "5.1.85",
+    "oh-my-opencode-linux-x64-baseline": "5.1.85",
+    "oh-my-opencode-linux-x64-musl": "5.1.85",
+    "oh-my-opencode-linux-x64-musl-baseline": "5.1.85",
+    "oh-my-opencode-windows-arm64": "5.1.85",
+    "oh-my-opencode-windows-x64": "5.1.85",
+    "oh-my-opencode-windows-x64-baseline": "5.1.85"
   },
   "overrides": {
     "hono": "^4.13.8",

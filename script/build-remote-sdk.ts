@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, relative, resolve } from "node:path"
+import nodePath, { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 // `omo-ai/remote` (omo#13413): the remote module bundled for node plus its declaration tree. TypeScript 7 has no
@@ -74,7 +74,11 @@ function relink(out: string, file: string, text: string, core: Record<string, st
       unresolved.push(specifier)
       return whole
     }
-    const path = relative(dirname(file), target).replace(/\.d\.ts$/, ".js")
+    // A module specifier uses "/" on every OS; a Windows separator would turn `.\remote...` into an escape sequence.
+    const path = relative(dirname(file), target)
+      .split(sep)
+      .join("/")
+      .replace(/\.d\.ts$/, ".js")
     return `${lead}${quote}${path.startsWith(".") ? path : `./${path}`}${quote}`
   })
   if (unresolved.length > 0)
@@ -146,18 +150,80 @@ async function declarations(): Promise<Artifacts> {
   }
 }
 
+/**
+ * Every path where what a commit ships differs from the build: an artifact git's index does not hold (missing, or written
+ * but never added), one whose indexed bytes differ, or an indexed file in the types tree the build no longer emits. The
+ * working tree is never read: an install's prepare build rewrites it, so it would always look current. Every key and
+ * `typesRoot` come from `paths` (the platform's path module), so the types tree is judged with it too.
+ */
+export function staleArtifacts(
+  artifacts: ReadonlyMap<string, string>,
+  typesRoot: string,
+  indexed: ReadonlyMap<string, string>,
+  paths: typeof nodePath = nodePath,
+): string[] {
+  const inTypes = (file: string): boolean => {
+    const below = paths.relative(typesRoot, file)
+    return below !== "" && below !== ".." && !below.startsWith(`..${paths.sep}`) && !paths.isAbsolute(below)
+  }
+  const extra = new Set([...indexed.keys()].filter(inTypes))
+  const differing = [...artifacts]
+    .filter(([path, text]) => {
+      extra.delete(path)
+      return indexed.get(path) !== text
+    })
+    .map(([path]) => path)
+  return [...differing, ...extra]
+}
+
+async function git(repo: string, args: readonly string[], input?: string): Promise<Buffer> {
+  const run = Bun.spawn(["git", ...args], {
+    cwd: repo,
+    stdin: input === undefined ? "ignore" : new TextEncoder().encode(input),
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(run.stdout).arrayBuffer(),
+    new Response(run.stderr).text(),
+    run.exited,
+  ])
+  if (code !== 0) throw new Error(`git ${args[0]} failed (${code}): ${stderr}`)
+  return Buffer.from(stdout)
+}
+
+/** The bytes git's index holds for every file under `dir`, keyed by absolute path: what a commit ships. */
+export async function indexedFiles(repo: string, dir: string): Promise<Map<string, string>> {
+  // `ls-files -s -z`: "<mode> <blob> <stage>\t<path>" per entry; the blobs' bytes come back from one cat-file batch.
+  const entries = (await git(repo, ["ls-files", "-s", "-z", "--", relative(repo, dir)]))
+    .toString("utf8")
+    .split("\0")
+    .filter((entry) => entry !== "")
+    .map((entry) => {
+      const tab = entry.indexOf("\t")
+      return { blob: entry.slice(0, tab).split(" ")[1] ?? "", path: join(repo, entry.slice(tab + 1)) }
+    })
+  if (entries.length === 0) return new Map()
+  const batch = await git(repo, ["cat-file", "--batch"], `${entries.map((e) => e.blob).join("\n")}\n`)
+  const indexed = new Map<string, string>()
+  let at = 0
+  for (const { path } of entries) {
+    const header = batch.indexOf(0x0a, at)
+    const size = Number(batch.subarray(at, header).toString("utf8").split(" ")[2])
+    indexed.set(path, batch.subarray(header + 1, header + 1 + size).toString("utf8"))
+    at = header + 1 + size + 1
+  }
+  return indexed
+}
+
 export async function buildRemoteSdk(check = false): Promise<void> {
   const artifacts = await declarations()
   artifacts.set(join(lib, "remote-sdk.generated.js"), await bundle())
   if (check) {
-    const tracked = new Set(walk(join(lib, TYPES_DIR)))
-    const stale = [...artifacts].filter(([path, text]) => {
-      tracked.delete(path)
-      const file = Bun.file(path)
-      return file.size === 0 || readFileSync(path, "utf8") !== text
-    })
-    if (stale.length > 0 || tracked.size > 0) {
-      throw new Error("Remote SDK bundle is stale; run bun script/build-remote-sdk.ts")
+    const stale = staleArtifacts(artifacts, join(lib, TYPES_DIR), await indexedFiles(root, lib))
+    if (stale.length > 0) {
+      const listed = stale.map((path) => relative(root, path)).join("\n  ")
+      throw new Error(`Remote SDK bundle is stale; run bun script/build-remote-sdk.ts\n  ${listed}`)
     }
     return
   }

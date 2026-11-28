@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { HostEnginePolicy } from "../lazy/senpi-barrel"
 import { RunnerError } from "./in-process/runner-error"
+import { withProbeRequestExtension } from "./probe-request"
 import {
   admitChildStore,
   ensureChildEndpoint,
@@ -45,6 +46,12 @@ export interface HostSessionChannel extends HostSessionPort {
 export type { EnsureTaskDaemonPort, ShardResolver } from "./rpc-host/child-endpoint"
 // `taskId` names the child whose dialogs and approval mode the channel carries (#6189).
 export type CreateHostSessionChannel = (socketPath: string, taskId?: string) => HostSessionChannel
+/** Builds one child's client; `keyRoot` is the runner's agent dir, where every host the runner reaches wrote its launch key. */
+export type CreateHostSessionClient = (
+  socketPath: string,
+  taskId: string | undefined,
+  keyRoot: string,
+) => HostSessionChannel
 
 /** The per-child runner this one delegates to when the daemon cannot host a child. */
 export interface FallbackChildRunner {
@@ -57,7 +64,7 @@ export type RpcHostRunnerOptions = {
   readonly agentDir: string
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly ensureDaemon?: EnsureTaskDaemonPort
-  readonly createClient?: CreateHostSessionChannel
+  readonly createClient?: CreateHostSessionClient
   readonly modelAdmission?: RpcModelAdmission
   // The parent's `-e` extension entries, forwarded exactly as the per-child runner forwards them:
   // the daemon loads its own extension set, but admission and the fallback still need the parent's.
@@ -140,11 +147,15 @@ export class RpcHostRunner {
 
   constructor(options: RpcHostRunnerOptions) {
     this.options = options
-    this.createClient =
+    // Every host this runner reaches was launched in its agent dir (ensured there, or the session's own host), which is
+    // where the host wrote its launch key: each client and probe proves the host there and nowhere else (senpi#7568).
+    const keyRoot = options.agentDir
+    const createClient: CreateHostSessionClient =
       options.createClient ??
-      ((socketPath, taskId) =>
+      ((socketPath, taskId, root) =>
         new HostSessionClient({
           socketPath,
+          keyRoot: root,
           ...(taskId === undefined
             ? {}
             : {
@@ -153,6 +164,7 @@ export class RpcHostRunner {
                 ),
               }),
         }))
+    this.createClient = (socketPath, taskId) => createClient(socketPath, taskId, keyRoot)
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []
     this.now = options.now ?? Date.now
@@ -170,7 +182,7 @@ export class RpcHostRunner {
       shardResolver: options.shardResolver,
       ownHostSocket: options.ownHostSocket,
       insideHost: options.insideHost,
-      probeHost: options.probeHost ?? probeWithEngine,
+      probeHost: options.probeHost ?? ((socket) => probeWithEngine(socket, keyRoot)),
       notice: onceNoticeSink(options.onNotice),
       now: this.now,
     }
@@ -190,10 +202,11 @@ export class RpcHostRunner {
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
-    const spec =
+    const spec = withProbeRequestExtension(
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }
-        : specInput
+        : specInput,
+    )
     await this.modelAdmission(spec)
     const endpoint = resolveChildEndpoint(this.endpoint, spec)
     const keyed =

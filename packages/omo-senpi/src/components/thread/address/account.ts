@@ -73,6 +73,7 @@ export async function accountState(
 
 /** The account in one read: this device, its roster, the listing rows of devices still on it, each device's listing. */
 export type Account = {
+  readonly host_counts?: Readonly<Record<string, unknown>>
   readonly here: string | null
   readonly devices: readonly RemoteDevice[]
   /** The roster as read; undefined when it could not be read (then no row is judged by it). */
@@ -201,6 +202,7 @@ export async function readAccount(remote: RemoteThreadSurface, given: AccountRea
       roster,
       rows: onAccount(listing.rows, roster, here),
       incomplete: listing.incomplete,
+      ...("host_counts" in listing ? { host_counts: listing.host_counts } : {}),
       listingOf: (device) => deviceListing(device, listing, online),
       missedHolder: (id) => {
         const device = earlier(id)

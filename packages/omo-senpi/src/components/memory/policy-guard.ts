@@ -37,25 +37,28 @@ export function hasFilesystemPolicySupport(
   return typeof candidate.registerFilesystemPolicy === "function"
 }
 
-export type MemoryPolicyRegistration =
-  { readonly status: "registered" } | { readonly status: "unbound" } | { readonly status: "unsupported" }
+export type MemoryPolicyRegistration = { readonly status: "registered" } | { readonly status: "unsupported" }
 
 /**
  * Registers the hard cross-identity filesystem policy when the host exposes the Senpi
  * filesystem policy API.
  *
- * Registration happens once at binding time. Resume-conflict and unbound sessions register
- * nothing: without a bound identity there is no carve-out to anchor, and the policy must
- * never deny everything. Hosts without the capability keep the P28 soft guard (guard.ts
- * tool_call hook) as the sole enforcement layer.
+ * Registration happens once, when the extension loads: Senpi composes the policies its file tools
+ * enforce when the runtime is built, before session_start, and a policy registered later is never
+ * consulted (#15251). The policy reads the bound identity of this extension instance's own session on
+ * every call (each senpi session runtime loads its own instance, so a policy never sees another session's
+ * binding). With no bound identity (before the session binds, after it shut down, or a resume-conflict
+ * session, which never binds) it fails closed on memory only: both memory areas under `memoryRoot` are
+ * denied, since there is no own root to carve out, and everything outside them stays allowed. Hosts without
+ * the capability keep the P28 soft guard (guard.ts tool_call hook) as the sole enforcement layer.
  */
 export function registerMemoryFilesystemPolicy(
   pi: SenpiExtensionAPI,
-  context: MemoryIdentityContext | undefined,
+  boundContext: () => MemoryIdentityContext | undefined,
+  memoryRoot: string,
 ): MemoryPolicyRegistration {
-  if (context === undefined) return { status: "unbound" }
   if (!hasFilesystemPolicySupport(pi)) return { status: "unsupported" }
-  pi.registerFilesystemPolicy(buildMemoryFilesystemPolicy(context))
+  pi.registerFilesystemPolicy(buildMemoryFilesystemPolicy(boundContext, memoryRoot))
   return { status: "registered" }
 }
 
@@ -76,24 +79,38 @@ export function registerMemoryFilesystemPolicy(
  * memoised, so a host that asks repeatedly - per spawned sandbox, say - still pays one enumeration
  * per bound session, exactly as binding used to.
  */
-function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): FilesystemPolicy {
-  const ownRoot = resolve(context.identityPaths.root)
-  const durableAgentsRoot = dirname(resolve(context.durableRoot))
-  const ownRoots = stableRoots([ownRoot])
-  const deniedAreas = stableRoots([
-    dirname(ownRoot),
-    durableAgentsRoot,
-    join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME),
-  ])
-  let resolvedDeniedRoots: readonly string[] | undefined
+function buildMemoryFilesystemPolicy(
+  boundContext: () => MemoryIdentityContext | undefined,
+  memoryRoot: string,
+): FilesystemPolicy {
+  const unboundAreas = stableRoots([join(memoryRoot, "agents"), join(memoryRoot, TRANSIENT_DIRNAME)])
+  // Per bound identity, computed on its first call: a rebind to another identity gets its own roots.
+  const layouts = new WeakMap<MemoryIdentityContext, IdentityLayout>()
+  const layoutOf = (context: MemoryIdentityContext): IdentityLayout => {
+    const known = layouts.get(context)
+    if (known !== undefined) return known
+    const layout = identityLayout(context)
+    layouts.set(context, layout)
+    return layout
+  }
 
   return {
     get deniedRoots(): readonly string[] {
-      resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
-      return resolvedDeniedRoots
+      const context = boundContext()
+      return context === undefined ? unboundAreas : layoutOf(context).deniedRoots()
     },
     check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
+      const context = boundContext()
       const target = resolve(request.canonicalPath)
+      if (context === undefined) {
+        return unboundAreas.some((area) => isWithin(area, target))
+          ? {
+              allow: false,
+              reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}`,
+            }
+          : { allow: true }
+      }
+      const { ownRoots, deniedAreas } = layoutOf(context)
       if (request.operation === "read" && isGrantedProjectMemoryRead(context, target)) return { allow: true }
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
       if (deniedAreas.some((root) => isWithin(root, target))) {
@@ -103,6 +120,30 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
         }
       }
       return { allow: true }
+    },
+  }
+}
+
+type IdentityLayout = {
+  readonly ownRoots: readonly string[]
+  readonly deniedAreas: readonly string[]
+  readonly deniedRoots: () => readonly string[]
+}
+
+function identityLayout(context: MemoryIdentityContext): IdentityLayout {
+  const ownRoot = resolve(context.identityPaths.root)
+  const durableAgentsRoot = dirname(resolve(context.durableRoot))
+  let resolvedDeniedRoots: readonly string[] | undefined
+  return {
+    ownRoots: stableRoots([ownRoot]),
+    deniedAreas: stableRoots([
+      dirname(ownRoot),
+      durableAgentsRoot,
+      join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME),
+    ]),
+    deniedRoots: () => {
+      resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
+      return resolvedDeniedRoots
     },
   }
 }
@@ -137,7 +178,9 @@ function canonicalizeFromNearestExisting(target: string): string | undefined {
   while (true) {
     try {
       lstatSync(candidate)
-      return resolve(realpathSync(candidate), ...missingSegments.reverse())
+      // Native, like senpi's own canonicalization of the request path: on Windows the JS realpath keeps an 8.3
+      // short name (RUNNER~1) that the native one expands, so the roots would never contain the target (#15251).
+      return resolve(realpathSync.native(candidate), ...missingSegments.reverse())
     } catch (error) {
       if (!isMissingPathError(error)) return undefined
       const parent = dirname(candidate)

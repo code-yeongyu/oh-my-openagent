@@ -204,6 +204,8 @@ function queuedLine(delivery: {
       return `queued #${position}: thread is paused or stopped${where}; delivers when it resumes`
     case "wake":
       return `queued #${position}: no engine is running the thread${where}; it starts to take the message`
+    case "host_identity_unproven":
+      return `queued #${position}: stored for the thread's host, which takes it itself; this caller could not prove that host (host_identity_unproven)`
     default:
       return `queued #${position}: waits for the running turn`
   }
@@ -239,18 +241,19 @@ function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView 
     delivery.kind === "started"
       ? `${mode}delivered (turn ${short(delivery.turn_id)})`
       : delivery.kind === "steered"
-        ? `steered into the running turn (turn ${short(delivery.turn_id)})`
+        ? `steer queued for turn ${short(delivery.turn_id)}: delivers at its next tool boundary`
         : delivery.kind === "queued"
           ? queuedLine(delivery)
           : delivery.kind === "queued_offline"
             ? `queued #${delivery.queue_position}: thread is offline, delivers when it starts`
-            : "sent"
+            : `delivery state unknown${delivery.kind === undefined ? "" : ` (${text(delivery.kind)})`}`
   return {
-    tone: delivery.kind === "started" || delivery.kind === "steered" ? "success" : "warning",
+    // Only a started turn has taken the message; a steer waits in the target's queue until its next tool boundary.
+    tone: delivery.kind === "started" ? "success" : "warning",
     headline: `-> ${target}  ${outcome}`,
     details: [
       ...(r.resolved_by === "fuzzy" ? ["matched by fuzzy name"] : []),
-      ...(r.deduplicated === true ? ["already sent under this key; not delivered twice"] : []),
+      ...(r.deduplicated === true ? ["already accepted under this key; not delivered twice"] : []),
       ...device(r),
     ],
   }

@@ -4,6 +4,7 @@
 // handshake-based revisions (2025-11-25 and earlier) for the rest of that connection.
 import {
   describeError,
+  internalError,
   redactFields,
   redactValue,
   type SurfaceDefinition,
@@ -92,7 +93,15 @@ export const mcpHandler = <O extends Ops>(
         isError: false,
       };
     } catch (error) {
-      const { kind, message, hint } = describeError(error);
+      // Any thrown value is wrapped, never rethrown, so its text still reaches the redactor; the
+      // instanceof check itself is guarded, because it throws for a revoked or trapped Proxy.
+      let reported: Error;
+      try {
+        reported = error instanceof Error ? error : internalError(error);
+      } catch {
+        reported = internalError(error);
+      }
+      const { kind, message, hint } = describeError(reported);
       const said = `${kind}: ${message}${hint === undefined ? "" : `\nhint: ${hint}`}`;
       return { content: [{ type: "text", text: said }], isError: true };
     }

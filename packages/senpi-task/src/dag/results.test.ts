@@ -197,6 +197,23 @@ describe("persistDagNodeResult durable node artifacts", () => {
     expect(fs.readdirSync(resultDir).sort()).toEqual([`${nodeId}.stats.json`, `${nodeId}.txt`])
   })
 
+  test("#given a node persisted with run stats #when a later run without run stats is persisted #then the earlier sidecar no longer describes the node (#12134)", () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore(ownedTaskState(projectDir))
+    persistDagNodeResult({ store, runId, nodeId, record: terminalRecord(projectDir, "first run") })
+
+    // when
+    const laterRun: TaskRecord = { ...terminalRecord(projectDir, "later run"), run_stats: undefined }
+    const outcome = persistDagNodeResult({ store, runId, nodeId, record: laterRun })
+
+    // then
+    if (outcome.kind !== "persisted") throw new Error("expected persisted outcome")
+    expect(outcome.artifact.stats).toBeUndefined()
+    expect(readDagNodeResult({ store, runId, nodeId })).toEqual({ output: "later run" })
+    expect(fs.readdirSync(dirname(store.paths.result(runId, nodeId)))).toEqual([`${nodeId}.txt`])
+  })
+
   test("#given a fault mid-write during re-persist #then the prior artifact body remains intact and no orphan temp file is left", () => {
     // given
     const projectDir = tempProject()

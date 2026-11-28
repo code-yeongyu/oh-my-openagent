@@ -27,6 +27,7 @@ Use the directory you read this file from. `OMO_BUNSHIN_TS_SDK_ROOT` is set only
 | You need to | Read |
 |---|---|
 | List the machines, run a command or a long job, move files, search a machine | [references/machines.md](references/machines.md) |
+| List, read, send to, create, interrupt or close a thread on any device, name one by address, or watch one | [references/threads.md](references/threads.md) |
 | Do the same thing on every machine, on chosen machines or on several threads, and report each one | [references/parallel.md](references/parallel.md) |
 | Act on an error code (`not_found`, `unsupported`, `invalid_arguments`, a skipped machine) | [references/errors.md](references/errors.md) |
 

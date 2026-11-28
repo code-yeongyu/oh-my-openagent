@@ -128,6 +128,7 @@ export const DAG_NODE_ERROR_CODES = [
   "resume_task_orphaned",
   "lost_while_paused",
   "journal_corrupt",
+  "stale_attempt_alive",
 ] as const
 
 export type DagNodeErrorCode = (typeof DAG_NODE_ERROR_CODES)[number]
@@ -139,34 +140,8 @@ export type DagNodeError = {
   readonly at: string
 }
 
-export type DagDiagnostic =
-  | {
-      readonly kind: "route_fallback"
-      readonly nodeId: DagNodeId
-      readonly message: string
-      readonly at: string
-    }
-  | {
-      readonly kind: "node_flag"
-      readonly nodeId: DagNodeId
-      readonly message: string
-      readonly at: string
-    }
-  | {
-      readonly kind: "missing_skill"
-      readonly nodeId: DagNodeId
-      readonly skill: string
-      readonly message: string
-      readonly at: string
-    }
-  | { readonly kind: "run_flag"; readonly message: string; readonly at: string }
-  | {
-      readonly kind: "journal_corrupt"
-      readonly runId?: DagRunId
-      readonly path: string
-      readonly message: string
-      readonly at: string
-    }
+export type { DagDiagnostic, DagHeldTrigger, DagHeldTriggerFact } from "./diagnostic-types"
+import type { DagDiagnostic, DagHeldTrigger } from "./diagnostic-types"
 
 export type DagNode = {
   readonly id: DagNodeId
@@ -194,6 +169,9 @@ export type DagNode = {
   // because it describes a LIVE child: a node running with no recent activity is either
   // finished-but-unreaped or genuinely stalled, and `running` alone cannot tell those apart (#8674).
   readonly lastActivityAt?: string
+  // A self-started turn the fence held while the user had stopped the run (#11381), shown until the
+  // node is next sent to, retried, amended or re-opened.
+  readonly heldTrigger?: DagHeldTrigger
 }
 
 // Per-node output budget in the checkpoint. A node's final message is normally far shorter; the cap
@@ -257,6 +235,9 @@ export type DagRunSnapshot = {
   // One entry per accepted amendment. Observe surfaces read this projection, so it must carry the
   // history rather than making them reach for the raw record. Absent on never-amended runs.
   readonly amendHistory?: readonly AmendRecord[]
+  // A settled run that still owns live children owes a stop (#11381): derived from the task records at
+  // read time, never stored. Absent when the run is active or owes nothing.
+  readonly outstandingStop?: { readonly liveTaskIds: readonly string[] }
   // Host pid holding the resume lease on a paused run. Display surfaces need it to tell a run that
   // is being resumed right now from one that is genuinely parked. Absent unless a claim is held.
   readonly leaseHolderPid?: number
