@@ -35,7 +35,12 @@ import {
 import { inputProblems } from "./contract-check"
 import { TYPED_AHEAD_INPUTS, typedAheadProblems } from "./typed-ahead"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
-import { freeFieldMappingProblems, loadSnapshot, sessionShapeProblems } from "./engine-snapshot-check"
+import {
+  freeFieldMappingProblems,
+  loadSnapshot,
+  pinnedEngineExportsContract,
+  sessionShapeProblems,
+} from "./engine-snapshot-check"
 import type { ScenarioTableFile, TableScenario } from "./scenario-table"
 
 // Negative controls of slice P1a-s's checks (#14949): each breaks one thing the real tree holds and expects the check to
@@ -206,6 +211,13 @@ describe("negative controls of custody and the held table (#14949)", () => {
       session_required: snapshot.session_required.filter((field) => field !== "provider"),
     }
     expect(sessionShapeProblems(engineLooser, session).join("\n")).toContain("session required fields")
+  })
+
+  test("#given an engine entry with only its command exports, then one that adds a contract export #then only the second counts", () => {
+    // senpi 2026.11.27's ./engine entry exports exactly these three names and none of the contract.
+    const commandsOnly = { ENGINE_COMMANDS: [], GATED_SLICE: "gated", engine: {} }
+    expect(pinnedEngineExportsContract(commandsOnly)).toBe(false)
+    expect(pinnedEngineExportsContract({ ...commandsOnly, RESULT_FREE_FIELDS: [] })).toBe(true)
   })
 
   test("#given a typed-ahead input with no entry, or an entry that is stale or names nothing #then each is named", () => {

@@ -2364,6 +2364,7 @@
     "packages/senpi-task/src/runners/rpc-host/reconcile-turn.ts",
     "packages/senpi-task/src/runners/rpc-host/session-client-connection.ts",
     "packages/senpi-task/src/runners/rpc-host/session-client-opening.ts",
+    "packages/senpi-task/src/runners/rpc-host/session-client-ports.ts",
     "packages/senpi-task/src/runners/rpc-host/session-client.ts",
     "packages/senpi-task/src/runners/rpc-host/session-close-proof.ts",
     "packages/senpi-task/src/runners/rpc-host/session-context.ts",
