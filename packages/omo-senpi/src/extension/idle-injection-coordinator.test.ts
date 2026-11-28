@@ -50,7 +50,7 @@ describe("IdleInjectionCoordinator", () => {
         display: false,
         details: [{ customType: "senpi-task:completion", details: { taskId: "st_1" } }],
       },
-      options: { deliverAs: "steer", items: [{ producer: "task-completion", content: "task st_1 completed" }] },
+      options: { deliverAs: "followUp", items: [{ producer: "task-completion", content: "task st_1 completed" }] },
     })
   })
 
@@ -67,10 +67,10 @@ describe("IdleInjectionCoordinator", () => {
     expect(collapsed).toBe(2)
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("task st_1 completed\n\ncontinue the run")
-    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
+    expect(calls[0]?.options).toEqual({ deliverAs: "followUp" })
   })
 
-  it("#given one task completion on an idle edge #when flushed #then it steers immediately", () => {
+  it("#given one task completion on an idle edge #when flushed #then it follows up immediately", () => {
     // given
     const { coordinator, calls } = createCoordinator()
     coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
@@ -82,12 +82,12 @@ describe("IdleInjectionCoordinator", () => {
     expect(calls).toEqual([
       {
         content: "task st_1 completed",
-        options: { deliverAs: "steer" },
+        options: { deliverAs: "followUp" },
       },
     ])
   })
 
-  it("#given two task completions on one idle edge #when flushed #then one steer carries both", () => {
+  it("#given two task completions on one idle edge #when flushed #then one followUp carries both", () => {
     // given
     const { coordinator, calls } = createCoordinator()
     coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
@@ -100,7 +100,7 @@ describe("IdleInjectionCoordinator", () => {
     expect(calls).toEqual([
       {
         content: "task st_1 completed\n\ntask st_2 completed",
-        options: { deliverAs: "steer" },
+        options: { deliverAs: "followUp" },
       },
     ])
   })
