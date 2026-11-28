@@ -160,22 +160,21 @@ function lstartWallClockMs(rendering: string): number | null {
   return Date.UTC(Number(year), monthIndex, Number(day), Number(hours), Number(minutes), Number(seconds))
 }
 
-// Every timezone offset in use lies in [UTC-12, UTC+14] and is a whole number of 15 minutes.
-const MIN_ZONE_OFFSET_MS = -12 * 3_600_000
-const MAX_ZONE_OFFSET_MS = 14 * 3_600_000
-const ZONE_OFFSET_STEP_MS = 15 * 60_000
+// A POSIX `TZ` names any offset up to 24:59:59 either way, to the second (`TZ='XYZ-15'`, `TZ='<X>-5:30:20'`), not only
+// the [UTC-12, UTC+14] quarter-hour offsets of the tz database (#15383).
+const MAX_POSIX_ZONE_OFFSET_MS = (25 * 3_600 - 1) * 1_000
 
 /**
  * The upgrade window (#12108 -> `ps-lstart-utc:`): a lock an older reader recorded as `ps-lstart:` holds the owner's start
- * as local wall time in a zone nobody recorded. It still proves the pid was reused when no real zone offset maps that
- * wall time onto the live process's UTC start. A record that cannot be read (a non-C locale) proves nothing.
+ * as local wall time in a zone nobody recorded. It proves the pid was reused only when no POSIX zone offset can map that
+ * wall time onto the live process's UTC start; any nearer gap may be a live owner's own zone, so it keeps the holder. A
+ * record that cannot be read (a non-C locale) proves nothing.
  */
 function legacyPsLstartConflict(recorded: string, actual: string): boolean {
   const recordedWall = lstartWallClockMs(recorded.slice("ps-lstart:".length))
   const actualUtc = lstartWallClockMs(actual.slice("ps-lstart-utc:".length))
   if (recordedWall === null || actualUtc === null) return false
-  const offset = recordedWall - actualUtc
-  return offset < MIN_ZONE_OFFSET_MS || offset > MAX_ZONE_OFFSET_MS || offset % ZONE_OFFSET_STEP_MS !== 0
+  return Math.abs(recordedWall - actualUtc) > MAX_POSIX_ZONE_OFFSET_MS
 }
 
 // `ps -o lstart=` once rendered local time (`ps-lstart:`), so the same pid yielded different bytes to two processes

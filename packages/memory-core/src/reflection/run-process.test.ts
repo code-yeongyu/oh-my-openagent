@@ -43,13 +43,13 @@ describe("recorded process classifiers (DESIGN.r2 4.3, C20-C22 controls)", () =>
   })
 
   // #15362: a start an older reader recorded as local wall time (`ps-lstart:`) is judged against today's UTC reading by
-  // the zone bound: no real offset (UTC-12..UTC+14, 15-minute steps) proves reuse, a real one does not.
+  // the zone bound: only a gap no POSIX offset (up to 24:59:59 either way) covers proves reuse (#15383).
   test.each([
     [
       "no zone offset maps onto",
       "dead",
       "ps-lstart:Tue Sep 15 14:59:03 2026",
-      "ps-lstart-utc:Wed Sep 16 14:59:03 2026",
+      "ps-lstart-utc:Thu Sep 17 14:59:03 2026",
     ],
     [
       "a real zone offset maps onto",
