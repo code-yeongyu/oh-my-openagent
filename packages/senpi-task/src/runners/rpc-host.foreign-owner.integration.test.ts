@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { defaultHostSessionProbe } from "../lifecycle/host-session-default"
 import type { TaskRecord } from "../state"
 import { startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 
 /**
  * #8932: a daemon-hosted child belongs to the omo process that launched it. Every OTHER omo process
@@ -47,7 +48,7 @@ describe("a daemon-hosted child stays with the process that launched it (#8932)"
     const { record } = await oneLiveChild()
     const identity = record.host_session
     if (identity === undefined) throw new Error("unreachable: oneLiveChild checked host_session")
-    const probe = defaultHostSessionProbe()
+    const probe = defaultHostSessionProbe(FAKE_HOST_KEY_ROOT)
 
     // when
     const daemonAlive = await probe.daemonAlive(identity)
