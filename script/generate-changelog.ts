@@ -2,6 +2,7 @@
 
 import { $ } from "bun"
 import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
+import { fitReleaseBody } from "./release-notes-budget"
 
 const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu", "sisyphus-dev-ai"]
 
@@ -143,7 +144,7 @@ async function main() {
   if (notes.length === 0) {
     console.log("No notable changes")
   } else {
-    console.log(notes.join("\n"))
+    console.log(fitReleaseBody(notes, previousTag))
   }
 }
 

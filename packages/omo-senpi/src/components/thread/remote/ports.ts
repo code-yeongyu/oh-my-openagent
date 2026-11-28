@@ -7,6 +7,7 @@ export type JsonObject = { readonly [key: string]: unknown }
 
 /** One row of the account-scoped session list (the device service's `sessions.list` listing). */
 export type RemoteSessionRow = {
+  readonly liveness?: unknown
   readonly device: string
   readonly session_id: string
   /** The session's omo durable id when its device publishes it (#12996); a delivery header names its sender by this id. */
@@ -49,7 +50,11 @@ export type RemoteDevice = {
 }
 
 /** One account listing: its rows, and the devices whose rows this listing could not include (timed out, unanswered). */
-export type RemoteListing = { readonly rows: readonly RemoteSessionRow[]; readonly incomplete: readonly string[] }
+export type RemoteListing = {
+  readonly rows: readonly RemoteSessionRow[]
+  readonly incomplete: readonly string[]
+  readonly host_counts?: Readonly<Record<string, unknown>>
+}
 
 /**
  * How a command sent to another device ended. `refused` carries the receiving side's reason

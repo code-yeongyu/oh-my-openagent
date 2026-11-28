@@ -12,10 +12,9 @@ import {
   createOnboardingScanComponent,
   createOnboardingScanStore,
   type OnboardingScanStore,
-  loadOnboardingScanRuntime,
   type OnboardingScanEvent,
-  type OnboardingScanRuntime,
 } from "./scan-component"
+import { loadOnboardingScanRuntime, type OnboardingScanRuntime } from "./scan-runtime-loader"
 import { encodeRecord, writeTranscript } from "./session-history/test-support"
 import { fakeModel, tempRoot, UNDERSTAND_MODEL, type FakeTurn } from "./understand.test-support"
 import {
@@ -344,7 +343,7 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     expect(rpc.starts).toHaveLength(0)
   })
 
-  test("#given the onboarding runtime fails to load #when understanding is requested #then it answers unavailable with the reason and no model runs", async () => {
+  test("#given the onboarding runtime fails to load #when understanding is requested #then it answers unavailable naming the runtime and no model runs", async () => {
     // given
     const { environment } = await profile()
     let loads = 0
@@ -369,7 +368,7 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     // then
     expect(response).toEqual({
       kind: "unavailable",
-      reason: expect.stringContaining("omo-onboarding-scan.js is missing"),
+      reason: expect.stringContaining("(extensions/omo-onboarding-scan.js) could not load"),
     })
     expect(rpc.starts).toHaveLength(0)
   })
