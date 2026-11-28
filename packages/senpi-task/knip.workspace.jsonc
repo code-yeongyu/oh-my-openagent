@@ -221,8 +221,6 @@
     "packages/senpi-task/src/team/messaging/session-start-reconcile.ts": ["DEFAULT_STALE_RESERVATION_TTL_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) clampWaitTimeout, finalResponseHead, isTerminalStatus, MemberScopedTaskSendParams, TaskSendParams, TaskCancelParams
     "packages/senpi-task/src/tools/control/index.ts": ["clampWaitTimeout", "finalResponseHead", "isTerminalStatus", "MemberScopedTaskSendParams", "TaskSendParams", "TaskCancelParams"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) scopeDenied
-    "packages/senpi-task/src/tools/control/send-results.ts": ["scopeDenied"],
     // pre-existing at origin dev 4686e425b5: unused export(s) isTerminalStatus, finalResponseHead
     "packages/senpi-task/src/tools/control/tool-result.ts": ["isTerminalStatus", "finalResponseHead"],
     // pre-existing at origin dev 4686e425b5: unused export(s) TaskOutputParams, TRANSCRIPT_MAX_CHARS, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, childSessionDir, parseSessionTranscript, readEventLogTranscript, readSessionDirTranscript
