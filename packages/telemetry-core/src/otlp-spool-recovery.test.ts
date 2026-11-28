@@ -301,7 +301,12 @@ describe("spool recovery", () => {
       // would let an extra wait of the same length pass as one of them...
       const ownFlushDeadline = timers.armed[firstShutdownSeq]
       const ownCap = timers.armed[firstShutdownSeq + 1]
-      expect([ownFlushDeadline?.ms, ownCap?.ms]).toEqual([FLUSH_DEADLINE_MS, CAP_MS])
+      expect(
+        [ownFlushDeadline?.ms, ownCap?.ms],
+        "shutdown must arm its flush deadline first and its cap second with no timer in between " +
+          "(see the delay() contract comment in #shutdown): " +
+          JSON.stringify(timers.armed.slice(firstShutdownSeq).map((timer) => timer.ms)),
+      ).toEqual([FLUSH_DEADLINE_MS, CAP_MS])
       // ...the flush deadline fired, and the only other timer that may have fired is shutdown's own cap
       // (it does when a claim is still in flight). Any other fired timer, of any length, is an extra wait.
       expect(firedWhenShutdownReturned).toContain(ownFlushDeadline as RecordedTimer)
