@@ -16,6 +16,7 @@ pub const MIN_INTERVAL_MS: u64 = 500;
 pub enum Dropped {
     NotSubscribed,
     NoLease,
+    PictureWithheld,
     TooSoon,
     TooLarge,
     NotJpeg,
@@ -32,12 +33,18 @@ pub struct PreviewFrame {
 pub struct Preview {
     subscribed: bool,
     last_ms: Option<u64>,
-    outbox: Vec<PreviewFrame>,
+    pending: Option<PreviewFrame>,
 }
 
 impl Preview {
     pub fn subscribe(&mut self) {
         self.subscribed = true;
+    }
+
+    pub(crate) fn end_session(&mut self) {
+        self.subscribed = false;
+        self.discard_pending();
+        // Reopening on this producer must not reset its rate limit.
     }
 
     #[must_use]
@@ -49,13 +56,7 @@ impl Preview {
     ///
     /// # Errors
     /// Why the frame was dropped; nothing is emitted then.
-    pub fn offer(&mut self, now_ms: u64, lease_active: bool, frame: FrameBytes) -> Result<(), Dropped> {
-        if !self.subscribed {
-            return Err(Dropped::NotSubscribed);
-        }
-        if !lease_active {
-            return Err(Dropped::NoLease);
-        }
+    pub(crate) fn offer_eligible(&mut self, now_ms: u64, frame: FrameBytes) -> Result<(), Dropped> {
         if frame.mime != omo_computer_core::observation::ImageMime::Jpeg {
             return Err(Dropped::NotJpeg);
         }
@@ -66,12 +67,16 @@ impl Preview {
             return Err(Dropped::TooSoon);
         }
         self.last_ms = Some(now_ms);
-        self.outbox.push(PreviewFrame { at_ms: now_ms, frame });
+        self.pending = Some(PreviewFrame { at_ms: now_ms, frame });
         Ok(())
     }
 
-    /// The frames for the host's `preview.frame` notifications, oldest first.
+    pub(crate) fn discard_pending(&mut self) {
+        self.pending = None;
+    }
+
+    /// A slow viewer gets the latest eligible frame, never a backlog.
     pub fn drain(&mut self) -> Vec<PreviewFrame> {
-        std::mem::take(&mut self.outbox)
+        self.pending.take().into_iter().collect()
     }
 }

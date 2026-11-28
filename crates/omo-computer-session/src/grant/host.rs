@@ -1,6 +1,6 @@
 //! The host-only verbs of the grant and the lease: `control.grant` / `control.revoke` /
 //! `control.acquire` / `control.release`, `display.release` / `display.resume`,
-//! `preview.subscribe`, and the host's consent events (a denied prompt, the per-app stop, a newer
+//! and the host's consent events (a denied prompt, the per-app stop, a newer
 //! user message, a re-approval). None of them is model-callable.
 
 use omo_computer_core::backend::Refusal;
@@ -17,9 +17,9 @@ use crate::mutate::LOCAL_HAND;
 use crate::lease::{Holder, SessionToken};
 use crate::mutate::Refused;
 use crate::presence::LeaseEnd;
-use crate::preview::{Dropped, PreviewFrame};
-use omo_computer_core::backend::FrameBytes;
 use crate::{Session, NOT_OPEN};
+
+mod stop_chord;
 
 impl Session {
     /// Every session of a test machine reads `clock` for reservations.
@@ -150,6 +150,7 @@ impl Session {
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
     pub(crate) fn end_lease(&mut self, why: LeaseEnd) {
+        self.funnel.control.preview.discard_pending();
         self.funnel.control.presence.end(why);
         self.funnel.control.slot.release(&self.funnel.control.token);
         self.funnel.control.lease_epoch = None;
@@ -176,25 +177,6 @@ impl Session {
     #[must_use]
     pub const fn display_released(&self) -> bool {
         self.funnel.control.display_released
-    }
-
-    pub fn preview_subscribe(&mut self) {
-        self.funnel.control.preview.subscribe();
-    }
-
-    /// A captured frame for the preview lane; emitted only to a subscriber during a lease.
-    ///
-    /// # Errors
-    /// Why the frame was dropped.
-    pub fn offer_preview(&mut self, frame: FrameBytes) -> Result<(), Dropped> {
-        let now = self.funnel.control.now_ms();
-        let lease = self.holds_lease();
-        self.funnel.control.preview.offer(now, lease, frame)
-    }
-
-    /// The frames for the host's `preview.frame` notifications.
-    pub fn take_preview_frames(&mut self) -> Vec<PreviewFrame> {
-        self.funnel.control.preview.drain()
     }
 
     /// Whether this session holds the machine's foreground lease.
@@ -251,101 +233,6 @@ impl Session {
         self.mint_token(session_id)
     }
 
-    /// A-IS-62 rev 5: a chord carried by `session.open{settings}` or `stopPath.start` is compared
-    /// with the configured one through the one parser; a differing or unparseable chord refuses the
-    /// call (one audit line naming both chords) and leaves the hand tampered (R70an C).
-    /// The configured chord as armed: its parsed spelling, or `None` when it cannot be armed.
-    fn configured_chord(&self) -> Option<String> {
-        match self.funnel.control.consent.view().stop_chord(backend_os(self.backend.as_ref())) {
-            crate::consent::StopChord::Chord(chord) => Some(chord),
-            crate::consent::StopChord::Unparseable(_) | crate::consent::StopChord::Unreadable => None,
-        }
-    }
-
-    /// Arms the configured chord (R70av), or a deaf listener when it cannot be read or parsed: the
-    /// stop path then reads deaf at once, never live or stale.
-    pub(crate) fn arm_configured_chord(&mut self) -> omo_computer_core::results::StopPathStatus {
-        if let Some(chord) = self.configured_chord() {
-            // R70av: the one chord seam; a chord the backend cannot arm reads deaf at once.
-            if self.backend.set_stop_chord(Some(&chord)).is_ok() {
-                self.funnel.control.armed_chord = Some(chord);
-                return self.guard.start_on(self.backend.as_mut());
-            }
-        }
-        self.funnel.control.armed_chord = Some(String::new());
-        self.guard.start(
-            Err(Refusal::new(
-                omo_computer_core::error::EngineCode::StopPathUnavailable,
-                omo_computer_core::error::Reason::Deaf,
-            )),
-            None,
-        )
-    }
-
-    /// R70av: before an exec is admitted, a stop key changed since it was armed re-arms the listener.
-    fn rearm_on_changed_chord(&mut self) {
-        let Some(armed) = self.funnel.control.armed_chord.clone() else {
-            return;
-        };
-        if self.configured_chord().unwrap_or_default() != armed {
-            self.arm_configured_chord();
-        }
-    }
-
-    /// R70as(3): where the engine cannot read the configured chord nothing is compared or armed;
-    /// the call is refused (the deaf chord-unarmable reading is row 50's or the LEAD's).
-    ///
-    /// # Errors
-    /// `ControlRequired{tampered}` when the view did not carry stopHotkey.
-    pub(crate) fn refuse_unreadable_chord(&mut self) -> Result<(), Refusal> {
-        if self.configured_chord().is_some() {
-            return Ok(());
-        }
-        // R70au(3): the listener arms no chord and reads deaf; the call answers StopPathUnavailable{deaf}.
-        self.arm_configured_chord();
-        Err(Refusal::new(
-            omo_computer_core::error::EngineCode::StopPathUnavailable,
-            omo_computer_core::error::Reason::Deaf,
-        ))
-    }
-
-    pub(crate) fn refuse_carried_chord(&mut self, stop_hotkey: Option<&str>, call: &str) -> Result<(), Refusal> {
-        let os = backend_os(self.backend.as_ref());
-        let view = self.funnel.control.consent.view();
-        let configured = match view.stop_chord(os) {
-            crate::consent::StopChord::Chord(chord) | crate::consent::StopChord::Unparseable(chord) => chord,
-            crate::consent::StopChord::Unreadable => "unreadable".to_owned(),
-        };
-        if let Err(refusal) = check_stop_hotkey(view, os, stop_hotkey) {
-            // One audit line for the refused call, naming both chords; the hand then reads
-            // tampered at once (A-IS-62 rev 5, R70an C, reversing R70aj). The peer's pid and executable
-            // are owed by row 29's peer check.
-            let _ = self.funnel.audit().append(crate::audit::AuditEvent {
-                action: call.to_owned(),
-                target: "stop_hotkey".to_owned(),
-                gate: crate::audit::Gate {
-                    outcome: crate::audit::GateOutcome::Refused,
-                    stage: Some("Consent".to_owned()),
-                    code: Some(refusal.code.wire().to_owned()),
-                    reason: refusal.reason.map(|reason| reason.wire().to_owned()),
-                },
-                status: crate::audit::Status::Refused,
-                primary_error: Some(refusal.code.wire().to_owned()),
-                evidence: vec![
-                    format!("configured={}", cut_chord(&configured)),
-                    format!("carried={}", cut_chord(stop_hotkey.unwrap_or_default())),
-                ],
-                ..crate::audit::AuditEvent::default()
-            });
-            // The hand now reads tampered until the consent is re-saved (A-IS-62 rev 5, R70an C).
-            let raw = self.backend.host_consent();
-            self.funnel.control.chord_tamper.refused(raw.as_ref());
-            self.open_consent()?;
-            return Err(refusal);
-        }
-        Ok(())
-    }
-
     /// `stopPath.stop`: the grant is revoked and the lease ends (`user_moved_on`, nothing more).
     pub(crate) fn stop_control(&mut self, source: Option<&str>) -> StopPathStatus {
         let status = self.guard.stop(source, &mut omo_computer_safety::NoHolds).1;
@@ -357,30 +244,8 @@ impl Session {
     /// Session close: the lease, the reservations and the presence surface end.
     pub(crate) fn close_control(&mut self) {
         self.control_release();
+        self.funnel.control.preview.end_session();
         self.funnel.control.reservations.release_all(&self.funnel.control.token);
-    }
-}
-
-/// A-IS-62: the stop chord has ONE source, the consent file's `stopHotkey`. A `stop_hotkey` in
-/// `session.open{settings}` that differs from it is refused before anything is armed.
-///
-/// # Errors
-/// The pin's `ControlRequired{permission_changed, tampered}` (d-sdk-skill.md:516, d-safety.md:335),
-/// encoded as the tampered-file refusal is today: `ControlRequired{reason:"tampered"}` (R70aj; the
-/// `permission_changed` marker rides the wire with row 27's data member). An unparseable file chord
-/// equals nothing, so any requested chord differs.
-fn check_stop_hotkey(view: &ConsentView, os: Os, requested: Option<&str>) -> Result<(), Refusal> {
-    let Some(requested) = requested else {
-        return Ok(());
-    };
-    // A-IS-62 rev 7: a carried chord longer than 256 bytes differs; it is never cut and compared.
-    if requested.len() <= MAX_CHORD_BYTES && view.same_stop_chord(os, requested) {
-        Ok(())
-    } else {
-        Err(Refusal::new(
-            omo_computer_core::error::EngineCode::ControlRequired,
-            omo_computer_core::error::Reason::Tampered,
-        ))
     }
 }
 
@@ -408,19 +273,6 @@ pub(crate) fn view_of(raw: Option<serde_json::Value>) -> ConsentView {
         },
         ConsentView::from_host,
     )
-}
-
-
-/// A-IS-62 rev 7: the longest chord compared or written; a peer-supplied chord cannot grow the line.
-const MAX_CHORD_BYTES: usize = 256;
-
-/// The first 256 bytes of a chord for the audit line (on a char boundary).
-fn cut_chord(chord: &str) -> &str {
-    let mut end = chord.len().min(MAX_CHORD_BYTES);
-    while !chord.is_char_boundary(end) {
-        end -= 1;
-    }
-    &chord[..end]
 }
 
 #[cfg(test)]

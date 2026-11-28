@@ -147,6 +147,15 @@ mod tests {
     }
 
     #[test]
+    fn preview_subscribe_refuses_forged_session_or_peer_params() {
+        let mut s = session();
+        for params in [json!({"sessionId":"another"}), json!({"peer":"session"}), json!({"generation":1})] {
+            let request = json!({"jsonrpc":"2.0","id":1,"method":"preview.subscribe","params":params});
+            assert_eq!(call(&mut s, &request.to_string())["error"]["code"], json!(INVALID_PARAMS));
+        }
+    }
+
+    #[test]
     fn framing_errors_answer_their_codes() {
         let mut session = session();
         assert_eq!(call(&mut session, "not json")["error"]["code"], json!(PARSE_ERROR));
