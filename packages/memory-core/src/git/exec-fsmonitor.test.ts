@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import { createNodeGitExec } from "./exec"
 import { removeTreeSync } from "../../../../test-support/remove-tree"
+import { HERMETIC_GIT_CONFIG } from "../../../../test-hermetic-home"
 
 // The builtin fsmonitor daemon exists on macOS and Windows only; on Linux `core.fsmonitor=true`
 // starts nothing, so the positive control below could not fail there (#10391 design, T9(a')).
@@ -22,7 +23,8 @@ interface FsmonitorFixture {
 function createFsmonitorFixture(): FsmonitorFixture {
   const root = mkdtempSync(join(tmpdir(), "omo-git-fsmonitor-"))
   const globalConfig = join(root, "gitconfig")
-  writeFileSync(globalConfig, "[core]\n\tfsmonitor = true\n")
+  // The hermetic no-auto-maintenance settings plus the fsmonitor the fixture simulates (#15109).
+  writeFileSync(globalConfig, `${HERMETIC_GIT_CONFIG}[core]\n\tfsmonitor = true\n`)
   const env = { ...process.env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" }
   const repo = join(root, "repo")
   mkdirSync(repo)

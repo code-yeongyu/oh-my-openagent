@@ -12,6 +12,8 @@ import {
   type MemoryKillPoint,
 } from "@oh-my-opencode/memory-core"
 
+import { HERMETIC_GIT_CONFIG } from "../../../../../../test-hermetic-home"
+
 // Every case runs a launcher, a supervisor, a bootstrap and a model child, then an out-of-process
 // reconciliation. Synchronisation is on process exit events and durable files, never on time.
 setDefaultTimeout(120_000)
@@ -77,7 +79,11 @@ async function hermetic(): Promise<Hermetic> {
   await mkdir(home, { recursive: true })
   await mkdir(temp, { recursive: true })
   const gitconfig = join(root, "gitconfig")
-  await writeFile(gitconfig, "[user]\n\tname = Crash Recovery\n\temail = crash@example.invalid\n")
+  // The hermetic no-auto-maintenance settings plus the identity the crash child commits with (#15109).
+  await writeFile(
+    gitconfig,
+    `${HERMETIC_GIT_CONFIG}[user]\n\tname = Crash Recovery\n\temail = crash@example.invalid\n`,
+  )
   const env: Record<string, string> = {}
   for (const name of ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "WINDIR", "LANG"]) {
     const inherited = process.env[name]

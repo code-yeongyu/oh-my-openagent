@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { HERMETIC_GIT_CONFIG } from "../../../../test-hermetic-home"
 import {
   EXIT_ADDED,
   EXIT_CLEAN,
@@ -16,10 +17,11 @@ import {
 import { entriesOf, stripJsonc } from "./dependency-diff-parsers.mjs"
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "dependency-diff-check.mjs")
-// os.devNull is `//./nul` on Windows which git cannot open as GIT_CONFIG_GLOBAL;
-// use an empty temp file instead so the test ignores user/system git config on all platforms.
+// os.devNull is `//./nul` on Windows which git cannot open as GIT_CONFIG_GLOBAL; use a temp file with
+// the hermetic no-auto-maintenance settings instead, so the test ignores user/system git config on
+// all platforms and its clones and fetches never race a detached auto-maintenance child (#15109).
 const EMPTY_GIT_CONFIG = join(mkdtempSync(join(tmpdir(), "dep-diff-git-")), ".gitconfig")
-writeFileSync(EMPTY_GIT_CONFIG, "")
+writeFileSync(EMPTY_GIT_CONFIG, HERMETIC_GIT_CONFIG)
 
 const GIT_ENV = {
   ...process.env,
