@@ -292,12 +292,12 @@ describe("onboarding understanding (#10480)", () => {
     expect(done).toMatchObject({ kind: "done", fallback: "scan_only", candidates: [] })
   })
 
-  test("#given a model provider that cannot start #when understanding runs #then the retry and fallback hold too", async () => {
+  test("#given a model provider that cannot start #when understanding runs #then the retry and fallback hold too, and each failure names its kind only", async () => {
     // given
     const root = await workspace()
 
     // when
-    const { done, starts } = await run({
+    const { done, events, starts } = await run({
       digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)],
       turn: async () => "throw",
     })
@@ -305,6 +305,11 @@ describe("onboarding understanding (#10480)", () => {
     // then
     expect(starts).toHaveLength(2)
     expect(done.fallback).toBe("scan_only")
+    // #15358: the desktop shows these reasons; a provider's error text can quote a request or a key fragment.
+    expect(events.filter((event) => event.kind === "step_failed").map((event) => event.reason)).toEqual([
+      "the model call could not start: an unexpected error",
+      "the model call could not start: an unexpected error",
+    ])
   })
 
   test("#given a model call that fails once #when the retry succeeds #then its facts are kept", async () => {
@@ -502,15 +507,16 @@ describe("onboarding understanding (#10480)", () => {
       },
       (event) => {
         events.push(event)
-        if (event.kind === "fact") throw new Error("client went away")
+        if (event.kind === "fact") throw new Error("client went away from /home/SYNTH-USER/.omo/agent")
       },
     )
     if ("kind" in started) throw new Error(`understanding did not start: ${started.reason}`)
     await started.finished
 
-    // then
+    // then: the reason is the failure's kind, never the error's text (#15358)
     const done = events.at(-1)
-    expect(done).toMatchObject({ kind: "done", fallback: "scan_only", toolCalls: 1 })
+    expect(done).toMatchObject({ kind: "done", fallback: "scan_only", toolCalls: 1, reason: "an unexpected error" })
+    expect(JSON.stringify(events)).not.toContain("SYNTH-USER")
     expect(done?.bytesRead).toBe(digests.reduce((sum, item) => sum + digestByteLength(item), 0))
     expect(done?.elapsedMs).toBeGreaterThanOrEqual(0)
   })

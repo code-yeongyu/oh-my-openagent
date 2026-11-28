@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto"
 
 import type { CreateChildSession, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
 
+import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
+
 import type { ChildModelRegistry } from "../memory/model-registry-resolver"
 import type { SessionDigest } from "./session-history"
 import type { OnboardingUnderstandBudgetLimits, OnboardingUnderstandEvent } from "./understand-contract"
@@ -80,7 +82,8 @@ export async function startOnboardingUnderstanding(
         elapsedMs: Math.round(performance.now() - startedAt),
         candidates: [],
         fallback: "scan_only",
-        reason: error instanceof Error ? error.message : String(error),
+        // The desktop shows this reason; a run's error text can name local paths or quote a provider reply (#15358).
+        reason: describeReadFailure(error),
       }
       emit(done)
       return done

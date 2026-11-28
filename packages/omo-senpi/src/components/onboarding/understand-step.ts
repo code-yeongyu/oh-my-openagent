@@ -5,6 +5,7 @@ import { basename, isAbsolute, join, relative, sep } from "node:path"
 import { parseFactsExtractionRecord, type FactsExtractionRecord } from "@oh-my-opencode/memory-core"
 import type { CreateChildSession, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
 
+import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
 import type { ComponentLogger } from "../../extension/types"
 import { launchFactsInProcess } from "../memory/facts-in-process-launch"
 import type { InProcessMemoryChildState } from "../memory/in-process-memory-child"
@@ -152,7 +153,8 @@ export async function runStep(input: {
         },
       })
     } catch (error) {
-      return { status: "failed", reason: error instanceof Error ? error.message : String(error), records: [] }
+      // A provider's error text can quote the request or a key fragment; the reason keeps the kind only (#15358).
+      return { status: "failed", reason: `the model call could not start: ${describeReadFailure(error)}`, records: [] }
     } finally {
       input.control.detach()
     }
