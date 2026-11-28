@@ -172,12 +172,6 @@
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/model-profile-e2e-mock-provider.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/model-profile-e2e-observations.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/model-profile-e2e-scenarios.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/model-profile-e2e.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/no-todo-continuity-e2e.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/onboarding-e2e.mjs",
