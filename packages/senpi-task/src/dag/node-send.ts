@@ -158,13 +158,6 @@ function foldSendOutcome(
         runId,
         nodeIds: [nodeId],
       })
-    case "scope_denied":
-      throw new DagNodeControlError({
-        code: "node_not_continuable",
-        message: `dag node "${nodeId}" cannot be messaged: ${outcome.reason} Retry the node instead.`,
-        runId,
-        nodeIds: [nodeId],
-      })
     case "not_continuable":
     case "stale":
       throw new DagNodeControlError({

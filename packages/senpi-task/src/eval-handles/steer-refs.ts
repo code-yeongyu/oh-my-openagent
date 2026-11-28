@@ -78,8 +78,6 @@ export async function sendRef(
       return runAt(ref.run_epoch).queued(ref)
     case "stale":
       throw runAt(ref.run_epoch).stale(ref)
-    case "scope_denied":
-      throw new EvalHandleHostError("eval_handle_forbidden", outcome.reason)
     case "not_found":
       throw new EvalHandleHostError("eval_handle_not_found", outcome.reason)
     case "not_continuable":
