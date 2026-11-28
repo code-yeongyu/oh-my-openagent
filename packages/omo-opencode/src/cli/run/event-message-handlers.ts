@@ -13,6 +13,22 @@ import type {
   RunContext,
 } from "./types"
 
+function resolveRenderedBaseline(
+  baselinesById: Record<string, string>,
+  partKey: string,
+  snapshotText: string,
+): string {
+  const ownBaseline = baselinesById[partKey]
+  if (ownBaseline !== undefined) {
+    return snapshotText.startsWith(ownBaseline) ? ownBaseline : ""
+  }
+  const anonymousBaseline = partKey === "" ? undefined : baselinesById[""]
+  if (anonymousBaseline !== undefined && snapshotText.startsWith(anonymousBaseline)) {
+    return anonymousBaseline
+  }
+  return ""
+}
+
 function renderCompletionMetaLine(state: EventState, messageID: string): void {
   if (state.completionMetaPrintedByMessageId[messageID]) return
 
@@ -48,14 +64,21 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
   if (part.type === "reasoning") {
     ensureThinkBlockOpen(state)
     const reasoningText = part.text ?? ""
-    const newText = reasoningText.slice(state.lastReasoningText.length)
-    if (newText) {
-      const padded = writePaddedText(newText, state.thinkingAtLineStart)
+    const reasoningKey = part.id ?? ""
+    const renderedReasoning = resolveRenderedBaseline(
+      state.reasoningTextById,
+      reasoningKey,
+      reasoningText,
+    )
+    const newReasoning = reasoningText.slice(renderedReasoning.length)
+    if (newReasoning) {
+      const padded = writePaddedText(newReasoning, state.thinkingAtLineStart)
       process.stdout.write(pc.dim(padded.output))
       state.thinkingAtLineStart = padded.atLineStart
       state.mainSessionStarted = true
       state.hasReceivedMeaningfulWork = true
     }
+    state.reasoningTextById[reasoningKey] = reasoningText
     state.lastReasoningText = reasoningText
     return
   }
@@ -63,7 +86,9 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
   closeThinkBlockIfNeeded(state)
 
   if (part.type === "text" && part.text) {
-    const newText = part.text.slice(state.lastPartText.length)
+    const textKey = part.id ?? ""
+    const renderedText = resolveRenderedBaseline(state.partTextById, textKey, part.text)
+    const newText = part.text.slice(renderedText.length)
     if (newText) {
       const padded = writePaddedText(newText, state.textAtLineStart)
       process.stdout.write(padded.output)
@@ -71,6 +96,7 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
       state.mainSessionStarted = true
       state.hasReceivedMeaningfulWork = true
     }
+    state.partTextById[textKey] = part.text
     state.lastPartText = part.text
 
     if (part.time?.end) {
@@ -109,6 +135,8 @@ export function handleMessagePartDelta(ctx: RunContext, payload: EventPayload, s
     const padded = writePaddedText(delta, state.thinkingAtLineStart)
     process.stdout.write(pc.dim(padded.output))
     state.thinkingAtLineStart = padded.atLineStart
+    const reasoningKey = props?.partID ?? ""
+    state.reasoningTextById[reasoningKey] = (state.reasoningTextById[reasoningKey] ?? "") + delta
     state.lastReasoningText += delta
     state.mainSessionStarted = true
     state.hasReceivedMeaningfulWork = true
@@ -120,6 +148,8 @@ export function handleMessagePartDelta(ctx: RunContext, payload: EventPayload, s
   const padded = writePaddedText(delta, state.textAtLineStart)
   process.stdout.write(padded.output)
   state.textAtLineStart = padded.atLineStart
+  const textKey = props?.partID ?? ""
+  state.partTextById[textKey] = (state.partTextById[textKey] ?? "") + delta
   state.lastPartText += delta
   state.mainSessionStarted = true
   state.hasReceivedMeaningfulWork = true
@@ -172,6 +202,8 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
     state.messageCount++
     state.lastPartText = ""
     state.lastReasoningText = ""
+    state.partTextById = {}
+    state.reasoningTextById = {}
     state.hasPrintedThinkingLine = false
     state.lastThinkingSummary = ""
     state.textAtLineStart = true
