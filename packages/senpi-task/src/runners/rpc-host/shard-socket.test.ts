@@ -110,7 +110,7 @@ describe("validateBindPath", () => {
     expect(Buffer.byteLength(`${socket}.next-1`)).toBe(103)
     expect(Buffer.byteLength(`${socket}.next-99`)).toBe(104)
     expect(Buffer.byteLength(`${socket}.shield-9999999`)).toBe(111)
-    expect(validateBindPath(socket)).toBe(false)
+    expect(validateBindPath(socket, "darwin")).toBe(false)
   })
 
   test("#given a socket whose longest sibling is exactly 103 bytes #when validating #then it holds, one byte more does not", () => {
@@ -120,24 +120,21 @@ describe("validateBindPath", () => {
 
     // then
     expect(Buffer.byteLength(`${fits}.shield-9999999`)).toBe(MAX_SHARD_BIND_PATH)
-    expect(validateBindPath(fits)).toBe(true)
-    expect(validateBindPath(over)).toBe(false)
+    expect(validateBindPath(fits, "darwin")).toBe(true)
+    expect(validateBindPath(over, "darwin")).toBe(false)
   })
 
   test("#given a win32 target #when validating or resolving a path past the darwin limit #then the named-pipe rule applies and the primary root is kept (#15103)", () => {
     // given: a Windows agent dir whose primary shard path plus its shield sibling is far past 103 bytes
     const agentDir = `C:\\Users\\${"a".repeat(40)}\\.omo\\agent`
-    const identity = { kind: "p" as const, key: OWNER_KEY, ownerSessionId: "s1", inherited: false }
+    const identity = rootIdentity()
 
-    expect(validateBindPath(`C:\\long\\p-${OWNER_KEY}.sock`, "win32")).toBe(true)
     const resolution = resolveShardSocket({ agentDir, env: {}, identity, platform: "win32" })
     expect(resolution.root).toBe("primary")
     expect(resolution.notice).toBeUndefined()
     expect(resolution.socket.startsWith(agentDir)).toBe(true)
-    // the same shape on darwin still moves to the alternate root
-    expect(resolveShardSocket({ agentDir: `/${"a".repeat(120)}/agent`, env: {}, identity, platform: "darwin" }).root).toBe(
-      "alt",
-    )
+    expect(validateBindPath(resolution.socket, "win32")).toBe(true)
+    expect(validateBindPath(resolution.socket, "darwin")).toBe(false)
   })
 })
 
