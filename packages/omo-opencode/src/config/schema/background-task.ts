@@ -22,7 +22,10 @@ export const BackgroundTaskConfigSchema = z.object({
   sessionGoneTimeoutMs: z.number().min(10000).optional(),
   /** Delay before removing completed/cancelled/errored tasks from memory and deleting completed sync subagent sessions, in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
   taskCleanupDelayMs: z.number().min(60000).optional(),
+  /** Foreground wait limit in milliseconds (minimum: 60000). A foreground call_omo_agent waits at most this long in total (5 minutes when unset). */
   syncPollTimeoutMs: z.number().min(60000).optional(),
+  /** Hand a foreground (run_in_background=false) task or call_omo_agent child that is still running after this long to the background, in milliseconds: the child keeps running under the same task id and its completion notice wakes the parent (default: 0 = never; the parent waits for it). */
+  foregroundHandoffMs: z.number().int().min(0).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),

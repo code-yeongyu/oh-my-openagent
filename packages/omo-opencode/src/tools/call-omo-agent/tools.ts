@@ -20,10 +20,16 @@ import { processMessages } from "./message-processor"
 import { waitForCompletion } from "./completion-poller"
 import { getFirstFallbackModel } from "../../agents/builtin-agents/model-resolution"
 
-function createSyncExecutorDeps(modelFallbackControllerAccessor?: ModelFallbackControllerAccessor) {
+function createSyncExecutorDeps(
+  modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
+  waitTimeoutMs?: number,
+  handoff?: { readonly manager: BackgroundManager; readonly ms: number | undefined },
+) {
   return {
     createOrGetSession,
-    waitForCompletion,
+    waitForCompletion: (...args: Parameters<typeof waitForCompletion>) =>
+      waitForCompletion(args[0], args[1], args[2], args[3] ?? waitTimeoutMs, args[4]),
+    ...(handoff ? { handoff } : {}),
     processMessages,
     setSessionFallbackChain: (sessionID: string, fallbackChain: FallbackEntry[] | undefined) => {
       modelFallbackControllerAccessor?.setSessionFallbackChain(sessionID, fallbackChain)
@@ -110,6 +116,8 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
+  syncPollTimeoutMs?: number,
+  foregroundHandoffMs?: number,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map((name) => `- ${name}: Specialized agent for ${name} tasks`).join("\n")
   const description = CALL_OMO_AGENT_DESCRIPTION.replace("{agents}", agentDescriptions)
@@ -174,7 +182,10 @@ export function createCallOmoAgent(
             args,
             toolCtx,
             ctx,
-            createSyncExecutorDeps(modelFallbackControllerAccessor),
+            createSyncExecutorDeps(modelFallbackControllerAccessor, syncPollTimeoutMs, {
+              manager: backgroundManager,
+              ms: foregroundHandoffMs,
+            }),
             fallbackChain,
             spawnReservation,
             resolvedModel,
@@ -189,7 +200,10 @@ export function createCallOmoAgent(
         args,
         toolCtx,
         ctx,
-        createSyncExecutorDeps(modelFallbackControllerAccessor),
+        createSyncExecutorDeps(modelFallbackControllerAccessor, syncPollTimeoutMs, {
+          manager: backgroundManager,
+          ms: foregroundHandoffMs,
+        }),
         fallbackChain,
         undefined,
         resolvedModel,

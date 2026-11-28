@@ -6,6 +6,7 @@ import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 import { MIN_SESSION_GONE_POLLS } from "../../features/background-agent/session-existence"
 import { formatDeletedSyncSessionError, isSyncSessionDeleted } from "./sync-session-existence"
+import { SYNC_POLL_HANDED_OFF } from "./sync-foreground-handoff"
 
 export { isSessionComplete } from "./sync-session-turns"
 
@@ -69,6 +70,8 @@ export async function pollSyncSession(
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
+    /** Aborts when the child is to be handed to the background: the poll returns SYNC_POLL_HANDED_OFF and leaves it running. */
+    handoffSignal?: AbortSignal
   },
   timeoutMs?: number,
 ): Promise<string | null> {
@@ -120,6 +123,11 @@ export async function pollSyncSession(
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
 
   while (true) {
+    if (input.handoffSignal?.aborted) {
+      log("[task] Poll handing the child to the background", { sessionID: input.sessionID, pollCount })
+      return SYNC_POLL_HANDED_OFF
+    }
+
     const inactiveElapsedMs = Date.now() - inactiveStart
     if (inactiveElapsedMs >= maxPollTimeMs) {
       timedOut = true

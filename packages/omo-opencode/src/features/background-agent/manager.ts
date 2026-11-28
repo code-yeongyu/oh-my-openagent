@@ -42,10 +42,8 @@ import {
   getCurrentAttempt,
   startAttempt,
 } from "./attempt-lifecycle"
-import {
-  type BackgroundTaskNotificationTask,
-  buildBackgroundTaskNotificationText,
-} from "./background-task-notification-template"
+import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
+import { readTaskNotificationResult } from "./task-notification-result"
 import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
   findNearestMessageExcludingCompaction,
@@ -107,7 +105,14 @@ import {
   getRegisteredBackgroundTask,
   rememberBackgroundTask,
 } from "./task-registry"
-import type { BackgroundTask, BackgroundTaskAttempt, BackgroundTaskSnapshot, LaunchInput, ResumeInput } from "./types"
+import type {
+  BackgroundTask,
+  BackgroundTaskAttempt,
+  BackgroundTaskSnapshot,
+  BackgroundTaskWake,
+  LaunchInput,
+  ResumeInput,
+} from "./types"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -259,7 +264,6 @@ export class BackgroundManager {
   private readonly syncAttachedSessions = new Set<string>()
   private readonly resumesAwaitingAdmission = new Set<string>()
   private completedTaskArchive: Map<string, BackgroundTask> = new Map()
-  private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private readonly parentWakeNotifier: ParentWakeNotifier
@@ -640,6 +644,7 @@ export class BackgroundManager {
         category: input.category,
         cwd: input.cwd,
         onSessionCreated: input.onSessionCreated,
+        wake: input.wake,
       }
       const firstAttempt = startAttempt(task, input.model)
 
@@ -1372,6 +1377,60 @@ The fallback retry session is now created and can be inspected directly.
     return task
   }
 
+  /**
+   * Takes over a still-running foreground child without touching it: the child keeps running, and its completion
+   * notice wakes the parent like any background task's. A session that already has a finished task record (a
+   * foreground continuation of a background child) revives that record rather than adding a second one, because
+   * session events are matched to the first task holding the session. `startedAt` is when the foreground call
+   * started, so the task's reported duration covers its whole run.
+   */
+  async adoptForegroundSession(input: {
+    taskId: string
+    sessionId: string
+    parentSessionId: string
+    description: string
+    agent: string
+    parentAgent?: string
+    wake: BackgroundTaskWake
+    startedAt: Date
+  }): Promise<BackgroundTask> {
+    const existing = this.findBySession(input.sessionId)
+    if (!existing) {
+      const task = await this.trackTask(input)
+      task.wake = input.wake
+      task.startedAt = input.startedAt
+      return task
+    }
+    existing.wake = input.wake
+    if (!TERMINAL_BACKGROUND_TASK_STATUSES.has(existing.status)) return existing
+
+    const completionTimer = this.completionTimers.get(existing.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(existing.id)
+    }
+    if (existing.parentSessionId !== input.parentSessionId) {
+      this.cleanupPendingByParent(existing)
+      this.updateTaskParent(existing, input.parentSessionId)
+    }
+    existing.status = "running"
+    existing.startedAt = input.startedAt
+    existing.completedAt = undefined
+    existing.error = undefined
+    existing.progress = { toolCalls: 0, lastUpdate: new Date() }
+    if (input.parentAgent !== undefined) existing.parentAgent = input.parentAgent
+    subagentSessions.add(input.sessionId)
+    const pending = this.pendingByParent.get(input.parentSessionId) ?? new Set()
+    pending.add(existing.id)
+    this.pendingByParent.set(input.parentSessionId, pending)
+    this.startPolling()
+    log("[background-agent] Revived a finished task record for an adopted foreground child:", {
+      taskId: existing.id,
+      sessionID: input.sessionId,
+    })
+    return existing
+  }
+
   async resume(input: ResumeInput): Promise<BackgroundTask> {
     const existingTask = this.findBySession(input.sessionId)
     if (!existingTask) {
@@ -1437,6 +1496,7 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
     if (input.parentTools) existingTask.parentTools = input.parentTools
+    existingTask.wake = input.wake ?? existingTask.wake
     if (input.parentSessionId) {
       const pending = this.pendingByParent.get(input.parentSessionId) ?? new Set<string>()
       pending.add(existingTask.id)
@@ -2593,7 +2653,6 @@ The task was re-queued on a fallback model after a retryable failure.
     if (!parentSessionID) return
     if (this.getTasksByParentSession(parentSessionID).length > 0) return
     this.taskHistory.clearSession(parentSessionID)
-    this.completedTaskSummaries.delete(parentSessionID)
   }
 
   private scheduleTaskRemoval(taskId: string, rescheduleCount = 0): void {
@@ -2924,18 +2983,7 @@ The task was re-queued on a fallback model after a retryable failure.
       })
     }
 
-    if (!this.completedTaskSummaries.has(task.parentSessionId)) {
-      this.completedTaskSummaries.set(task.parentSessionId, [])
-    }
-    this.completedTaskSummaries.get(task.parentSessionId)!.push({
-      id: task.id,
-      description: task.description,
-      status: task.status,
-      error: task.error,
-      attempts: cloneAttempts(task),
-    })
-
-    // Update pending tracking and check if all tasks complete
+    // Update pending tracking: the last of the parent's tasks marks its notice as the final one
     const pendingSet = this.pendingByParent.get(task.parentSessionId)
     let allComplete = false
     let remainingCount = 0
@@ -2956,22 +3004,6 @@ The task was re-queued on a fallback model after a retryable failure.
       allComplete = remainingCount === 0
     }
 
-    const completedTasks = allComplete
-      ? (this.completedTaskSummaries.get(task.parentSessionId) ?? [
-          {
-            id: task.id,
-            description: task.description,
-            status: task.status,
-            error: task.error,
-            attempts: cloneAttempts(task),
-          },
-        ])
-      : []
-
-    if (allComplete) {
-      this.completedTaskSummaries.delete(task.parentSessionId)
-    }
-
     const statusText =
       task.status === "completed"
         ? "COMPLETED"
@@ -2980,13 +3012,25 @@ The task was re-queued on a fallback model after a retryable failure.
           : task.status === "error"
             ? "ERROR"
             : "CANCELLED"
+    const result =
+      task.sessionId && this.enableParentSessionNotifications
+        ? await readTaskNotificationResult(this.client, task.sessionId, this.directory)
+        : undefined
     const notification = buildBackgroundTaskNotificationText({
-      task,
+      task: {
+        id: task.id,
+        sessionId: task.sessionId,
+        description: task.description,
+        status: task.status,
+        error: task.error,
+        attempts: cloneAttempts(task),
+      },
       duration,
       statusText,
       allComplete,
       remainingCount,
-      completedTasks,
+      result,
+      usage: { toolCalls: task.progress?.toolCalls },
     })
 
     if (this.enableParentSessionNotifications) {
@@ -2999,7 +3043,9 @@ The task was re-queued on a fallback model after a retryable failure.
       })
 
       const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-      const shouldReply = allComplete || isTaskFailure
+      // wake "each" (the default) starts a parent turn for every finished task; "none" only leaves the
+      // notice for the parent's next turn.
+      const shouldReply = task.wake !== "none"
 
       const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
@@ -3588,7 +3634,6 @@ The task was re-queued on a fallback model after a retryable failure.
     for (const parentSessionID of queuedResumeParents) {
       this.updateBackgroundTaskMarker(parentSessionID)
     }
-    this.completedTaskSummaries.clear()
     this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
   }

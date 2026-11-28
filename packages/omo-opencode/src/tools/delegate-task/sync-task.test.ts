@@ -716,6 +716,136 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
+  test("#given a foreground handoff threshold #when the child is still running at it #then it is adopted as a background task and left running", async () => {
+    // given
+    const abortCalls: string[] = []
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input.path.id)
+          return {}
+        },
+      },
+    }
+    const { executeSyncTask } = require("./sync-task")
+    const { SYNC_POLL_HANDED_OFF } = require("./sync-foreground-handoff")
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: (_ctx: unknown, _client: unknown, input: { handoffSignal?: AbortSignal }) =>
+        new Promise<string>((resolve) => {
+          input.handoffSignal?.addEventListener("abort", () => resolve(SYNC_POLL_HANDED_OFF), { once: true })
+        }),
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "never read" }),
+    }
+    const adoptCalls: Array<Record<string, unknown>> = []
+    const mockExecutorCtx = {
+      manager: {
+        reserveSubagentSpawn: mock(async () => ({
+          spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+          descendantCount: 1,
+          commit: mock(() => 1),
+          rollback: mock(() => {}),
+        })),
+        adoptForegroundSession: async (input: Record<string, unknown>) => {
+          adoptCalls.push(input)
+          return { id: input.taskId, wake: input.wake }
+        },
+      },
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      foregroundHandoffMs: 1,
+    }
+    const args = {
+      prompt: "long work",
+      description: "long task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    // when
+    const result = await executeSyncTask(
+      args,
+      { sessionID: "parent-session", callID: "call-1", metadata: () => {} },
+      mockExecutorCtx,
+      {
+        sessionID: "parent-session",
+      },
+      "test-agent",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      deps,
+    )
+
+    // then
+    expect(adoptCalls).toHaveLength(1)
+    expect(adoptCalls[0]).toMatchObject({
+      taskId: "sync_ses_test",
+      sessionId: "ses_test_12345678",
+      parentSessionId: "parent-session",
+      wake: "each",
+    })
+    expect(adoptCalls[0]?.startedAt).toBeInstanceOf(Date)
+    expect(result).toContain("background_task_id: sync_ses_test")
+    expect(abortCalls).toEqual([])
+    expect(deleteCalls).toEqual([])
+  })
+
+  test("#given no foreground handoff threshold #when the child is polled #then the poll carries no handoff signal", async () => {
+    // given
+    const { executeSyncTask } = require("./sync-task")
+    let sawSignal: AbortSignal | undefined
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { handoffSignal?: AbortSignal }) => {
+        sawSignal = input.handoffSignal
+        return null
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+    const mockExecutorCtx = {
+      manager: {
+        reserveSubagentSpawn: mock(async () => ({
+          spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+          descendantCount: 1,
+          commit: mock(() => 1),
+          rollback: mock(() => {}),
+        })),
+        adoptForegroundSession: mock(async () => ({})),
+      },
+      client: { session: { create: async () => ({ data: { id: "ses_test_12345678" } }) } },
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    // when
+    const result = await executeSyncTask(
+      { prompt: "p", description: "d", category: "test", load_skills: [], run_in_background: false },
+      { sessionID: "parent-session", callID: "c", metadata: () => {} },
+      mockExecutorCtx,
+      {
+        sessionID: "parent-session",
+      },
+      "test-agent",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      deps,
+    )
+
+    // then
+    expect(result).toContain("Task completed")
+    expect(sawSignal).toBeUndefined()
+    expect(mockExecutorCtx.manager.adoptForegroundSession).not.toHaveBeenCalled()
+  })
+
   test("retries sync session on retryable runtime session error using next fallback model", async () => {
     const mockClient = {
       session: {
