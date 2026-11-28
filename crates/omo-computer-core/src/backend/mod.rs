@@ -3,12 +3,14 @@
 //! answers a typed refusal with nothing sent. The session calls `post_input` only from
 //! `mutate()`: it is the one side-effect sink.
 
+mod processes;
 mod refusal;
 mod refusing;
 mod settle_source;
 mod sources;
 mod types;
 
+pub use processes::{ProcessRow, ProcessTable};
 pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
 pub use settle_source::{NotificationFingerprint, SettleSource, NO_NOTIFICATION_SURFACE};
@@ -16,7 +18,7 @@ pub use sources::{
     AxEventSource, BackendClock, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener,
 };
 pub use types::{
-    AxEvent, AxSnapshot, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
+    AxEvent, AxSnapshot, BackendProbes, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
     PermissionProbe, Ref, Resolved, Route, Semantic, SnapshotRequest, TaggedInput, Target,
     WindowFilter, WindowList,
 };
@@ -79,6 +81,11 @@ pub trait Backend: Send {
             EngineCode::StopPathUnavailable,
             Reason::NoListener,
         ))
+    }
+
+    /// R62: the backend's own doctor checks; `None` (the default) adds nothing to `diagnose`.
+    fn diagnose(&self) -> Option<BackendProbes> {
+        None
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
@@ -198,6 +205,20 @@ pub trait Backend: Send {
     /// notification surface; `None` (the default) makes every settle read `unsupported`.
     fn settle_source(&mut self) -> Option<Box<dyn SettleSource>> {
         None
+    }
+
+    // --- Row 50 (R62): the OS's own process table and the physical lease-end key. ---
+
+    /// The uid's processes with their parents, TTYs and the TTY owners, read for the self set.
+    /// `None` (the default): the guard keeps its own source (the engine process alone).
+    fn processes(&self) -> Option<ProcessTable> {
+        None
+    }
+
+    /// Whether the user pressed the lease-end key (a bare physical Escape) since the last call;
+    /// taking it consumes it. `false` by default: the backend hears no such key.
+    fn take_lease_end(&mut self) -> bool {
+        false
     }
 }
 

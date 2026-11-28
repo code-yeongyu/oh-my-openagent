@@ -8,7 +8,7 @@ mod v1;
 
 pub use diagnosis::{
     AttachVia, ChainLink, ChainRole, ConsentAuthority, Diagnosis, IdentityMatch, IdentityReport,
-    PermissionReport, PermissionState, SpawnPath,
+    PermissionReport, PermissionState, ProbeCheck, ProbeState, SpawnPath,
 };
 pub use exec::ExecReply;
 pub use notifications::{AuditLine, EpochChanged, ForegroundConsent, HandConsent, HandStatus};

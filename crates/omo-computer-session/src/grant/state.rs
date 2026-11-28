@@ -250,6 +250,15 @@ impl Control {
             })
     }
 
+    /// The lease ends under the user: presence goes, the slot is released, and the R45 hook
+    /// hears why exactly once.
+    pub(crate) fn end_lease(&mut self, backend: &mut dyn Backend, why: crate::presence::LeaseEnd) {
+        self.presence.end(why);
+        self.slot.release(&self.token);
+        self.lease_epoch = None;
+        self.lease_hook.lease_ended(backend, why);
+    }
+
     /// The call's report went out.
     pub(crate) fn reported(&mut self, plan: &Plan) {
         let now = self.now_ms();

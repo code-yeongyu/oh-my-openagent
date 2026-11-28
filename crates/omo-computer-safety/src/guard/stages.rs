@@ -34,6 +34,7 @@ impl Guard {
         stages: StageVerdicts,
     ) -> Result<Admitted, GateRefusal> {
         self.observe(&mut || backend.stop_listener(), &mut NoHolds);
+        self.read_processes(backend);
         self.refresh();
         let now = self.now_ms();
         let mut facts = GateFacts::clear(Tier::Exec, call.verb, self.supervisor.view(now));

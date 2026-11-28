@@ -13,6 +13,8 @@ mod wire;
 #[cfg(test)]
 mod presence_tests;
 #[cfg(test)]
+mod stop_esc_tests;
+#[cfg(test)]
 mod session_tests;
 #[cfg(test)]
 mod tests;

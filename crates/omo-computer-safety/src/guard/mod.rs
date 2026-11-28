@@ -9,6 +9,7 @@ use omo_computer_core::paths::Roots;
 use omo_computer_core::results::{PermissionState, StopPathStatus};
 use omo_computer_core::session_state::Tristate;
 
+mod processes;
 mod sources;
 mod stages;
 
@@ -52,6 +53,8 @@ pub struct Guard {
     allowed_apps: Vec<String>,
     self_set: SelfSet,
     watched: std::collections::BTreeSet<u32>,
+    /// Row 50 (R62): the backend's own process table, read at open and before every exec.
+    backend_processes: Option<omo_computer_core::backend::ProcessTable>,
 }
 
 impl Guard {
@@ -71,6 +74,7 @@ impl Guard {
             allowed_apps: Vec::new(),
             self_set: SelfSet::default(),
             watched: std::collections::BTreeSet::new(),
+            backend_processes: None,
         }
     }
 
@@ -141,7 +145,7 @@ impl Guard {
     }
 
     fn recompute(&mut self) {
-        let snapshot = self.source.snapshot();
+        let snapshot = self.snapshot();
         let locks = self.source.brain_locks();
         self.watched = watch_key(&snapshot, &locks);
         self.self_set = SelfSet::compute(&SelfSetInputs {
@@ -155,7 +159,7 @@ impl Guard {
 
     /// Recomputes the self set when the sibling-engine / brain list changed.
     fn refresh(&mut self) {
-        let key = watch_key(&self.source.snapshot(), &self.source.brain_locks());
+        let key = watch_key(&self.snapshot(), &self.source.brain_locks());
         if key != self.watched {
             self.recompute();
         }
@@ -235,6 +239,7 @@ impl Guard {
         call: &Call<'_>,
     ) -> Result<Admitted, GateRefusal> {
         self.observe(&mut || backend.stop_listener(), &mut NoHolds);
+        self.read_processes(backend);
         let observed = Observed {
             screen_locked: backend.capabilities().session.screen_locked,
             permission: backend.probe_permissions().input,

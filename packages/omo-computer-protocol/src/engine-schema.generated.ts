@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b1e294f921009a741e7503e5ed45e5056d0025a3c8f82eac712c3fca02a68fd2" as const
+export const SCHEMA_SHA256 = "43e5abfc6de370d22e12af6865f9dcf266732b86a9dc464ccada503396be4406" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -696,7 +696,7 @@ export type Cut = {
 	childCount: number
 }
 
-export type DeafReason = "secure-input-active" | "portal-unavailable" | "xi2-raw-unavailable" | "hook-install-failed" | "listener-parked"
+export type DeafReason = "secure-input-active" | "portal-unavailable" | "xi2-raw-unavailable" | "hook-install-failed" | "listener-parked" | "chord-unarmable"
 
 export type DefaultDelivery = "foreground_lease_first"
 
@@ -722,6 +722,7 @@ export type Diagnosis = {
 	stopPath: StopPathCapability
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
+	checks?: ProbeCheck[]
 }
 
 export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
@@ -1253,6 +1254,14 @@ export type PressParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
+
+export type ProbeCheck = {
+	name: string
+	state: ProbeState
+	reason?: string | null
+}
+
+export type ProbeState = "ok" | "unavailable" | "unknown"
 
 export type RaiseWindowParams = {
 	windowId: string
