@@ -161,6 +161,13 @@ const facts = (passwd: () => string): PlatformFacts => ({
   },
 })
 
+test("#given a missing candidate under a literal /home #when the spellings are compared #then it answers without resolving /home", () => {
+  // On macOS /home is the auto_home autofs trigger and Bun's realpathSync never returns there; the spelling fallback
+  // must stop before it. This is that hang in portable form: it would never finish on such a host without the guard
+  // (#14866).
+  expect(isSharedAgentDir(join("/", "home", "me", ".omo", "agent"), { homes: [join("/", "home", "me")] })).toBe(true)
+})
+
 test("#given HOME and USERPROFILE elsewhere #when the agent dir is the OS user record's store #then it is shared", () => {
   const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE }
   // A real directory as the record's home: a literal /home/<user> is the macOS auto_home trigger, where Bun's realpath of
