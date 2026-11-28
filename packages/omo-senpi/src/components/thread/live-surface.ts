@@ -15,7 +15,7 @@ import { isIdentityRefusal } from "./tools/session-error"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { readDiskSessionAsync, type AddressBookHost, type DiskSession } from "./address-book"
-import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
+import { openContext } from "./opened-by"
 import {
   claimedSessionPaths,
   controlSocketSecretPath,
@@ -1035,7 +1035,7 @@ export function createLiveThreadSurface(
       // goes straight to `closing` and every later call answers `session_closing`.
       // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field; `cwd`,
       // `sessionPath`, `forkFrom` and `permissionPreset` (the mode the session starts in, #12884) are wire fields.
-      const { initialSkills, name, ...openParams } = params
+      const { initialSkills, openedBy, name, ...openParams } = params
       const result = dataRecord(
         await callFrame(
           legacy,
@@ -1043,9 +1043,7 @@ export function createLiveThreadSurface(
           {
             ...openParams,
             retain_on_disconnect: true,
-            ...(initialSkills === undefined
-              ? {}
-              : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }),
+            ...openContext(initialSkills, openedBy),
           },
           undefined,
           undefined,

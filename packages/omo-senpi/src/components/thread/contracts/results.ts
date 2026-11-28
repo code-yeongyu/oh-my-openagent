@@ -222,6 +222,8 @@ export type ThreadCreateResult =
       readonly worktree?: ThreadWorktree
       /** Steps after the session was created that failed; the thread exists anyway. */
       readonly warnings?: readonly ThreadToolFailure[]
+      /** The session that opened the new thread (#15221 row 25); null when no session made the call (a script, the CLI). */
+      readonly created_by?: { readonly thread: string } | null
     } & ThreadLocalAliasNote &
       ThreadWorkspaceNote)
   | ThreadDataError

@@ -38,19 +38,23 @@ function runtimeIdOf(options: ThreadToolSurfaceOptions, ectx: unknown): string {
   )
 }
 
-/** thread_create records its creator (the engine-resolved caller) once the host opened the session; a session op's `caller_created_target` reads it. */
+/**
+ * thread_create records its creator (the engine-resolved caller) once the host opened the session; a session op's
+ * `caller_created_target` reads it. The answer says who opened the thread, `created_by: null` when no session made the
+ * call (a script or the CLI), never leaving it out (#15221 row 25).
+ */
 export async function recordThreadCreator(
   options: ThreadToolSurfaceOptions,
   view: ThreadHostView,
   runtimeId: string,
   created: ThreadToolResult,
 ): Promise<ThreadToolResult> {
-  const createdId = created.kind === "ok" ? (created as { readonly thread?: unknown }).thread : undefined
-  if (typeof createdId !== "string") return created
+  if (created.kind !== "ok" || !("thread" in created) || typeof created.thread !== "string") return created
+  const createdId = created.thread
   const creator = resolveCallerDurableId(options, view, runtimeId)
-  if (creator !== undefined && creator !== createdId)
-    await options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId })
-  return created
+  if (creator === undefined || creator === createdId) return { ...created, created_by: null }
+  await options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId })
+  return { ...created, created_by: { thread: creator } }
 }
 
 function output(result: ExtensionCallResult): ExtensionToolOutput {

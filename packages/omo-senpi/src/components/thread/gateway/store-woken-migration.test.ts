@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs"
 import { dirname } from "node:path"
 
 import { gatewayDatabasePath } from "./paths"
-import { GATEWAY_MIGRATIONS } from "./schema"
+import { GATEWAY_MIGRATIONS, LEDGER_COLUMNS } from "./schema"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
 // Storage contract: the woken-session table arrives as its own schema step, and a store written by the build before it
@@ -101,6 +101,8 @@ test("#given a current store rewound to the previous version #when it opens agai
   await first.dispose()
   const db = new Database(gatewayDatabasePath(h.agentDir))
   try {
+    // v17 adds the ledger columns to thread_creations, which no later step rebuilds: undone so they can be added again.
+    for (const column of LEDGER_COLUMNS) db.exec(`ALTER TABLE thread_creations DROP COLUMN ${column}`)
     db.exec(`PRAGMA user_version = ${WOKEN_STEP}`)
   } finally {
     db.close()

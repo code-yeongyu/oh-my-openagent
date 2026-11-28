@@ -115,6 +115,7 @@ export type ThreadHost = {
     readonly name?: string
     readonly forkFrom?: string
     readonly initialSkills?: readonly string[]
+    readonly openedBy?: { readonly thread: string; readonly device: string }
     readonly permissionPreset?: string
     /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
     readonly provider?: string

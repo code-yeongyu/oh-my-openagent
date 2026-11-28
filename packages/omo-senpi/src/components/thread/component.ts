@@ -11,6 +11,7 @@ import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-r
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { registerCreateReceivers } from "./create-receivers"
+import { registerOpenedBy } from "./opened-by"
 import {
   controlSessionOf,
   createControlEndpointRegistrant,
@@ -329,6 +330,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           legacyMailboxDirectories: [legacyMailbox],
           ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
         })
+      registerOpenedBy(pi, {
+        store: () => store,
+        thisDevice: async () => {
+          const here = await thisDeviceId(remote)
+          return "device" in here ? here.device : undefined
+        },
+        log: (line) => ctx.logger.warn(line),
+      })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()

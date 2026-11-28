@@ -13,7 +13,8 @@ import { AWAIT_REQUEST_ID, RESERVED_CALLER_KEYS, isToolSessionOp } from "./exten
 import { gatewayDatabasePath } from "./paths"
 import { argumentFailure } from "./session-args-schema"
 import type { StoreExtensions } from "./store-extension-ops"
-import { transaction, type StoreContext } from "./store-ops"
+import { createdBy } from "./store-ledger-ops"
+import type { StoreContext } from "./store-ops"
 import type { StoreExtensionRefusal, StoreExtensionResult } from "./store-extensions"
 import { UNKNOWN_CALLER } from "../tools/ports"
 
@@ -47,27 +48,6 @@ function touchWake(agentDir: string, wakeDir: string, wake: string): void {
   } finally {
     rmSync(temporary, { force: true })
   }
-}
-
-function createdBy(ctx: StoreContext, creator: string, created: string): boolean {
-  return (
-    ctx.sql.one(["n"], "SELECT 1 AS n FROM thread_creations WHERE creator_durable_id = ? AND created_durable_id = ?", [
-      creator,
-      created,
-    ]) !== undefined
-  )
-}
-
-export async function recordThreadCreation(
-  ctx: StoreContext,
-  request: { readonly now: number; readonly creator_durable_id: string; readonly created_durable_id: string },
-): Promise<void> {
-  await transaction(ctx, "record_thread_creation", () => {
-    ctx.sql.run(
-      "INSERT OR IGNORE INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES (?, ?, ?)",
-      [request.creator_durable_id, request.created_durable_id, request.now],
-    )
-  })
 }
 
 export async function sessionCall(

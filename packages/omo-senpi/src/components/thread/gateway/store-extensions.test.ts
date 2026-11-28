@@ -20,6 +20,16 @@ const extension = (name = "alpha"): StoreExtensionRegistration => ({
   ],
 })
 
+/** Undoes v17 (#15221 row 25) by hand, as the rewinds below undo every later step: the ledger columns and the metadata table. */
+function rewindSubsessionLedger(db: Database): void {
+  db.exec("DROP TABLE thread_metadata")
+  const columns = db.query("SELECT name FROM pragma_table_info('thread_creations')").all() as { name: string }[]
+  if (!columns.some((column) => column.name === "creator_device")) return
+  db.exec("DROP INDEX thread_creations_created")
+  for (const column of ["creator_device", "created_device", "handed_over_from"])
+    db.exec(`ALTER TABLE thread_creations DROP COLUMN ${column}`)
+}
+
 describe("store extension migrations", () => {
   test("#given a mixed-case extension table registered on a v6 store #when the store upgrades to the current schema #then the extension registers again and owns its one table row", async () => {
     const h = (harness = createGatewayHarness())
@@ -37,6 +47,7 @@ describe("store extension migrations", () => {
       db.exec("DROP TABLE thread_creations")
       db.exec("DROP TABLE extension_registrations")
       db.exec("DROP TABLE toolkit_replay_receipts")
+      rewindSubsessionLedger(db)
       db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
       db.exec("DROP INDEX deliveries_ledger")
       db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
@@ -94,6 +105,7 @@ describe("store extension migrations", () => {
           "INSERT INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES ('parent', 'child', 1)",
         )
         db.exec(rewind as string)
+        rewindSubsessionLedger(db)
         db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
         db.exec("DROP INDEX deliveries_ledger")
         db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
