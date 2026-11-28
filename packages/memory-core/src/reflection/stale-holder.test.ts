@@ -39,14 +39,14 @@ describe("reflection lock holder decision (#10377)", () => {
     })
   })
 
-  // #15362: an older reader recorded the launcher start as local wall time (`ps-lstart:`); the zone bound (UTC-12..UTC+14,
-  // 15-minute steps), not the scheme, decides whether the live process started then.
+  // #15362: an older reader recorded the launcher start as local wall time (`ps-lstart:`); the zone bound (any POSIX offset,
+  // up to 24:59:59 either way, #15383), not the scheme, decides whether the live process started then.
   test.each([
     [
       "no zone offset maps onto",
       "dead",
       "ps-lstart:Tue Sep 15 14:59:03 2026",
-      "ps-lstart-utc:Wed Sep 16 14:59:03 2026",
+      "ps-lstart-utc:Thu Sep 17 14:59:03 2026",
     ],
     [
       "a real zone offset maps onto",

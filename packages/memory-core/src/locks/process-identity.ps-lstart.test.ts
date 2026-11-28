@@ -83,9 +83,9 @@ describe("ps-lstart start identity", () => {
 })
 
 // The upgrade window (#15260 review L2): a lock an older reader recorded in its local time (`ps-lstart:`) is compared
-// with the live pid's UTC rendering (`ps-lstart-utc:`). The recorder's zone is unknown, but every zone offset lies in
-// [-12h, +14h] and is a whole number of 15 minutes, so a recorded wall time no such offset maps onto the live start
-// proves the pid was reused.
+// with the live pid's UTC rendering (`ps-lstart-utc:`). The recorder's zone is unknown, and a POSIX `TZ` may name any
+// offset up to 24:59:59 either way, to the second (#15383), so only a recorded wall time further than that from the live
+// start proves the pid was reused; anything nearer keeps a possibly live owner.
 describe("legacy ps-lstart record against a UTC reading", () => {
   const live = "ps-lstart-utc:Mon Nov 2 10:00:00 2026"
 
@@ -95,16 +95,19 @@ describe("legacy ps-lstart record against a UTC reading", () => {
     ["Baker Island (UTC-12), the day before", "ps-lstart:Sun Nov 1 22:00:00 2026"],
     ["Kathmandu (UTC+5:45)", "ps-lstart:Mon Nov 2 15:45:00 2026"],
     ["UTC itself", "ps-lstart:Mon Nov 2 10:00:00 2026"],
+    ["POSIX TZ=XYZ-15 (UTC+15)", "ps-lstart:Tue Nov 3 01:00:00 2026"],
+    ["POSIX TZ=XYZ13 (UTC-13)", "ps-lstart:Sun Nov 1 21:00:00 2026"],
+    ["POSIX TZ='<X>-5:30:20' (seconds in the offset)", "ps-lstart:Mon Nov 2 15:30:20 2026"],
+    ["POSIX TZ='<X>-0:10' (off the 15-minute grid)", "ps-lstart:Mon Nov 2 10:10:00 2026"],
+    ["POSIX TZ='<X>24' (the largest offset, UTC-24)", "ps-lstart:Sun Nov 1 10:00:00 2026"],
   ])("#given a record a %s reader wrote for the live start #when compared #then no conflict", (_zone, recorded) => {
     expect(startIdentitiesConflict(recorded, live)).toBe(false)
   })
 
   test.each([
     ["a start three days earlier", "ps-lstart:Fri Oct 30 10:00:00 2026"],
-    ["a start 15 hours after the live one in any zone", "ps-lstart:Tue Nov 3 01:00:00 2026"],
-    ["a start 13 hours before it in any zone", "ps-lstart:Sun Nov 1 21:00:00 2026"],
-    ["the same minute with other seconds", "ps-lstart:Mon Nov 2 05:00:07 2026"],
-    ["an offset that is no whole number of 15 minutes", "ps-lstart:Mon Nov 2 05:10:00 2026"],
+    ["a start 25 hours after the live one in any zone", "ps-lstart:Tue Nov 3 11:00:00 2026"],
+    ["a start 25 hours before it in any zone", "ps-lstart:Sun Nov 1 09:00:00 2026"],
   ])("#given a record of %s #when compared #then the pid was reused: conflict", (_case, recorded) => {
     expect(startIdentitiesConflict(recorded, live)).toBe(true)
   })
