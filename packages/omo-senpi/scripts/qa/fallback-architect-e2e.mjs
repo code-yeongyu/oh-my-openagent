@@ -133,12 +133,19 @@ function readSessionEntries(sessionDir) {
   return entries
 }
 
+// Count the delivered custom messages themselves. The engine's own bookkeeping entries (work-custody
+// records, session-lifecycle waits) carry a copy of a queued message, so counting every entry that
+// mentions the type counted one delivery three or four times (#13301).
+function deliveredCustomMessages(entries, customType) {
+  return entries.filter((entry) => entry?.type === "custom_message" && entry.customType === customType)
+}
+
 function collectDirectives(entries) {
-  return entries.filter((entry) => collectCustomTypes(entry).includes(DIRECTIVE_TYPE))
+  return deliveredCustomMessages(entries, DIRECTIVE_TYPE)
 }
 
 function collectNotices(entries) {
-  return entries.filter((entry) => collectCustomTypes(entry).includes(NOTICE_TYPE))
+  return deliveredCustomMessages(entries, NOTICE_TYPE)
 }
 
 function findCustomPayload(entry, customType) {
@@ -160,16 +167,6 @@ function userMessagesLeakingReminder(entries) {
     if (entry?.type !== "message" || entry?.message?.role !== "user") return false
     return JSON.stringify(entry.message.content ?? "").includes(REMINDER_TAG)
   })
-}
-
-function collectCustomTypes(value, depth = 0) {
-  if (depth > 4 || typeof value !== "object" || value === null) return []
-  const found = []
-  for (const [key, nested] of Object.entries(value)) {
-    if (key === "customType" && typeof nested === "string") found.push(nested)
-    else found.push(...collectCustomTypes(nested, depth + 1))
-  }
-  return found
 }
 
 function directiveContent(entry) {
@@ -273,18 +270,23 @@ function findOnPath(bin) {
 }
 
 function runSelfTest() {
-  const entries = [
-    {
-      type: "custom",
-      message: { customType: DIRECTIVE_TYPE, content: `${PRIMARY} ${FALLBACK} task(category: "architect")` },
-    },
-    { type: "user", content: "hello" },
-  ]
+  const directive = {
+    type: "custom_message",
+    customType: DIRECTIVE_TYPE,
+    content: `${PRIMARY} ${FALLBACK} task(category: "architect")`,
+  }
+  // The engine's work-custody record carries a copy of the queued message; it is not a delivery (#13301).
+  const custodyCopy = {
+    type: "custom",
+    customType: "work-custody",
+    data: { state: "queued", payload: { message: { customType: DIRECTIVE_TYPE, content: directive.content } } },
+  }
+  const entries = [custodyCopy, directive, { type: "user", content: "hello" }]
   if (collectDirectives(entries).length !== 1) throw new Error("self-test: directive entry not detected exactly once")
   if (!directiveContent(collectDirectives(entries)[0]).includes(PRIMARY))
     throw new Error("self-test: directive content not read")
   if (collectDirectives([{ type: "user", content: "hello" }]).length !== 0) throw new Error("self-test: false positive")
-  const duplicated = [...entries, entries[0]]
+  const duplicated = [...entries, directive]
   if (collectDirectives(duplicated).length !== 2)
     throw new Error("self-test: duplicate directives must be counted, not collapsed")
   if (SCENARIOS.filter((s) => s.expectDirective).length !== 4)
