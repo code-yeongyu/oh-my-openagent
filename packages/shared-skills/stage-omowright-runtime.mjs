@@ -7,7 +7,8 @@
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
-import { access, copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { createRequire } from "node:module"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
@@ -18,7 +19,19 @@ const defaultTargetDir =
   process.env.OMO_OMOWRIGHT_TARGET ?? join(scriptDir, "skills", "browser", "runtime", "omowright")
 
 // LICENSE is omowright's own MIT text, copied verbatim so the notice ships beside the bundle (omowright#290).
-export const STAGED_FILES = Object.freeze(["index.js", "page-bundle.js", "LICENSE"])
+export const STAGED_FILES = Object.freeze(["index.js", "page-bundle.js", "LICENSE", "THIRD_PARTY_NOTICES"])
+
+async function thirdPartyNotices(sourceRoot) {
+  const require = createRequire(await realpath(join(sourceRoot, "package.json")))
+  const notices = await Promise.all(
+    ["ws", "zod"].map(async (name) => {
+      const manifest = require.resolve(`${name}/package.json`)
+      const text = await readFile(join(dirname(manifest), "LICENSE"), "utf8")
+      return `${name}\n\n${text}`
+    }),
+  )
+  return notices.join("\n\n")
+}
 
 async function sha256(path) {
   return createHash("sha256")
@@ -58,7 +71,7 @@ function resolveLayout(sourceRoot) {
   return layout
 }
 
-async function sourceDigest(sourceRoot, layout) {
+async function sourceDigest(sourceRoot, layout, notices) {
   const entries = ["package.json", "LICENSE", layout.entry, layout.pageBundle, ...layout.sources]
   const hash = createHash("sha256")
   for (const entry of entries)
@@ -66,7 +79,7 @@ async function sourceDigest(sourceRoot, layout) {
       .update(entry)
       .update("\0")
       .update(await readFile(join(sourceRoot, entry)))
-  return hash.digest("hex")
+  return hash.update("THIRD_PARTY_NOTICES\0").update(notices).digest("hex")
 }
 
 function bundle({ sourceRoot, layout, outFile, bunExecutable }) {
@@ -96,7 +109,8 @@ export async function stageOmowrightRuntime(options = {}) {
   if (!existsSync(join(sourceRoot, "LICENSE"))) {
     throw new Error(`omowright has no LICENSE to ship beside the bundle: ${join(sourceRoot, "LICENSE")}`)
   }
-  const digest = await sourceDigest(sourceRoot, layout)
+  const notices = await thirdPartyNotices(sourceRoot)
+  const digest = await sourceDigest(sourceRoot, layout, notices)
 
   await mkdir(dirname(targetDir), { recursive: true })
   const tempParent = await mkdtemp(join(dirname(targetDir), ".tmp-omowright-runtime-"))
@@ -109,6 +123,7 @@ export async function stageOmowrightRuntime(options = {}) {
     bundle({ sourceRoot, layout, outFile: join(tempDir, "index.js"), bunExecutable })
     await copyFile(join(sourceRoot, layout.pageBundle), join(tempDir, "page-bundle.js"))
     await copyFile(join(sourceRoot, "LICENSE"), join(tempDir, "LICENSE"))
+    await writeFile(join(tempDir, "THIRD_PARTY_NOTICES"), notices)
     const files = {}
     for (const name of STAGED_FILES) files[name] = await sha256(join(tempDir, name))
     await writeFile(
@@ -141,7 +156,7 @@ export async function stageOmowrightRuntime(options = {}) {
 export async function checkOmowrightRuntimeFresh(options = {}) {
   const sourceRoot = resolve(options.sourceRoot ?? defaultSourceRoot)
   const targetDir = resolve(options.targetDir ?? defaultTargetDir)
-  const digest = await sourceDigest(sourceRoot, resolveLayout(sourceRoot))
+  const digest = await sourceDigest(sourceRoot, resolveLayout(sourceRoot), await thirdPartyNotices(sourceRoot))
   let manifest
   try {
     manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))

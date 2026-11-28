@@ -36,6 +36,20 @@ afterEach(async () => {
 })
 
 describe("runSenpiInstaller", () => {
+  for (const name of ["LICENSE", "THIRD_PARTY_NOTICES"]) {
+    test(`rejects a browser runtime missing ${name} before writing settings (#12928)`, async () => {
+      const agentDir = await makeAgentDir()
+      const pluginPath = await makePluginFixture()
+      await rm(join(pluginPath, "skills", "browser", "runtime", "omowright", name))
+      const settings = join(agentDir, "settings.json")
+      await writeFile(settings, '{"theme":"keep"}')
+      await expect(
+        runSenpiInstaller({ env: { HOME: agentDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath }),
+      ).rejects.toThrow("missing required runtime artifacts")
+      expect(await readFile(settings, "utf8")).toBe('{"theme":"keep"}')
+    })
+  }
+
   test("#given temp SENPI_CODING_AGENT_DIR #when installing twice #then it writes one absolute plugin package entry and creates backups", async () => {
     // given
     const agentDir = await makeAgentDir()
