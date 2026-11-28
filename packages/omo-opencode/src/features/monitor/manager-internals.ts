@@ -12,6 +12,7 @@ import { MonitorBatcher, type SchedulerDeps, type TimerHandle } from "./batcher"
 import { createMonitorPipeline } from "./pipeline"
 import { spawnMonitoredProcess, type MonitoredProcess } from "./process"
 import { MonitorRingBuffer } from "./ring-buffer"
+import type { MonitorRateLimiter } from "./rate-limiter"
 import type { MonitorId, MonitorRecord, OutputBatch } from "./types"
 
 export type MonitorPipeline = ReturnType<typeof createMonitorPipeline>
@@ -29,12 +30,14 @@ export interface InternalMonitorState {
   batcher: MonitorBatcher
   pipeline: MonitorPipeline
   injector: MonitorInjector
+  rateLimiter: MonitorRateLimiter
+  /** Events the rate limit dropped since the last delivered batch. */
+  suppressedEvents: number
   stopped: boolean
 }
 
 export interface MonitorManagerDeps {
   randomId?: () => MonitorId
-  isBackgroundSession?: (sessionId: string) => boolean
   spawnMonitoredProcess?: typeof spawnMonitoredProcess
   createInjector?: (
     record: MonitorRecord,
@@ -44,6 +47,8 @@ export interface MonitorManagerDeps {
   registerManagerForCleanup?: typeof registerManagerForCleanup
   unregisterManagerForCleanup?: typeof unregisterManagerForCleanup
   log?: typeof log
+  /** Directory monitor output files go under (default: the OS temp dir). */
+  outputRoot?: string
 }
 
 export interface MonitorManagerOptions {
@@ -54,10 +59,10 @@ export interface MonitorManagerOptions {
 
 export const DEFAULT_MONITOR_CONFIG = {
   max_monitors_per_session: 3,
-  max_runtime_ms: 1800000,
+  max_runtime_ms: 1800000 as number,
   batch_max_lines: 50,
   batch_max_bytes: 16384,
-  flush_interval_ms: 1000,
+  flush_interval_ms: 200,
   ring_max_lines: 1000,
   line_max_bytes: 8192,
   pattern_max_length: 512,
@@ -99,4 +104,14 @@ export function createRealScheduler(): SchedulerDeps {
 
 export function createMonitorId(): MonitorId {
   return `mon_${crypto.randomUUID().slice(0, 8)}`
+}
+
+/**
+ * The runtime a monitor gets: its call's timeout, capped by monitor.max_runtime_ms. A cap of 0 is no cap, and a
+ * timeout of 0 or none runs until the source ends (still capped). Undefined means no limit at all.
+ */
+export function resolveMonitorTimeoutMs(requested: number | undefined, cap: number): number | undefined {
+  const capped = cap > 0 ? cap : undefined
+  if (requested === undefined || requested <= 0) return capped
+  return capped === undefined ? requested : Math.min(requested, capped)
 }

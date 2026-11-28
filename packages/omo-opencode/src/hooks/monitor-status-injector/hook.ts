@@ -87,7 +87,7 @@ function formatMonitorRecord(record: MonitorRecord): string {
 }
 
 function buildStatusLine(records: MonitorRecord[]): string {
-  return `${MONITOR_STATUS_PREFIX} ${records.map(formatMonitorRecord).join(", ")} - call monitor_stop to stop`
+  return `${MONITOR_STATUS_PREFIX} ${records.map(formatMonitorRecord).join(", ")} - stop one with background_cancel(taskId="<id>")`
 }
 
 function createInjectedMessage(sessionID: string, statusLine: string): MessageWithParts {

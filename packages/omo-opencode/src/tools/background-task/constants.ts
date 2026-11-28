@@ -8,4 +8,4 @@ export const BACKGROUND_OUTPUT_DESCRIPTION = `Get output from background task. U
 
 IMPORTANT: ONLY call this tool AFTER receiving a <system-reminder> notification for the task. Do NOT call immediately after launching a background task - wait for the notification first.`
 
-export const BACKGROUND_CANCEL_DESCRIPTION = `Cancel running background task(s). Use all=true to cancel ALL before final answer.`
+export const BACKGROUND_CANCEL_DESCRIPTION = `Stop a background job: a task (\`bg_...\`, \`sync_...\`) or a monitor (\`mon_...\`). Use all=true to stop ALL of this session's background tasks and monitors before your final answer.`
