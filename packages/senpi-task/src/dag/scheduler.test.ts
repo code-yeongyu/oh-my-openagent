@@ -2353,29 +2353,15 @@ describe("DAG scheduler node controls", () => {
           agent: "plan-reviewer",
           message: "plan-reviewer takes no follow-ups",
         },
-        denied: {
-          kind: "scope_denied",
-          task_id: "task-denied",
-          owning_session_id: "other",
-          reason: "belongs to another session",
-        },
         detached: { kind: "not_continuable", task_id: "task-detached", reason: "suspended", suggestion: "task_output" },
       },
     })
     const { scheduler } = settledFixture(
-      definition([
-        node("queued"),
-        node("one-shot"),
-        node("denied"),
-        node("detached"),
-        node("never-ran"),
-        node("ghost"),
-      ]),
+      definition([node("queued"), node("one-shot"), node("detached"), node("never-ran"), node("ghost")]),
       manager,
       {
         queued: { state: "running", taskId: "task-queued", attempt: 1 },
         "one-shot": { state: "failed", taskId: "task-one-shot", attempt: 1 },
-        denied: { state: "failed", taskId: "task-denied", attempt: 1 },
         detached: { state: "failed", taskId: "task-detached", attempt: 1 },
         "never-ran": { state: "skipped" },
         ghost: { state: "failed", taskId: "task-ghost", attempt: 1 },
@@ -2383,13 +2369,12 @@ describe("DAG scheduler node controls", () => {
     )
     manager.seed("queued", "pending", "task-queued")
     manager.seed("one-shot", "completed", "task-one-shot")
-    manager.seed("denied", "completed", "task-denied")
     manager.seed("detached", "completed", "task-detached")
     // when
     const queued = await scheduler.sendToNode(runId, "queued" as DagNodeId, "queued message")
     manager.complete("queued") // a settled run owes no stop once its last live child settles (#11381)
     const outcomes: Record<string, string> = {}
-    for (const nodeId of ["one-shot", "denied", "detached", "never-ran", "ghost", "absent"]) {
+    for (const nodeId of ["one-shot", "detached", "never-ran", "ghost", "absent"]) {
       try {
         await scheduler.sendToNode(runId, nodeId as DagNodeId, "message")
         outcomes[nodeId] = "delivered"
@@ -2407,8 +2392,6 @@ describe("DAG scheduler node controls", () => {
     })
     expect(outcomes["one-shot"]).toContain("node_not_continuable")
     expect(outcomes["one-shot"]).toContain("plan-reviewer takes no follow-ups")
-    expect(outcomes.denied).toContain("node_not_continuable")
-    expect(outcomes.denied).toContain("belongs to another session")
     expect(outcomes.detached).toContain("node_not_continuable")
     expect(outcomes.detached).toContain("Retry the node")
     expect(outcomes["never-ran"]).toContain("node_has_no_task")

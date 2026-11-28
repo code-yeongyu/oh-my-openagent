@@ -16,7 +16,7 @@ import { WorkpoolError, type WorkpoolAgent, type WorkpoolCaller, type WorkpoolSp
 import type { WorkpoolAdmission, WorkpoolRequest } from "../workpool/ports"
 import { resolveWorkerKernelTools } from "../workpool/worker-kernel-tools"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
-import { TaskConcurrency } from "./concurrency"
+import type { TaskConcurrency } from "./concurrency"
 import { decideDepthPolicy } from "./depth-policy"
 import { resolveExecutionMode } from "./execution-mode"
 import { prepareWorkpoolLaunch, type WorkpoolLaunch } from "./workpool-start"
@@ -278,7 +278,6 @@ function refusal(outcome: Exclude<SendOutcome, { kind: "revived" }>): WorkpoolEr
     case "admission_refused":
     case "cwd_unavailable":
     case "config_generation_mismatch":
-    case "scope_denied":
       return new WorkpoolError(outcome.kind, outcome.reason)
     case "unresponsive":
     case "capacity_deferred":

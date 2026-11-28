@@ -101,7 +101,7 @@ describe("steering engine one-shot agent refusal", () => {
 })
 
 describe("steering engine one-shot refusal vs scope ordering", () => {
-  test("#given a foreign-owned plan-reviewer child #when sent without all_scope #then the scope denial wins and the one-shot classification is not leaked", async () => {
+  test("#given a foreign-owned plan-reviewer child #when sent without all_scope #then the not-found answer wins and the one-shot classification is not leaked", async () => {
     // given
     const harness = makeHarness()
     const record = harness.seedRecord({
@@ -120,8 +120,7 @@ describe("steering engine one-shot refusal vs scope ordering", () => {
     })
 
     // then
-    if (outcome.kind !== "scope_denied") throw new Error("expected scope_denied")
-    expect(outcome.owning_session_id).toBe("parent-1")
+    expect(outcome.kind).toBe("not_found")
   })
 
   test("#given a foreign-owned plan-reviewer child #when sent with all_scope #then the one-shot refusal applies", async () => {

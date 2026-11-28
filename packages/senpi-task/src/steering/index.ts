@@ -1,5 +1,6 @@
 export { createSteeringEngine } from "./engine"
-export { ownsTask, resolveTaskCallerFirst } from "./scope-resolver"
+export { redispatchNotFound, sendNotFound } from "./engine-policy"
+export { resolveSendTarget } from "./scope-resolver"
 export { DEFAULT_SEND_DELIVERY } from "./types"
 export type {
   CallerScope,
