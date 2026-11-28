@@ -151,6 +151,9 @@ test("one host missing the listing deadline cannot turn its claimed session inac
     const gone = (await list.execute("gone", { all_scope: true }, undefined, undefined, undefined as never)).details
       .result
     if (!("threads" in gone)) throw new Error("no rows after the slow host exited")
+    // Holding nothing, the gone host is neither an answer nor a missing one, and the listing is complete (#14308).
+    expect(gone).toHaveProperty("host_counts", { answered: 1, unanswered: 0 })
+    expect(gone).not.toHaveProperty("listing")
     expect(gone.threads.find((item: { thread: string }) => item.thread === "slow")).toMatchObject({
       state: "inactive",
       liveness: { kind: "not_running" },

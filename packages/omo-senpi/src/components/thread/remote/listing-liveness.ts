@@ -22,17 +22,22 @@ export function hostCountsFor(
     : null
 }
 
+const answeredListing = (host: ThreadHostView["hosts"][number]): boolean => {
+  const reply = host.list_sessions ?? host.result
+  return (
+    host.error === undefined &&
+    host.alive !== false &&
+    reply !== undefined &&
+    !("kind" in reply && reply.kind === "error")
+  )
+}
+
+// A host known dead (its socket gone or refusing) holds no thread, so it is in neither count, as it never makes the
+// listing incomplete (#14308).
 export function countHostAnswers(view: ThreadHostView): HostCounts {
-  const answered = view.hosts.filter((host) => {
-    const reply = host.list_sessions ?? host.result
-    return (
-      host.error === undefined &&
-      host.alive !== false &&
-      reply !== undefined &&
-      !("kind" in reply && reply.kind === "error")
-    )
-  }).length
-  return { answered, unanswered: view.hosts.length - answered }
+  const answered = view.hosts.filter(answeredListing).length
+  const unanswered = view.hosts.filter((host) => !answeredListing(host) && host.reason !== "dead").length
+  return { answered, unanswered }
 }
 
 export function listingProof(row: RemoteSessionRow) {
