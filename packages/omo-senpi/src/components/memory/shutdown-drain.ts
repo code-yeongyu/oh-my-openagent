@@ -74,6 +74,8 @@ export interface ShutdownDrain {
    */
   raceDetached(input: ShutdownDrainInput, name: string, work: () => Promise<void>): Promise<boolean>
   run(input: ShutdownDrainInput, options?: { readonly journalFlushed?: boolean }): Promise<void>
+  /** Removes the session's detached-step record once the last post-drain settle has been raced (#11696). */
+  releaseDetached(sessionId: string): void
 }
 
 export interface ShutdownDrainOptions {
@@ -94,7 +96,7 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
   const execute = async (
     input: ShutdownDrainInput,
     settings: { readonly journalFlushed?: boolean; readonly journalOnly?: boolean } = {},
-  ): Promise<boolean> => {
+  ): Promise<{ readonly journalCompleted: boolean; readonly completedSteps: readonly string[] }> => {
     const now = input.now ?? Date.now
     const controller = new AbortController()
     const signal = controller.signal
@@ -111,7 +113,7 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
         reason: input.reason,
         sessionId: input.sessionId,
         remainingMs: Math.max(0, input.deadlineAt - now()),
-        completedSteps,
+        completedSteps: [...(detachedSteps.get(input.sessionId) ?? []), ...completedSteps],
       }
       if (step === "shutdown-evaluator") {
         options.logger?.info("memory shutdown drain deferred optional work", details)
@@ -159,21 +161,21 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
     try {
       if (!settings.journalFlushed) {
         journalCompleted = await runStep("journal-flush", () => options.steps.flushJournal(input.sessionId, signal))
-        if (!journalCompleted) return false
+        if (!journalCompleted) return { journalCompleted, completedSteps }
       }
-      if (settings.journalOnly) return journalCompleted
+      if (settings.journalOnly) return { journalCompleted, completedSteps }
       if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal))))
-        return journalCompleted
-      if (input.reason !== "quit") return journalCompleted
+        return { journalCompleted, completedSteps }
+      if (input.reason !== "quit") return { journalCompleted, completedSteps }
       if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal))))
-        return journalCompleted
+        return { journalCompleted, completedSteps }
       for (const evaluator of evaluators) {
         const proceed = await runStep("shutdown-evaluator", async () => {
           await evaluator(evaluatorInput)
         })
-        if (!proceed) return journalCompleted
+        if (!proceed) return { journalCompleted, completedSteps }
       }
-      return journalCompleted
+      return { journalCompleted, completedSteps }
     } finally {
       // The handler is returning and the component releases the session next: nothing that
       // still holds this signal may start further work, budget spent or not.
@@ -186,7 +188,7 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
       evaluators.push(evaluator)
     },
     flushJournal(input: ShutdownDrainInput): Promise<boolean> {
-      return execute(input, { journalOnly: true })
+      return execute(input, { journalOnly: true }).then((outcome) => outcome.journalCompleted)
     },
     async raceDetached(input: ShutdownDrainInput, name: string, work: () => Promise<void>): Promise<boolean> {
       const now = input.now ?? Date.now
@@ -225,8 +227,17 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
       return true
     },
     async run(input: ShutdownDrainInput, settings): Promise<void> {
-      await execute(input, settings)
-      detachedSteps.delete(input.sessionId)
+      const { completedSteps } = await execute(input, settings)
+      // The settles the handler races after the drain read this record for their own budget
+      // warnings, so the drain's completed steps join it instead of the record being dropped here
+      // (the old delete left a re-created, never-removed entry and emptied later warnings, #11696);
+      // releaseDetached removes it once the last settle has been raced.
+      const record = detachedSteps.get(input.sessionId) ?? []
+      record.push(...completedSteps)
+      detachedSteps.set(input.sessionId, record)
+    },
+    releaseDetached(sessionId: string): void {
+      detachedSteps.delete(sessionId)
     },
   }
 }

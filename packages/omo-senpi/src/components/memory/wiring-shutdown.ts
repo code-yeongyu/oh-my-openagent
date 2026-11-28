@@ -74,5 +74,7 @@ export async function runMemorySessionShutdown(
     await parts.work.settled()
     await Promise.all([parts.reflectionLive.settled(), parts.corpusCache.settled(), parts.promptCache.settled()])
   })
+  // The last settle has been raced: the session's detached-step record can go (#11696).
+  drain.releaseDetached(input.sessionId)
   parts.resetSession(input.sessionId)
 }
