@@ -482,7 +482,11 @@ describe("the declared form: additive input and result changes (#15345)", () => 
     )
   }
   const widen = (base: readonly string[], head: readonly string[], body: string, extra: Partial<GateInput> = {}) => {
-    const usage = (variants: readonly string[]) => ({ exit: 2, stdout: "", stderr: `usage: --x ${variants.join(", ")}\n` })
+    const usage = (variants: readonly string[]) => ({
+      exit: 2,
+      stdout: "",
+      stderr: `usage: --x ${variants.join(", ")}\n`,
+    })
     const baseOutcome = usage(base)
     const headOutcome = usage(head)
     return gateReport(
@@ -494,6 +498,40 @@ describe("the declared form: additive input and result changes (#15345)", () => 
     )
   }
 
+  test("declaring an array item widening covers the actual state filter shape", () => {
+    const gate = (variants: string[], changeOld = false) => ({
+      ...input().head,
+      rows: rowForTool(),
+      tools: [
+        {
+          name: "thread_send",
+          parameters: {
+            properties: {
+              delivery: {
+                type: "array",
+                items: {
+                  anyOf: variants.map((value, i) => ({
+                    type: "string",
+                    const: value,
+                    ...(changeOld && i === 0 ? { minLength: 3 } : {}),
+                  })),
+                },
+              },
+            },
+            required: [],
+          },
+        },
+      ],
+      outcomes: { s1: { exit: 2, stdout: "", stderr: `usage: --x ${variants.join(", ")}\n` } },
+    })
+    const check = (changeOld: boolean) =>
+      widen(["a", "b"], ["a", "b", "c"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n", {
+        base: gate(["a", "b"]),
+        head: gate(["a", "c", "b"], changeOld),
+      })
+    expect(check(false).failures).toEqual([])
+    expect(check(true).failures.length).toBeGreaterThan(0)
+  })
   test("#given a declared widening #when the outcomes differ only by the new variants #then it is exempt", () => {
     expect(
       widen(["a", "b"], ["a", "b", "c"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n").failures,
@@ -508,7 +546,11 @@ describe("the declared form: additive input and result changes (#15345)", () => 
   })
 
   test("#given a declared narrowing #then the declaration fails", () => {
-    const report = widen(["a", "b", "c"], ["a", "b"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n")
+    const report = widen(
+      ["a", "b", "c"],
+      ["a", "b"],
+      "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n",
+    )
     expect(report.failures.join("\n")).toContain("does not widen in order")
   })
 
@@ -533,7 +575,13 @@ describe("the declared form: additive input and result changes (#15345)", () => 
                 name: "thread_send",
                 parameters: {
                   properties: {
-                    delivery: { anyOf: [{ type: "string", const: "a" }, { type: "string", const: "b" }, { type: "string", const: "c" }] },
+                    delivery: {
+                      anyOf: [
+                        { type: "string", const: "a" },
+                        { type: "string", const: "b" },
+                        { type: "string", const: "c" },
+                      ],
+                    },
                     scope: { type: "string" },
                   },
                   required: [],
@@ -550,20 +598,25 @@ describe("the declared form: additive input and result changes (#15345)", () => 
 
   test("#given a declared result field added #when nothing else differs #then it is exempt", () => {
     const report = gateReport(
-      withOutcomes(listed({ threads: [] }), listed({ threads: [], host_counts: {} }), "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n", {
-        base: {
-          ...input().base,
-          rows: rowForTool(),
-          tools: [tool({ delivery: ["a"] })],
-          outcomes: { s1: listed({ threads: [] }) },
+      withOutcomes(
+        listed({ threads: [] }),
+        listed({ threads: [], host_counts: {} }),
+        "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n",
+        {
+          base: {
+            ...input().base,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a"] })],
+            outcomes: { s1: listed({ threads: [] }) },
+          },
+          head: {
+            ...input().head,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a"] })],
+            outcomes: { s1: listed({ threads: [], host_counts: {} }) },
+          },
         },
-        head: {
-          ...input().head,
-          rows: rowForTool(),
-          tools: [tool({ delivery: ["a"] })],
-          outcomes: { s1: listed({ threads: [], host_counts: {} }) },
-        },
-      }),
+      ),
     )
     expect(report.failures).toEqual([])
   })
@@ -576,49 +629,64 @@ describe("the declared form: additive input and result changes (#15345)", () => 
 
   test("#given a result field the base already carries #then the declaration fails", () => {
     const report = gateReport(
-      withOutcomes(listed({ threads: [], host_counts: {} }), listed({ threads: [], host_counts: { a: 1 } }), "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n", {
-        base: {
-          ...input().base,
-          rows: rowForTool(),
-          tools: [tool({ delivery: ["a"] })],
-          outcomes: { s1: listed({ threads: [], host_counts: {} }) },
+      withOutcomes(
+        listed({ threads: [], host_counts: {} }),
+        listed({ threads: [], host_counts: { a: 1 } }),
+        "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n",
+        {
+          base: {
+            ...input().base,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a"] })],
+            outcomes: { s1: listed({ threads: [], host_counts: {} }) },
+          },
+          head: {
+            ...input().head,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a"] })],
+            outcomes: { s1: listed({ threads: [], host_counts: { a: 1 } }) },
+          },
         },
-        head: {
-          ...input().head,
-          rows: rowForTool(),
-          tools: [tool({ delivery: ["a"] })],
-          outcomes: { s1: listed({ threads: [], host_counts: { a: 1 } }) },
-        },
-      }),
+      ),
     )
     expect(report.failures.join("\n")).toContain("base result already carries")
   })
 
   test("#given a declared result field with another result change #then it fails", () => {
     const report = gateReport(
-      withOutcomes(listed({ threads: [] }), listed({ threads: [], host_counts: {}, scope: "all" }), "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n", {
-        base: {
-          ...input().base,
-          rows: rowForTool(),
-          tools: [tool({ delivery: ["a"] })],
-          outcomes: { s1: listed({ threads: [] }) },
+      withOutcomes(
+        listed({ threads: [] }),
+        listed({ threads: [], host_counts: {}, scope: "all" }),
+        "SDK-Parity-Changed: s1 result-field-added thread_send.host_counts\n",
+        {
+          base: {
+            ...input().base,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a"] })],
+            outcomes: { s1: listed({ threads: [] }) },
+          },
+          head: {
+            ...input().head,
+            rows: rowForTool(),
+            tools: [tool({ delivery: ["a"] })],
+            outcomes: { s1: listed({ threads: [], host_counts: {}, scope: "all" }) },
+          },
         },
-        head: {
-          ...input().head,
-          rows: rowForTool(),
-          tools: [tool({ delivery: ["a"] })],
-          outcomes: { s1: listed({ threads: [], host_counts: {}, scope: "all" }) },
-        },
-      }),
+      ),
     )
     expect(report.failures.join("\n")).toContain("differ outside the added result field")
   })
 
   test("#given a declared widening whose outcome did not move #then the declaration is refused", () => {
-    const report = widen(["a", "b", "c"], ["a", "b", "c"], "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n", {
-      base: { ...input().base, tools: [tool({ delivery: ["a", "b"] })] },
-      head: { ...input().head, tools: [tool({ delivery: ["a", "b", "c"] })] },
-    })
+    const report = widen(
+      ["a", "b", "c"],
+      ["a", "b", "c"],
+      "SDK-Parity-Changed: s1 input-enum-widened thread_send.delivery\n",
+      {
+        base: { ...input().base, tools: [tool({ delivery: ["a", "b"] })] },
+        head: { ...input().head, tools: [tool({ delivery: ["a", "b", "c"] })] },
+      },
+    )
     expect(report.failures.join("\n")).toContain("nothing to declare")
   })
 })
