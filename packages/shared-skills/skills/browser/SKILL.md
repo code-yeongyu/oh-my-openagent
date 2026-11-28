@@ -153,5 +153,6 @@ the extension's automation settings.
 | Doctor states, installing the CLI, daemon and extension, the one human step | [references/install.md](references/install.md) |
 | The built-in browser inside OmO Desktop | [references/desktop.md](references/desktop.md) |
 | Agent on one machine, browser on another | [references/remote.md](references/remote.md) |
+| What the attached engine sends over the network, and the pinned update check | [references/network.md](references/network.md) |
 | Owned engine: launch, snapshot ladder, network, frames, human handoff | [references/owned-engine/README.md](references/owned-engine/README.md) |
 | Reading a 1Password vault the user has unlocked | [references/recipes/1password.md](references/recipes/1password.md) |
