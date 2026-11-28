@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCompiledLauncher } from "../compile-entry"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 import { compiledDiagnosticRuntimeLoader } from "../compiled-diagnostic-runtime"
 
 const roots: string[] = []
@@ -18,7 +19,7 @@ afterEach(() => {
 function runtimeRoot(version = "9.2.1"): string {
   const root = temp()
   writeFileSync(join(root, "package.json"), JSON.stringify({ version }))
-  for (const artifact of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js"]) {
+  for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
     mkdirSync(join(root, artifact, ".."), { recursive: true })
     writeFileSync(join(root, artifact), "fixture\n")
   }
@@ -58,6 +59,22 @@ describe("compiled omo setup", () => {
 })
 
 describe("compiled omo doctor", () => {
+  test("#given a missing credential-gated x-search payload #when compiled doctor runs #then diagnostics fail", async () => {
+    const root = runtimeRoot()
+    rmSync(join(root, "plugin/skills-conditional/x-search/SKILL.md"), { force: true })
+    let exitCode: number | undefined
+    const output = await captureLog(async () => {
+      await runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        computerUseLines: async () => [],
+        coverageLines: async () => [],
+        list: () => [],
+      })
+      exitCode = Number(process.exitCode)
+    })
+    expect(exitCode).toBe(1)
+    expect(output).toContain("FAIL x-search skill: missing plugin/skills-conditional/x-search/SKILL.md")
+  })
+
   test("#given a release binary #when doctor runs #then it prints the update command and the computer-use and task-category sections", async () => {
     const root = runtimeRoot()
     const output = await captureLog(() =>
