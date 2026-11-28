@@ -1,7 +1,9 @@
 import { lstatSync as nodeLstatSync, realpathSync as nodeRealpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { renderDirective } from "./directive.js";
+import { scopedReceipt } from "./scoped-receipt.js";
 import { clearAttemptState, MAX_ATTEMPTS, readAttemptState, writeAttemptState } from "./state.js";
 import type { FileStat, HookFileSystem, StopHookOutput, SubagentStopInput } from "./types.js";
 import { SUBAGENT_STOP_EVENT } from "./types.js";
@@ -10,11 +12,15 @@ const RECEIPT_ENFORCED_AGENTS = new Set(["lazycodex-worker-low", "lazycodex-work
 
 type EvidenceReceiptFailure = "invalid" | "placeholder" | "stale" | null;
 
-export function runSubagentStopHook(input: unknown, fs: HookFileSystem): string {
+export function runSubagentStopHook(
+	input: unknown,
+	fs: HookFileSystem,
+	bindingsRoot = resolve(homedir(), ".omo/operations/bindings"),
+): string {
 	if (!isSubagentStopInput(input)) return "";
 	if (!RECEIPT_ENFORCED_AGENTS.has(input.agent_type)) return "";
 	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
-	const receiptFailure = getEvidenceReceiptFailure(input, fs);
+	const receiptFailure = getEvidenceReceiptFailure(input, fs, bindingsRoot);
 	if (receiptFailure === null) {
 		clearAttemptState(input.cwd, input.session_id, input.agent_id, fs);
 		return "";
@@ -52,11 +58,22 @@ function transcriptHasContextPressureMarker(transcriptPath: string, fs: HookFile
 	}
 }
 
-function getEvidenceReceiptFailure(input: SubagentStopInput, fs: HookFileSystem): EvidenceReceiptFailure {
+function getEvidenceReceiptFailure(
+	input: SubagentStopInput,
+	fs: HookFileSystem,
+	bindingsRoot: string,
+): EvidenceReceiptFailure {
 	const receiptPath = extractEvidencePath(input.last_assistant_message);
 	if (receiptPath === null) return "invalid";
-	const evidenceRoot = resolve(input.cwd, ".omo", "evidence");
+	let assigned: string | null;
+	try {
+		assigned = scopedReceipt(input, fs, bindingsRoot);
+	} catch {
+		return "invalid";
+	}
+	const evidenceRoot = assigned === null ? resolve(input.cwd, ".omo", "evidence") : resolve(assigned, "..");
 	const resolvedPath = isAbsolute(receiptPath) ? resolve(receiptPath) : resolve(input.cwd, receiptPath);
+	if (assigned !== null && resolvedPath !== assigned) return "invalid";
 	if (!isPathInsideDirectory(resolvedPath, evidenceRoot)) return "invalid";
 	try {
 		return getEvidenceFileFailure(resolvedPath, evidenceRoot, input, fs);
