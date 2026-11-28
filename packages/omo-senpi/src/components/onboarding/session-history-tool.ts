@@ -3,9 +3,15 @@ import { randomUUID } from "node:crypto"
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static, Type } from "typebox"
 
-import { loadOnboardingScanRuntime } from "./scan-component"
+import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
+import { loadOnboardingScanRuntime } from "./scan-runtime-loader"
 import type { ScanCounts, SessionHistoryOptions, SessionHistoryScanSource } from "./session-history"
-import { loadSessionHistoryRuntime, type SessionHistoryRuntimeLoader } from "./session-history-runtime-loader"
+import {
+  loadSessionHistoryRuntime,
+  sessionHistoryRuntimeLoadFailure,
+  type SessionHistoryRuntimeLoader,
+  type SessionHistoryRuntimeModule,
+} from "./session-history-runtime-loader"
 
 export const ONBOARDING_SESSION_HISTORY_TOOL_NAME = "onboarding_session_history"
 
@@ -66,13 +72,31 @@ export function createOnboardingSessionHistoryTool(
     allowLazyActivation: true,
     executionMode: "sequential",
     async execute(_toolCallId, params): Promise<AgentToolResult<OnboardingSessionHistoryDetails>> {
-      return (await loadOnboardingScanRuntime()).executeOnboardingSessionHistory({
-        params,
-        stateDir: options.stateDir,
-        ...(options.scanOptions === undefined ? {} : { scanOptions: options.scanOptions }),
-        scanId: newScanId(),
-        loadRuntime,
-      })
+      // Every failure is answered here: the host hands a thrown error's text to the model, and that text can
+      // name local paths or quote what the scan read (#15352).
+      let history: SessionHistoryRuntimeModule
+      try {
+        history = await loadRuntime()
+      } catch {
+        return failure(sessionHistoryRuntimeLoadFailure())
+      }
+      try {
+        return await (
+          await loadOnboardingScanRuntime()
+        ).executeOnboardingSessionHistory({
+          params,
+          stateDir: options.stateDir,
+          ...(options.scanOptions === undefined ? {} : { scanOptions: options.scanOptions }),
+          scanId: newScanId(),
+          loadRuntime: async () => history,
+        })
+      } catch (error) {
+        return failure(`The session history scan failed: ${describeReadFailure(error)}`)
+      }
     },
   }
+}
+
+function failure<T>(text: string): AgentToolResult<T> {
+  return { content: [{ type: "text", text }], details: undefined as T, isError: true }
 }

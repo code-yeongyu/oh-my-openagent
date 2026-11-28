@@ -5,11 +5,11 @@ import type { ReflectionLockProbe, ReflectionLockVerdict } from "./stale-holder"
 import type { StaleLockDecision, StaleLockProbe, StrandedRunDecision } from "./stale-lock-reaper"
 
 export const REFLECTION_DIR = "/memory/agents/agent-a/runtime/reflection"
-const RUN = "reflection-run-64"
+export const RUN = "reflection-run-64"
 const HOST = "this-host"
-const LAUNCHER = 11096
+export const LAUNCHER = 11096
 const CLAIMANT = 4200
-const LOCK = join(REFLECTION_DIR, "active.lock")
+export const LOCK = join(REFLECTION_DIR, "active.lock")
 const VALID_OUTCOME = JSON.stringify({
   version: 1,
   runId: "reflection-run-64",
@@ -36,12 +36,12 @@ export interface Scenario {
   readonly expected: ReflectionLockVerdict
 }
 
-function lock(fields: Record<string, unknown> = {}): string {
+export function lock(fields: Record<string, unknown> = {}): string {
   return JSON.stringify({ runId: RUN, launcherPid: LAUNCHER, launcherHostname: HOST, ...fields })
 }
 
 // A provably dead holder: every rule passes. Each scenario below changes exactly one fact of it.
-function deadHolder(
+export function deadHolder(
   change: { files?: Record<string, FileState | undefined>; pids?: Facts["pids"]; starts?: Facts["starts"] } = {},
 ): Facts {
   const files: Record<string, FileState> = {

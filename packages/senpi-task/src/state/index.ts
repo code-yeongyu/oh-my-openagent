@@ -60,7 +60,15 @@ export type { TaskId } from "./id"
 export { messageability } from "./messageability"
 export { isTransportLostMessage, TRANSPORT_LOST_REASON } from "./transport-loss"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
-export { currentRunStartEpoch, fenceRun, LEGACY_RUN_START_EPOCH, nextRunEpoch, type RunFence } from "./run-fence"
+export {
+  acceptedStopOwnsRun,
+  burnUndoneRun,
+  currentRunStartEpoch,
+  fenceRun,
+  LEGACY_RUN_START_EPOCH,
+  nextRunEpoch,
+  type RunFence,
+} from "./run-fence"
 export {
   TASK_START_FAILURE_KINDS,
   TASK_START_FAILURE_REASONS,

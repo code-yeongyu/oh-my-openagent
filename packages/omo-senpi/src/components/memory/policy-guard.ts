@@ -104,7 +104,10 @@ function buildMemoryFilesystemPolicy(
       const target = resolve(request.canonicalPath)
       if (context === undefined) {
         return unboundAreas.some((area) => isWithin(area, target))
-          ? { allow: false, reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}` }
+          ? {
+              allow: false,
+              reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}`,
+            }
           : { allow: true }
       }
       const { ownRoots, deniedAreas } = layoutOf(context)
@@ -133,7 +136,11 @@ function identityLayout(context: MemoryIdentityContext): IdentityLayout {
   let resolvedDeniedRoots: readonly string[] | undefined
   return {
     ownRoots: stableRoots([ownRoot]),
-    deniedAreas: stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)]),
+    deniedAreas: stableRoots([
+      dirname(ownRoot),
+      durableAgentsRoot,
+      join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME),
+    ]),
     deniedRoots: () => {
       resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
       return resolvedDeniedRoots
@@ -171,7 +178,9 @@ function canonicalizeFromNearestExisting(target: string): string | undefined {
   while (true) {
     try {
       lstatSync(candidate)
-      return resolve(realpathSync(candidate), ...missingSegments.reverse())
+      // Native, like senpi's own canonicalization of the request path: on Windows the JS realpath keeps an 8.3
+      // short name (RUNNER~1) that the native one expands, so the roots would never contain the target (#15251).
+      return resolve(realpathSync.native(candidate), ...missingSegments.reverse())
     } catch (error) {
       if (!isMissingPathError(error)) return undefined
       const parent = dirname(candidate)

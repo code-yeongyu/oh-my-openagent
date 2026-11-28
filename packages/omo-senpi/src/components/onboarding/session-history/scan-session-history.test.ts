@@ -76,12 +76,13 @@ describe("scanSessionHistory events (onboarding scan contract, issue A1)", () =>
     expect(events[5]?.counts).toEqual({ found: 1, read: 1, cap: 100 })
   })
 
-  it("#given a digest store that fails #when scanned #then reports sessions as failed and keeps projects", async () => {
+  it("#given a digest store that fails #when scanned #then reports sessions as failed with the failure kind only and keeps projects", async () => {
     // given
     const { homes } = await fixture()
+    const path = "/home/SYNTH-USER/.omo/agent/onboarding/scans/scan-2/digests.jsonl"
     const failingStore: SessionDigestStore = {
       put: async () => {
-        throw new Error("disk full")
+        throw Object.assign(new Error(`ENOSPC: no space left on device, write '${path}'`), { code: "ENOSPC", path })
       },
       list: async () => [],
       drop: async () => {},
@@ -106,7 +107,8 @@ describe("scanSessionHistory events (onboarding scan contract, issue A1)", () =>
       "source_started:sessions",
       "source_failed:sessions",
     ])
-    expect(events.at(-1)).toMatchObject({ kind: "source_failed", source: "sessions", error: "disk full" })
+    // #15352: the event reaches the onboarding RPC, the first-prompt context and the history tool's output.
+    expect(events.at(-1)).toMatchObject({ kind: "source_failed", source: "sessions", error: "ENOSPC" })
   })
 
   it("#given a scan id #when digests are stored #then they persist privately on disk under the scan id", async () => {

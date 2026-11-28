@@ -1,4 +1,5 @@
-import { registerSyncRpc } from "./sync-rpc-registration"
+import { handleSyncVerbs } from "./sync-rpc-contract"
+import { createSyncRpcDispatcher } from "./sync-rpc-registration"
 import type {
   SyncRpcAccount,
   SyncRpcContext,
@@ -11,6 +12,13 @@ import { createAccountHttp } from "../../../../memory-core/src/sync/account/http
 import { createPairingHttp } from "../../../../memory-core/src/sync/account/pairing-http"
 
 type Handler = Parameters<SyncRpcRegistration["handle"]>[1]
+
+/** The dispatcher on the RPC surface as wireSyncRpc serves it once its sidecar has loaded, without the lazy import. */
+export function registerSyncRpcForTest(rpc: SyncRpcRegistration, options: SyncRpcOptions) {
+  const { coordinator, dispatch } = createSyncRpcDispatcher(options)
+  handleSyncVerbs(rpc, dispatch)
+  return coordinator
+}
 const cleanups: (() => Promise<void>)[] = []
 export async function disposeSyncRpcFixtures(): Promise<void> {
   for (const cleanup of cleanups.splice(0)) await cleanup()
@@ -139,7 +147,7 @@ export async function setup(overrides: Partial<SyncRpcOptions> = {}) {
     syncStatus: async () => ({ state: "paused" }),
     ...overrides,
   }
-  const coordinator = registerSyncRpc(
+  const coordinator = registerSyncRpcForTest(
     {
       handle: (name, handler) => {
         handlers.set(name, handler)

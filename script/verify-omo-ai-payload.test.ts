@@ -29,6 +29,7 @@ const PACKED_ARTIFACTS = [
   "plugin/extensions/omo.js",
   "plugin/extensions/gateway-store-worker.mjs",
   "plugin/extensions/omo-device-account.js",
+  "plugin/extensions/omo-memory-sync-rpc.js",
   "plugin/extensions/omo-feedback.js",
   "plugin/skills-conditional/x-search/SKILL.md",
   "plugin/runtime/lsp-daemon/dist/cli.js",

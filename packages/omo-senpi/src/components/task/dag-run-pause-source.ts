@@ -2,7 +2,10 @@ import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 import type { DagRecovery, InstalledDagRun } from "../../../../senpi-task/src/dag/recovery"
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunId } from "../../../../senpi-task/src/dag/types"
-import { controlJournal } from "../../../../senpi-task/src/dag/node-control-context"
+import { controlJournal, observeRunOwners } from "../../../../senpi-task/src/dag/node-control-context"
+import { appendWhileStopped } from "../../../../senpi-task/src/dag/paused-controls"
+import { dagRunEligibility, decideDagRun } from "../../../../senpi-task/src/dag/run-acquisition"
+import { holderProbeOf } from "../../../../senpi-task/src/dag/run-lease"
 import { dispatchGuidance } from "../../../../senpi-task/src/pause/guidance"
 import type { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
 import { RunPauseAdmissionHeld } from "../../../../senpi-task/src/manager/run-pause"
@@ -17,71 +20,127 @@ export type DagGuidanceDelivery = (
   },
 ) => Promise<{ readonly entryId?: string }>
 
+/**
+ * Journals the user's Stop on one run, decided on the fresh record under the journal's run lock by
+ * the acquisition's own decision (`decideDagRun`, #15125). A run another live process schedules
+ * (pending or running, or paused under that process's own lease: it has just claimed the run) is
+ * left untouched and its holder pid returned; any other live run is paused exactly as before,
+ * keeping the previous holder the holder rule reads. Stop never takes the lease: it ends holding.
+ */
+function stopUnderHolderRule(
+  options: DagSchedulerOptions,
+  record: DagRunRecordV1,
+  pauseSeq: number,
+): number | undefined {
+  const probe = holderProbeOf(options)
+  let refusedBy: number | undefined
+  const journal = controlJournal({ ...options, initialRecord: record }, record, undefined, (fresh) => {
+    const decision = decideDagRun(fresh, { probe, eligible: dagRunEligibility.userStop(pauseSeq) })
+    if (decision.kind === "not_eligible") return true
+    if (decision.kind === "free") return false
+    const scheduling = fresh.status !== "paused" || fresh.leaseHolderPid === decision.holderPid
+    if (scheduling) refusedBy = decision.holderPid
+    return scheduling
+  })
+  journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq })
+  return refusedBy
+}
+
+type StopPorts = {
+  options(record: DagRunRecordV1): DagSchedulerOptions
+  warn?(message: string, fields?: Record<string, unknown>): void
+}
+
+function stopRuns(ports: StopPorts, records: readonly DagRunRecordV1[], pauseSeq: number): void {
+  for (const initial of records) {
+    const options = ports.options(initial)
+    const record = options.store.readCheckpoint<DagRunRecordV1>(initial.runId)
+    if (record === null) continue
+    const refusedBy = stopUnderHolderRule(options, record, pauseSeq)
+    if (refusedBy !== undefined) {
+      ports.warn?.("omo-senpi DAG Stop left a run to the live process that is scheduling it", {
+        runId: record.runId,
+        holderPid: refusedBy,
+      })
+    }
+  }
+}
+
 export function createDagRunPauseSource(ports: {
   readonly barrier: AdmissionBarrier
   records(parentSessionId: string): readonly DagRunRecordV1[]
   options(record: DagRunRecordV1): DagSchedulerOptions
-  retire(runId: DagRunId): Promise<void>
+  // Retires the run; resolves with the release of the reservation it holds until the pause is
+  // written, when it holds one.
+  retire(runId: DagRunId): Promise<unknown>
   prepareResume(runId: DagRunId): void
   readonly recovery: DagRecovery
   adopt(installed: InstalledDagRun): void
   cancel(runId: DagRunId): Promise<void>
   readonly deliverGuidance?: DagGuidanceDelivery
+  warn?(message: string, fields?: Record<string, unknown>): void
+  // Holds the run's reservation (waiting while another operation holds it) and returns its release.
+  reserve?(runId: DagRunId): Promise<() => void>
 }): RunPauseSource {
   const active = (parent: string) =>
     ports
       .records(parent)
       .filter((record) => record.status === "pending" || record.status === "running" || record.status === "paused")
+  const dispatchRunGuidance = async (listed: DagRunRecordV1): Promise<void> => {
+    const options = ports.options(listed)
+    const record = options.store.readCheckpoint<DagRunRecordV1>(listed.runId) ?? listed
+    const guidance = [...(record.guidance ?? [])].sort(
+      (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    )
+    for (const entry of guidance) {
+      const targets = record.nodes
+        .filter((node) => (entry.scope.kind === "node" ? node.id === entry.scope.nodeId : node.state !== "completed"))
+        .map((node) => ({
+          nodeId: node.id,
+          ...(node.state === "running" || node.state === "paused" ? { taskId: node.taskId } : {}),
+        }))
+      await dispatchGuidance([entry], targets, {
+        save: (entries) => {
+          for (const guidance of entries)
+            // The one stopped-run write: same Stop and no other live holder, decided at the write.
+            appendWhileStopped(options, options.store.readCheckpoint<DagRunRecordV1>(record.runId) ?? record, {
+              type: guidance.state === "delivered" ? "dag.guidance.delivered" : "dag.guidance.dispatching",
+              guidance,
+            })
+        },
+        deliver: async (taskId, input) => {
+          if (ports.deliverGuidance === undefined) throw new Error("run guidance custody port is not configured")
+          return ports.deliverGuidance(taskId, input)
+        },
+      })
+    }
+  }
   return {
     refs: (parent) => active(parent).map((record) => ({ kind: "dag", id: record.runId })),
     async quiesce(parent, pauseSeq) {
       const records = active(parent)
-      await Promise.all(records.map((record) => ports.retire(record.runId)))
-      for (const initial of records) {
-        const options = ports.options(initial)
-        const record = options.store.readCheckpoint<DagRunRecordV1>(initial.runId)
-        if (
-          record === null ||
-          (record.status !== "pending" && record.status !== "running" && record.status !== "paused")
-        )
-          continue
-        if ((record.pause?.pauseSeq ?? 0) >= pauseSeq) continue
-        controlJournal({ ...options, initialRecord: record }, record).append({
-          type: "dag.run.paused",
-          reason: "user_stop",
-          pauseSeq,
-        })
+      const retired = await Promise.allSettled(records.map((record) => ports.retire(record.runId)))
+      const releases = retired.flatMap((outcome) =>
+        outcome.status === "fulfilled" && typeof outcome.value === "function" ? [outcome.value as () => void] : [],
+      )
+      try {
+        const failure = retired.find((outcome) => outcome.status === "rejected")
+        if (failure?.status === "rejected") throw failure.reason
+        const observing = records.flatMap((record) => observeRunOwners(ports.options(record), record.runId) ?? [])
+        if (observing.length > 0) await Promise.all(observing)
+        stopRuns(ports, records, pauseSeq)
+      } finally {
+        for (const release of releases) release()
       }
     },
     async dispatchGuidance(parent) {
-      for (const record of active(parent)) {
-        const options = ports.options(record)
-        const journal = controlJournal(options, record)
-        const guidance = [...(record.guidance ?? [])].sort(
-          (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-        )
-        for (const entry of guidance) {
-          const targets = record.nodes
-            .filter((node) =>
-              entry.scope.kind === "node" ? node.id === entry.scope.nodeId : node.state !== "completed",
-            )
-            .map((node) => ({
-              nodeId: node.id,
-              ...(node.state === "running" || node.state === "paused" ? { taskId: node.taskId } : {}),
-            }))
-          await dispatchGuidance([entry], targets, {
-            save: (entries) => {
-              for (const guidance of entries)
-                journal.append({
-                  type: guidance.state === "delivered" ? "dag.guidance.delivered" : "dag.guidance.dispatching",
-                  guidance,
-                })
-            },
-            deliver: async (taskId, input) => {
-              if (ports.deliverGuidance === undefined) throw new Error("run guidance custody port is not configured")
-              return ports.deliverGuidance(taskId, input)
-            },
-          })
+      for (const listed of active(parent)) {
+        // Delivered and recorded under the run's reservation, from the record read once it is held.
+        const release = (await ports.reserve?.(listed.runId)) ?? (() => undefined)
+        try {
+          await dispatchRunGuidance(listed)
+        } finally {
+          release()
         }
       }
     },
@@ -106,6 +165,7 @@ export function createDagRunPauseSource(ports: {
           if (entered.ticket.check().kind === "held") {
             await installed.scheduler.suspend()
             await installed.settled
+            installed.release()
             throw new RunPauseAdmissionHeld()
           }
           ports.adopt(installed)

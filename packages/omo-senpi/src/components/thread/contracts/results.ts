@@ -74,6 +74,9 @@ export type ThreadBacklog = {
 }
 
 export type ThreadResultSummary = {
+  readonly liveness?: import("../tools/row-liveness").RowLiveness
+  readonly verification?: "unverified"
+  readonly hold?: import("../tools/row-liveness").RowHold
   readonly thread: string
   readonly name: string
   /** Set when `name` is a fallback (thread-address-core `rowName`): the thread has no name of its own, so its name is no address. */
@@ -129,13 +132,17 @@ export type ThreadDelivery =
   | { readonly kind: "started"; readonly turn_id: string }
   /**
    * `waiting_on`: what the message waits on, on that device (`device`, absent when this install has no device identity):
-   * an `approval` a human must answer, a `hold` on the session (a Stop, a pause), or the `wake` of a session no engine runs
-   * (omo#13037); the message runs after it.
+   * an `approval` a human must answer, a `hold` on the session (a Stop, a pause), the `wake` of a session no engine runs
+   * (omo#13037), or `host_identity_unproven`: a live host holds the session but this caller could not prove that host, so
+   * the message is stored for that host's own drain to take (omo#15197); the message runs after it.
    */
   | {
       readonly kind: "queued"
       readonly queue_position: number
-      readonly waiting_on?: { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
+      readonly waiting_on?: {
+        readonly kind: "approval" | "hold" | "wake" | "host_identity_unproven"
+        readonly device?: string
+      }
     }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
   | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
@@ -227,6 +234,7 @@ export type ThreadCreateResult =
  * lists on the device (this device's are the caller's scoped threads). This device's row is always present.
  */
 export type ThreadDevice = {
+  readonly host_counts?: { readonly answered: number; readonly unanswered: number } | null
   readonly device: string
   readonly name: string
   readonly platform?: string
@@ -245,6 +253,7 @@ export type ThreadListResult =
       readonly kind: "ok"
       readonly threads: readonly ThreadResultSummary[]
       readonly scope: "workspace" | "all"
+      readonly host_counts?: { readonly answered: number; readonly unanswered: number }
       /** Why the rows carry no `backlog`: the gateway store could not be read (#14428). The threads are still listed. */
       readonly backlog_error?: string
       /** The account's devices, this one included, when the account's devices could be listed. */
@@ -295,6 +304,10 @@ export type ThreadReadResult =
       readonly truncated: boolean
       readonly next_cursor?: string
       readonly source: ThreadReadSource
+      readonly state?: ThreadState
+      readonly liveness?: ThreadResultSummary["liveness"]
+      readonly verification?: "unverified"
+      readonly hold?: ThreadResultSummary["hold"]
       /** Set on the JSONL fallback for a thread whose endpoint is dead: the file may lag the session. */
       readonly source_incomplete?: boolean
       readonly error_note?: string

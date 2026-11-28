@@ -77,13 +77,6 @@ export function toContinueResult(outcome: SendOutcome): ContinueResult {
         reason: outcome.message,
         suggestion: CONTINUE_SUGGESTION,
       }
-    case "scope_denied":
-      return {
-        kind: "not_continuable",
-        task_id: outcome.task_id,
-        reason: outcome.reason,
-        suggestion: CONTINUE_SUGGESTION,
-      }
     case "not_found":
       return { kind: "not_continuable", reason: outcome.reason, suggestion: outcome.suggestion }
     default:

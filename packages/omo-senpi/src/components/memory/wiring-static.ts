@@ -1,7 +1,12 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { resolveMemoryRoot, type MemoryBlockCache, type ReservedRun, type TranscriptProjection } from "@oh-my-opencode/memory-core"
+import {
+  resolveMemoryRoot,
+  type MemoryBlockCache,
+  type ReservedRun,
+  type TranscriptProjection,
+} from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"

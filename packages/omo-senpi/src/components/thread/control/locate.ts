@@ -5,13 +5,13 @@ import { resolveAddress } from "../address/lazy"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { createRelayControl } from "../remote/lazy-ops"
 import type { RemoteSessionRow } from "../remote/ports"
-import { failure, sendBookFor, targetSession } from "../tools/internals"
+import { addressBook, failure, sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
 
 export type LocatedControl =
-  | { readonly kind: "control"; readonly control: SessionControl }
+  | { readonly kind: "control"; readonly control: SessionControl; readonly row?: RemoteSessionRow }
   /** The address names a thread no engine holds live: its session file here, or an ended session on another device. */
   | {
       readonly kind: "not_live"
@@ -51,10 +51,15 @@ export async function locateControl(
     const row = resolved.where.row
     if (row.state === "ended")
       return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device, row }
-    return { kind: "control", control: createRelayControl(options.remote, row) }
+    return { kind: "control", control: createRelayControl(options.remote, row), row }
   }
   const session = targetSession(current, resolved.thread)
-  if (session === undefined) return { kind: "not_live", thread_id: resolved.thread, title: resolved.entry.name }
+  if (session === undefined) {
+    // A thread whose endpoint answered but was refused for its host's identity is not ended: the refusal is the answer.
+    const refusal = addressBook(options, current).find((entry) => entry.thread_id === resolved.thread)?.identity_refusal
+    if (refusal !== undefined) throw refusal
+    return { kind: "not_live", thread_id: resolved.thread, title: resolved.entry.name }
+  }
   if (session.status === "opening")
     return {
       kind: "error",
