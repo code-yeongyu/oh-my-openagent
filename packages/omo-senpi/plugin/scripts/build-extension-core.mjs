@@ -143,6 +143,7 @@ const telemetryOtlpEntryPath = join(packageRoot, "src", "components", "telemetry
 // The sync engine sidecar carries the Loro runtime; its wasm is emitted beside it under this fixed name
 // (the engine's loader reads it relative to its own module), so omo.js never pulls Loro in.
 const memorySyncEntryPath = join(packageRoot, "src", "components", "memory", "sync-runtime.ts")
+const memorySyncRpcEntryPath = join(packageRoot, "src", "components", "memory", "sync-rpc-runtime.ts")
 export const MEMORY_SYNC_WASM_NAME = "loro_wasm_bg.wasm"
 // Every file the sync sidecar loads from beside itself; a build test fails on any undeclared asset.
 export const MEMORY_SYNC_ASSET_NAMES = [MEMORY_SYNC_WASM_NAME, "CaseFolding.txt"]
@@ -217,6 +218,11 @@ const telemetryOtlpOutputPath = join(
   "omo-telemetry-otlp.js",
 )
 const memorySyncOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-sync.js")
+const memorySyncRpcOutputPath = join(
+  process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot,
+  "extensions",
+  "omo-memory-sync-rpc.js",
+)
 const threadClientOutputPath = join(
   process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot,
   "extensions",
@@ -269,6 +275,7 @@ const externalSpecifiers = [
   "#omo-telemetry-posthog-runtime",
   "#omo-telemetry-otlp-runtime",
   "#omo-memory-sync-runtime",
+  "#omo-memory-sync-rpc-runtime",
   "#omo-thread-client-runtime",
   "#omo-wake-runtime",
   "#omo-telemetry-recovery-runtime",
@@ -402,6 +409,7 @@ export function resolveOutputs(options) {
     ),
     telemetryOtlpOutput: sibling(options.telemetryOtlpOutputPath, telemetryOtlpOutputPath, "omo-telemetry-otlp.js"),
     memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
+    memorySyncRpcOutput: sibling(options.memorySyncRpcOutputPath, memorySyncRpcOutputPath, "omo-memory-sync-rpc.js"),
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
     wakeOutput: sibling(options.wakeOutputPath, wakeOutputPath, "omo-wake.js"),
     telemetryRecoveryOutput: sibling(
@@ -455,6 +463,7 @@ export async function buildExtension(options = {}) {
     telemetryPosthogOutput,
     telemetryOtlpOutput,
     memorySyncOutput,
+    memorySyncRpcOutput,
     threadClientOutput,
     wakeOutput,
     telemetryRecoveryOutput,
@@ -496,6 +505,7 @@ export async function buildExtension(options = {}) {
   const memorySyncInputs = await buildEntry(memorySyncEntryPath, memorySyncOutput, buildDefines, externalSpecifiers, {
     assets: true,
   })
+  const memorySyncRpcInputs = await buildEntry(memorySyncRpcEntryPath, memorySyncRpcOutput, buildDefines)
   const threadClientInputs = await buildEntry(
     threadClientEntryPath,
     threadClientOutput,
@@ -561,6 +571,7 @@ export async function buildExtension(options = {}) {
     telemetryPosthogInputs,
     telemetryOtlpInputs,
     memorySyncInputs,
+    memorySyncRpcInputs,
     threadClientInputs,
     wakeInputs,
     telemetryRecoveryInputs,

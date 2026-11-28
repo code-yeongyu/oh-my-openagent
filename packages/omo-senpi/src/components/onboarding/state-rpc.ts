@@ -1,6 +1,6 @@
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { ClaimOwnerSeams } from "./claim-owner"
-import { loadOnboardingScanRuntime } from "./scan-component"
+import { loadOnboardingScanRuntime } from "./scan-runtime-loader"
 
 export const ONBOARDING_STATE_GET_RPC_METHOD = "omo.onboarding.state.get"
 export const ONBOARDING_STATE_COMPLETE_RPC_METHOD = "omo.onboarding.state.complete"

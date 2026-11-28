@@ -104,6 +104,11 @@ export interface HostSessionOpenInput {
 export interface HostRpcClientOptions {
   readonly socketPath: string
   readonly onDisconnect: (error: RpcTransportGoneError) => void
+  /**
+   * The agent dir the task host was launched in, where it wrote its launch key record. The engine client proves the
+   * host there and only there (senpi#7568); omo always names it, never leaving the engine to its own default.
+   */
+  readonly keyRoot: string
 }
 
 export type HostRpcClientFactory = (options: HostRpcClientOptions) => Promise<HostRpcClient>
@@ -113,12 +118,17 @@ export type HostProtocolProbe = (socketPath: string) => Promise<SenpiHostProtoco
 export async function createSenpiRpcClient(options: HostRpcClientOptions): Promise<HostRpcClient> {
   await loadSenpiBarrel()
   const RpcClient = senpiRpcClient()
-  return new RpcClient({ socketPath: options.socketPath, onDisconnect: options.onDisconnect })
+  return new RpcClient({
+    socketPath: options.socketPath,
+    onDisconnect: options.onDisconnect,
+    keyRoot: options.keyRoot,
+  })
 }
 
-export async function probeWithEngine(socketPath: string): Promise<SenpiHostProtocolInfo | undefined> {
+/** The engine's probe of a task host, proving it under `keyRoot`, the agent dir the host was launched in. */
+export async function probeWithEngine(socketPath: string, keyRoot: string): Promise<SenpiHostProtocolInfo | undefined> {
   await loadSenpiBarrel()
-  return senpiProbeHost()({ socket: socketPath })
+  return senpiProbeHost()({ socket: socketPath, keyRoot })
 }
 
 export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {

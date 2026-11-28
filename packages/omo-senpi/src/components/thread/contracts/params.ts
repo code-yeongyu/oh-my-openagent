@@ -30,6 +30,8 @@ export const ThreadListParams = Type.Object({
         Type.Literal("opening"),
         Type.Literal("running"),
         Type.Literal("idle"),
+        Type.Literal("held"),
+        Type.Literal("unknown"),
         Type.Literal("inactive"),
         Type.Literal("archived"),
       ]),

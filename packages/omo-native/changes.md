@@ -1,3 +1,7 @@
+## 2026-11-27 - Recover refuses on a device that already syncs (#14464)
+
+`omo sync recover` answers that the device is already part of memory sync instead of recovering it again, and turns sync on through the recovery engine's own recover-then-turn-on path.
+
 ## 2026-11-22 - Thread train 11 (#14623)
 
 omo thread keeps list, send and read (#14319):

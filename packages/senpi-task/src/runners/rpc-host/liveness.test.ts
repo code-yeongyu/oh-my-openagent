@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { daemonReachable } from "./liveness"
+import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 
 const cleanups: Array<() => Promise<void> | void> = []
 
@@ -42,7 +43,7 @@ describe.skipIf(process.platform === "win32")("daemonReachable (omo#9069)", () =
     await silentDaemon(socketPath)
 
     // when
-    const reachable = await daemonReachable(socketPath)
+    const reachable = await daemonReachable(socketPath, FAKE_HOST_KEY_ROOT)
 
     // then
     expect(reachable).toBe(true)
@@ -53,7 +54,7 @@ describe.skipIf(process.platform === "win32")("daemonReachable (omo#9069)", () =
     const socketPath = join(socketDir(), "rpc.sock")
 
     // when
-    const reachable = await daemonReachable(socketPath)
+    const reachable = await daemonReachable(socketPath, FAKE_HOST_KEY_ROOT)
 
     // then
     expect(reachable).toBe(false)

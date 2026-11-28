@@ -18,6 +18,7 @@ import {
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host-key-root"
 
 // The parent dies after the handoff is committed but before the failed rung's daemon session closed.
 // Revival must close that retained session before it opens the next rung, on the real daemon wire.
@@ -103,6 +104,8 @@ test("#given the parent dies before the failed rung's session closes #when anoth
   } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
   const lifecycle = createTaskLifecycle({
     ...deps,
+    // The production probe and closer reach the fake host, which publishes no launch key.
+    hostKeyRoot: FAKE_HOST_KEY_ROOT,
     registry: createManagerResidencyRegistry(() => sweeper),
     respawn: (record, sessionPath) => sweeper.respawn(record, sessionPath),
     reattach: (record, handle) => sweeper.reattach(record, handle),

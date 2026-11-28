@@ -1,12 +1,11 @@
-import { join } from "node:path"
 import type { DeviceAccountSource } from "./device-session/account-source"
 import type { MemoryRpcSync } from "./memory-rpc-sync"
-import { createSyncRpcClaims } from "./sync-rpc-claims"
-import type { SyncRpcAccount, SyncRpcRegistration } from "./sync-rpc-ports"
-import { registerSyncRpc } from "./sync-rpc-registration"
 import { phraseGateFrom } from "./sync-phrase-gate"
+import { handleSyncVerbs, syncRpcHandlerFailure, syncRpcUntrusted, type SyncRpcVerb } from "./sync-rpc-contract"
+import type { SyncRpcAccount, SyncRpcContext, SyncRpcRegistration } from "./sync-rpc-ports"
+import type { createSyncRpcRuntime } from "./sync-rpc-runtime"
 
-export function wireSyncRpc(options: {
+export interface SyncRpcWiringOptions {
   readonly rpc: SyncRpcRegistration
   readonly source: DeviceAccountSource | (() => Promise<SyncRpcAccount | null>)
   readonly memoryRoot: string
@@ -17,36 +16,46 @@ export function wireSyncRpc(options: {
   readonly resumeSync?: () => Promise<void>
   readonly logger: { error(message: string, fields?: Record<string, unknown>): void }
   readonly warn?: (message: string, fields: Record<string, unknown>) => void
-}) {
-  let warnedLegacy = false
-  return registerSyncRpc(options.rpc, {
-    source: async () => {
-      const account = await options.source()
-      // Legacy CLI sources cannot prove a captured generation. Only the selected source's
-      // operation-capable branch may be used; there is deliberately no credential fallback.
-      if (account !== null && "descriptor" in account && "forOperation" in account) return account
-      // Say once why sync has no account when a source did answer (#13153).
-      if (account !== null && !warnedLegacy) {
-        warnedLegacy = true
-        options.warn?.("memory sync source has no operation-capable account", { code: "legacy_source" })
-      }
-      return null
+}
+
+export function wireSyncRpc(options: SyncRpcWiringOptions) {
+  // The gate is built once at registration, even when the dispatcher is cold.
+  const phraseGate = phraseGateFrom(options.logger)
+  type Runtime = ReturnType<typeof createSyncRpcRuntime>
+  let runtime: Runtime | undefined
+  let pending: Promise<Runtime> | undefined
+  let binding = 0
+  const loadRuntime = async () => {
+    const { createSyncRpcRuntime } = await import("#omo-memory-sync-rpc-runtime")
+    return createSyncRpcRuntime(options, phraseGate)
+  }
+  const dispatchCold = async (verb: SyncRpcVerb, data: unknown, context?: SyncRpcContext) => {
+    const acceptedBinding = binding
+    let loaded: Runtime
+    try {
+      loaded = await (pending ??= loadRuntime().catch((error: unknown) => {
+        pending = undefined
+        throw error
+      }))
+    } catch (error) {
+      options.warn?.("memory sync RPC sidecar failed to load", {
+        path: verb,
+        code: "handler_failed",
+        error: error instanceof Error ? error.name : typeof error,
+      })
+      return syncRpcHandlerFailure()
+    }
+    runtime = loaded
+    // A request waiting on the import must not reach the next session binding.
+    return acceptedBinding === binding ? loaded.dispatch(verb, data, context) : syncRpcUntrusted()
+  }
+  handleSyncVerbs(options.rpc, (verb, data, context) =>
+    runtime === undefined ? dispatchCold(verb, data, context) : runtime.dispatch(verb, data, context),
+  )
+  return {
+    retireBinding() {
+      binding++
+      runtime?.coordinator.retireBinding()
     },
-    runtime: {
-      enableSync: async (input) => (await import("#omo-memory-sync-runtime")).enableSync(input),
-      disableSync: async (input) => (await import("#omo-memory-sync-runtime")).disableSync(input),
-      joinAccount: async (input) => (await import("#omo-memory-sync-runtime")).joinAccount(input),
-      approveDevice: async (input) => (await import("#omo-memory-sync-runtime")).approveDevice(input),
-      phraseNoticeStatus: async (place) => (await import("#omo-memory-sync-runtime")).phraseNoticeStatus(place),
-      acknowledgePhraseVoid: async (input) => (await import("#omo-memory-sync-runtime")).acknowledgePhraseVoid(input),
-    },
-    claims: createSyncRpcClaims(join(options.memoryRoot, "runtime", "sync-rpc-claims")),
-    pinDir: options.pinDir,
-    signal: options.signal,
-    syncStatus: options.syncStatus,
-    ...(options.stopSync === undefined ? {} : { stopSync: options.stopSync }),
-    ...(options.resumeSync === undefined ? {} : { resumeSync: options.resumeSync }),
-    phraseGate: phraseGateFrom(options.logger),
-    ...(options.warn === undefined ? {} : { warn: options.warn }),
-  })
+  }
 }

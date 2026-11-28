@@ -38,7 +38,9 @@ function rpcHost() {
 
 const missingRuntime = () =>
   createSessionHistoryRuntimeLoader(() =>
-    Promise.reject(new Error("Cannot find module '#omo-session-history-runtime'")),
+    Promise.reject(
+      new Error("Cannot find module '#omo-session-history-runtime' from '/home/SYNTH-USER/plugin/extensions/omo.js'"),
+    ),
   )
 
 describe("session-history runtime loader", () => {
@@ -64,7 +66,7 @@ describe("session-history runtime loader", () => {
     expect(await load()).toBe(runtime)
   })
 
-  it("#given a payload missing the sidecar #when the projects method is called #then it answers unavailable with the cause and the remedy", async () => {
+  it("#given a payload missing the sidecar #when the projects method is called #then it answers unavailable with the artifact and the remedy, never the import error's text", async () => {
     const host = rpcHost()
     registerSessionHistoryRpc(host.pi, { loadRuntime: missingRuntime() })
     const reply = await host.handlers.get(OMO_SESSION_PROJECTS_RPC_METHOD)?.({
@@ -73,11 +75,11 @@ describe("session-history runtime loader", () => {
       excludedDirectories: [],
       managedWorktreeDirectories: [],
     })
-    expect(reply).toEqual({
-      kind: "unavailable",
-      reason: expect.stringContaining("Cannot find module '#omo-session-history-runtime'"),
-    })
-    expect(String((reply as { reason: string }).reason)).toContain("reinstall omo")
+    expect(reply).toEqual({ kind: "unavailable", reason: expect.stringContaining(SESSION_HISTORY_RUNTIME_ARTIFACT) })
+    const reason = String((reply as { reason: string }).reason)
+    expect(reason).toContain("reinstall omo")
+    // #15352: the same text reaches the model through the onboarding_session_history tool.
+    expect(reason).not.toContain("Cannot find module")
   })
 
   it("#given a payload missing the sidecar #when a sessions scan runs #then it ends with one failed event naming the artifact", async () => {

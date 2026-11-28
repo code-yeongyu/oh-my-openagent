@@ -5,6 +5,7 @@ import { baseSpec, cleanupProjects, launchSettled, makeManager } from "../manage
 import { createRpcManagedRunner } from "../manager/runner"
 import { hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 
 const harness = hostRunnerHarness()
 
@@ -26,6 +27,7 @@ describe("host first-prompt refusal cleanup", () => {
     const runner = harness.runnerOver(host, {
       createClient: (socketPath) => {
         const client = new HostSessionClient({
+          keyRoot: FAKE_HOST_KEY_ROOT,
           socketPath,
           ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
         })

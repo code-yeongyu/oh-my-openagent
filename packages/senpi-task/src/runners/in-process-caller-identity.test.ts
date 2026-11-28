@@ -7,7 +7,8 @@ import { awaitWithinTestBudget } from "../../../../test-support/test-deadline"
 
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { createTaskCancelTool } from "../tools/control/cancel"
-import type { CancelManager } from "../tools/control/types"
+import { createTaskSendTool } from "../tools/control/send"
+import type { CancelManager, SendManager } from "../tools/control/types"
 import { assistant, streamMessage } from "./__fixtures__/in-process-fallback-session"
 import { InProcessRunner } from "./in-process"
 
@@ -19,7 +20,9 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-async function childMachine() {
+type ScriptedCall = { readonly name: string; readonly arguments: Record<string, unknown> }
+
+async function childMachine(call: ScriptedCall) {
   const senpi = await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-caller-identity-"))
   roots.push(root)
@@ -51,7 +54,7 @@ async function childMachine() {
       const toolUse = assistant(MODEL, "toolUse", "", undefined, PROVIDER)
       return streamMessage({
         ...toolUse,
-        content: [{ type: "toolCall", id: "call-cancel", name: "task_cancel", arguments: { task_id: "st_0000c0de" } }],
+        content: [{ type: "toolCall", id: "call-scripted", name: call.name, arguments: call.arguments }],
       })
     },
   }
@@ -87,7 +90,7 @@ async function childMachine() {
       depth: 1,
       parentSessionId,
       rootSessionId: parentSessionId,
-      prompt: "cancel the task",
+      prompt: "call the tool",
       promptEnvelope: "bare" as const,
       completion: "turn" as const,
       includeTaskTools: true,
@@ -97,7 +100,7 @@ async function childMachine() {
 
 describe("task_cancel called from an in-process child", () => {
   test("#given the parent's task_cancel definition shared into a child #when the child calls it #then the caller is the child's session", async () => {
-    const machine = await childMachine()
+    const machine = await childMachine({ name: "task_cancel", arguments: { task_id: "st_0000c0de" } })
     const callers: Array<string | undefined> = []
     const manager: CancelManager = {
       cancelTask: async (idOrName, _reason, options) => {
@@ -108,6 +111,32 @@ describe("task_cancel called from an in-process child", () => {
     }
     const { renderCall: _renderCall, renderResult: _renderResult, ...cancelTool } = createTaskCancelTool({ manager })
     const runner = new InProcessRunner({ sharedParentTools: [cancelTool] })
+
+    const handle = await runner.start(machine.spec)
+    await awaitWithinTestBudget(handle.waitForIdle(), "the child's turn")
+    await handle.abort()
+    await handle.dispose()
+    await machine.closeParent()
+
+    expect(handle.sessionId).toBeDefined()
+    expect(handle.sessionId).not.toBe(machine.parentSessionId)
+    expect(callers).toEqual([handle.sessionId])
+  })
+})
+
+describe("task_send called from an in-process child", () => {
+  test("#given the parent's task_send definition shared into a child #when the child calls it #then the caller is the child's session", async () => {
+    const machine = await childMachine({ name: "task_send", arguments: { to: "st_0000c0de", message: "hi" } })
+    const callers: Array<string | undefined> = []
+    const manager: SendManager = {
+      sendToTask: async (input) => {
+        callers.push(input.callerSessionId)
+        return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: "none" }
+      },
+      list: () => [],
+    }
+    const { renderCall: _renderCall, renderResult: _renderResult, ...sendTool } = createTaskSendTool({ manager })
+    const runner = new InProcessRunner({ sharedParentTools: [sendTool] })
 
     const handle = await runner.start(machine.spec)
     await awaitWithinTestBudget(handle.waitForIdle(), "the child's turn")
