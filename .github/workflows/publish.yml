@@ -1258,6 +1258,19 @@ jobs:
               exit 0
             fi
 
+            # A closed or conflicting stamp PR can never merge, and a conflict also keeps its CI from starting, so stop now
+            # instead of polling it for the whole wait (run 46118333194 polled the conflicting #15385 for 51 min, #15400).
+            # UNKNOWN is GitHub still computing mergeability: keep waiting.
+            if [ "$PR_STATE" = "CLOSED" ]; then
+              echo "::error::Release-state PR #${PR_NUMBER} was closed without merging; refusing to publish npm packages."
+              exit 1
+            fi
+            MERGEABLE="$(retry_gh "Read release-state PR mergeability" gh pr view "$PR_NUMBER" --json mergeable --jq '.mergeable')"
+            if [ "$MERGEABLE" = "CONFLICTING" ]; then
+              echo "::error::Release-state PR #${PR_NUMBER} conflicts with ${BASE_REF}, so it cannot merge and its checks cannot start; refusing to publish npm packages. Re-dispatch publish.yml so it regenerates the stamp on the current ${BASE_REF}."
+              exit 1
+            fi
+
             FAILURES="$(retry_gh "Read release-state PR checks" gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
             if [ "$FAILURES" != "0" ]; then
               echo "::error::Release-state PR #${PR_NUMBER} has failing checks; refusing to publish npm packages."
@@ -1601,64 +1614,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Verify platform packages are published
-        if: inputs.lazycodex_only != true
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-        run: |
-          set -uo pipefail
-
-          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
-          # npm reads have lagged successful publishes by 10-25 minutes in this release lane
-          # (#8691: 12-16 min on beta.84; 5.1.1: linux-arm64-musl still 404 when the old
-          # 5-minute window closed). 120 x 15s = 30 minutes covers that with margin, so the
-          # wrapper publish does not strand an otherwise successful platform release.
-          ATTEMPTS="${PROPAGATION_ATTEMPTS:-120}"
-          DELAY="${PROPAGATION_DELAY:-15}"
-
-          PENDING=()
-          for platform in "${PLATFORMS[@]}"; do
-            for family in oh-my-opencode oh-my-openagent; do
-              PENDING+=("${family}-${platform}")
-            done
-          done
-
-          # The platform publish jobs have already succeeded when this runs, but the registry read
-          # path lags the write: a version can 404 for a short while after a successful publish.
-          # A single probe therefore proves nothing, so re-probe only what is still pending and
-          # fail once the window closes - a genuinely unpublished package still blocks the release.
-          for attempt in $(seq 1 "$ATTEMPTS"); do
-            STILL_PENDING=()
-            for pkg in "${PENDING[@]}"; do
-              STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${pkg}/${VERSION}" || echo 000)"
-              if [ "$STATUS" = "200" ]; then
-                echo "OK   ${pkg}@${VERSION}"
-              else
-                # 000 means curl itself failed (network/DNS), which is not evidence of absence.
-                echo "WAIT ${pkg}@${VERSION} (HTTP ${STATUS})"
-                STILL_PENDING+=("${pkg}")
-              fi
-            done
-
-            if [ "${#STILL_PENDING[@]}" -eq 0 ]; then
-              echo "All ${#PENDING[@]} platform package(s) are visible at ${VERSION}"
-              break
-            fi
-
-            PENDING=("${STILL_PENDING[@]}")
-
-            if [ "$attempt" -ge "$ATTEMPTS" ]; then
-              echo "::error::Missing platform package(s); refusing to publish wrappers. Still absent after ${ATTEMPTS} attempts:"
-              for pkg in "${PENDING[@]}"; do
-                echo "::error::  ${pkg}@${VERSION}"
-              done
-              exit 1
-            fi
-
-            echo "Waiting for platform package registry propagation (attempt ${attempt}/${ATTEMPTS}; ${#PENDING[@]} pending)"
-            sleep "$DELAY"
-          done
-
       - name: Check if already published
         id: check
         env:
@@ -1817,6 +1772,66 @@ jobs:
       - name: Verify omo-ai payload
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
         run: node script/verify-omo-ai-payload.mjs --release
+
+      # Runs after the build steps (they do not need it) and before every npm publish, so the ~4-min registry poll
+      # overlaps nothing that waits on it and the platform-before-wrapper order is unchanged (#15400).
+      - name: Verify platform packages are published
+        if: inputs.lazycodex_only != true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          set -uo pipefail
+
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
+          # npm reads have lagged successful publishes by 10-25 minutes in this release lane
+          # (#8691: 12-16 min on beta.84; 5.1.1: linux-arm64-musl still 404 when the old
+          # 5-minute window closed). 120 x 15s = 30 minutes covers that with margin, so the
+          # wrapper publish does not strand an otherwise successful platform release.
+          ATTEMPTS="${PROPAGATION_ATTEMPTS:-120}"
+          DELAY="${PROPAGATION_DELAY:-15}"
+
+          PENDING=()
+          for platform in "${PLATFORMS[@]}"; do
+            for family in oh-my-opencode oh-my-openagent; do
+              PENDING+=("${family}-${platform}")
+            done
+          done
+
+          # The platform publish jobs have already succeeded when this runs, but the registry read
+          # path lags the write: a version can 404 for a short while after a successful publish.
+          # A single probe therefore proves nothing, so re-probe only what is still pending and
+          # fail once the window closes - a genuinely unpublished package still blocks the release.
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            STILL_PENDING=()
+            for pkg in "${PENDING[@]}"; do
+              STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${pkg}/${VERSION}" || echo 000)"
+              if [ "$STATUS" = "200" ]; then
+                echo "OK   ${pkg}@${VERSION}"
+              else
+                # 000 means curl itself failed (network/DNS), which is not evidence of absence.
+                echo "WAIT ${pkg}@${VERSION} (HTTP ${STATUS})"
+                STILL_PENDING+=("${pkg}")
+              fi
+            done
+
+            if [ "${#STILL_PENDING[@]}" -eq 0 ]; then
+              echo "All ${#PENDING[@]} platform package(s) are visible at ${VERSION}"
+              break
+            fi
+
+            PENDING=("${STILL_PENDING[@]}")
+
+            if [ "$attempt" -ge "$ATTEMPTS" ]; then
+              echo "::error::Missing platform package(s); refusing to publish wrappers. Still absent after ${ATTEMPTS} attempts:"
+              for pkg in "${PENDING[@]}"; do
+                echo "::error::  ${pkg}@${VERSION}"
+              done
+              exit 1
+            fi
+
+            echo "Waiting for platform package registry propagation (attempt ${attempt}/${ATTEMPTS}; ${#PENDING[@]} pending)"
+            sleep "$DELAY"
+          done
 
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
@@ -2351,12 +2366,15 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   release-announce:
-    needs: [release-metadata, release, post-publish-verify, installer-mirror]
+    # The announcement is the one step that still waits for every package on the registry (registry-wait): it tells
+    # users to install the wrappers too, so it must not go out before npm serves them.
+    needs: [release-metadata, release, post-publish-verify, installer-mirror, registry-wait]
     if: >-
       !cancelled() &&
       needs.release.outputs.created == 'true' &&
       needs.release.result == 'success' &&
       needs.post-publish-verify.result == 'success' &&
+      needs.registry-wait.result == 'success' &&
       (needs.installer-mirror.result == 'success' || (inputs.skip_platform == true && needs.installer-mirror.result == 'skipped')) &&
       needs.release-metadata.outputs.dist_tag == '' &&
       inputs.lazycodex_only != true &&
@@ -2453,11 +2471,12 @@ jobs:
   registry-wait:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
     runs-on: ubuntu-24.04
-    # The wait below has one 60-minute deadline; the margin covers checkout and setup.
-    timeout-minutes: 75
+    # The wait below has one 90-minute deadline; the margin covers checkout and setup.
+    timeout-minutes: 105
     needs: [release-metadata, prepare-release-state, publish-main]
     # A pure registry read that needs only publish-main, so it runs beside the release job instead of after it.
-    # Nothing waits on it except post-publish-verify, so it cannot hold back the GitHub release either.
+    # Only release-announce waits on it: the GitHub release, post-publish-verify and the installer channel do not, so a
+    # slow wrapper package on npm (#15400) no longer holds back get.omo.dev.
     if: >-
       always() &&
       inputs.prepared_release_sha != '' &&
@@ -2479,9 +2498,10 @@ jobs:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
           PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
           LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
-          # ONE 60-minute deadline shared by every package, probe time included (each probe is capped at
-          # 15 s): well inside the job's 120-minute timeout, so a missing package fails with its name.
-          REGISTRY_WAIT_DEADLINE_SECONDS: "3600"
+          # ONE 90-minute deadline shared by every package, probe time included (each probe is capped at
+          # 15 s): inside the job's 105-minute timeout, so a missing package fails with its name. npm's slow
+          # processing step lands at 55.3-56 min (#15400), which left a 60-minute deadline only ~5 min of headroom.
+          REGISTRY_WAIT_DEADLINE_SECONDS: "5400"
         run: |
           set -euo pipefail
           # npm answers every publish with 202 "being processed": 5.1.38's oh-my-openagent printed
@@ -2510,7 +2530,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Reads every main and platform package of this release back from the registry at its exact version.
-            - Runs beside the release job; post-publish-verify starts once both are done.
+            - Runs beside the release job and post-publish-verify; only the release announcement waits for it.
           JOB_SUMMARY_NEXT: Check the named package on npm; the publish already succeeded, so this is registry propagation.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
@@ -2519,8 +2539,11 @@ jobs:
     runs-on: ubuntu-24.04
     # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
     # probe can't hold a runner for GitHub's 6 h default (#9492).
-    timeout-minutes: 120
-    needs: [release-metadata, prepare-release-state, publish-main, release, registry-wait]
+    timeout-minutes: 150
+    # It does not need registry-wait: it waits for omo-ai itself (the readiness loop below), and the LazyCodex smoke
+    # polls for lazycodex-ai itself, so the installer channel that follows it no longer waits on the two wrapper
+    # packages, which alone hit npm's ~55-minute processing step (#15400).
+    needs: [release-metadata, prepare-release-state, publish-main, release]
     # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
     # already public by this point, so blocking the release job on them could only produce the worst
     # outcome: packages on npm with no GitHub release and no marketplace sync. A failure here is still a
@@ -2530,8 +2553,7 @@ jobs:
       inputs.prepared_release_sha != '' &&
       needs.release-metadata.result == 'success' &&
       needs.publish-main.result == 'success' &&
-      needs.release.result == 'success' &&
-      needs.registry-wait.result == 'success'
+      needs.release.result == 'success'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -2558,7 +2580,7 @@ jobs:
           # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
           # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
           READINESS_INTERVAL_SECONDS=15
-          READINESS_ATTEMPTS=240  # 240 x 15 s = 60 minutes; npm took ~55 minutes to serve omo-ai@5.1.13 (#9492)
+          READINESS_ATTEMPTS=360  # 360 x 15 s = 90 minutes; npm took ~55 minutes to serve omo-ai@5.1.13 (#9492, #15400)
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
             IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
             TARBALL_URL=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball 2>/dev/null || true)

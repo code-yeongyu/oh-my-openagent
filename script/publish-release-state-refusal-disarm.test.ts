@@ -40,6 +40,7 @@ const GH_STUB = [
   '    "pr view 77 --json autoMergeRequest"*) [ -n "$ENABLE_FAILS" ] && return 1; if [ -e "$STATE/armed" ]; then echo true; else echo false; fi ;;',
   '    "pr view 77 --json state,autoMergeRequest"*) [ -n "$SNAPSHOT_FAILS" ] && return 1; local st=OPEN; [ -e "$STATE/merged" ] && st=MERGED; [ -e "$STATE/closed" ] && st=CLOSED; printf \'{"state":"%s","autoMergeRequest":%s}\' "$st" "$([ -e "$STATE/armed" ] && echo "{}" || echo null)" | jq -r "$filter" ;;',
   '    "pr view 77 --json state"*) [ -n "$STATE_READ_FAILS" ] && return 1; echo OPEN ;;',
+  '    "pr view 77 --json mergeable"*) if [ -n "$CONFLICTING" ]; then echo CONFLICTING; else echo UNKNOWN; fi ;;',
   '    "pr view 77 --json statusCheckRollup"*) printf \'{"statusCheckRollup":[{"name":"sdk-parity","conclusion":"%s"}]}\' "$CHECK" | jq -r "$filter" ;;',
   '    "pr view 77 --json url,statusCheckRollup"*) echo "{}" ;;',
   "    *) return 1 ;;",
@@ -57,6 +58,7 @@ interface Case {
   readonly snapshotFails?: boolean
   readonly stateReadFails?: boolean
   readonly enableFails?: boolean
+  readonly conflicting?: boolean
   readonly sourceSha?: string
   readonly releaseRef?: string
 }
@@ -94,6 +96,7 @@ function run(input: Case): Outcome {
       SNAPSHOT_FAILS: input.snapshotFails ? "1" : "",
       STATE_READ_FAILS: input.stateReadFails ? "1" : "",
       ENABLE_FAILS: input.enableFails ? "1" : "",
+      CONFLICTING: input.conflicting ? "1" : "",
       RELEASE_BRANCH: "release/v9.9.9-source-state",
       RELEASE_REF: input.releaseRef ?? "dev",
       // The merge wait's poll count (120 in a release); a few polls reach its timeout branch the same way.
@@ -135,6 +138,15 @@ describe("publish.yml release-state refusal (#15126)", () => {
     expect(
       result.ghCalls.split("\n").filter((call) => call.startsWith("pr view 77 --json statusCheckRollup")),
     ).toHaveLength(3)
+    expect(result.armed).toBe(false)
+  })
+
+  test("#when the stamp PR conflicts with its base #then the release is refused on the first poll, not after the wait", () => {
+    const result = run({ check: "SUCCESS", conflicting: true })
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain("Release-state PR #77 conflicts with dev, so it cannot merge")
+    expect(result.ghCalls.split("\n").filter((call) => call.startsWith("pr view 77 --json mergeable"))).toHaveLength(1)
+    expect(result.ghCalls).not.toContain("statusCheckRollup")
     expect(result.armed).toBe(false)
   })
 

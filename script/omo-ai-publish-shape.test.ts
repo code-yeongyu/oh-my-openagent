@@ -409,14 +409,20 @@ describe("beta follows latest on a stable release (#12987)", () => {
     expect(assets.needs).not.toContain("post-publish-verify")
   })
 
-  test("the registry wait runs beside the release job and gates post-publish-verify", () => {
+  test("the registry wait runs beside the release job and gates only the announcement, not verification or the installer channel", () => {
     const wait = job("registry-wait")
     expect(wait.needs).toContain("publish-main")
     expect(wait.needs).not.toContain("release")
     expect(steps("registry-wait").map((step) => step.name)).toContain(
       "Wait for every published package on the registry",
     )
-    expect(job("post-publish-verify").needs).toContain("registry-wait")
-    expect(job("post-publish-verify").if).toContain("needs.registry-wait.result == 'success'")
+    // #15400: the wrapper packages alone hit npm's ~55-minute processing step; the installer channel follows
+    // post-publish-verify, which waits for omo-ai itself, so neither may wait on every package.
+    for (const name of ["post-publish-verify", "installer-mirror", "installer-mirror-beta"]) {
+      expect(job(name).needs).not.toContain("registry-wait")
+      expect(job(name).if).not.toContain("needs.registry-wait")
+    }
+    expect(job("release-announce").needs).toContain("registry-wait")
+    expect(job("release-announce").if).toContain("needs.registry-wait.result == 'success'")
   })
 })

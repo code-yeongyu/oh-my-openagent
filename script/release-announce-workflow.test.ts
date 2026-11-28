@@ -131,7 +131,7 @@ test("#given release automation #when parsed #then published events, safe dispat
   }
   const caller = publisher.jobs["release-announce"]
   expect(new Set(caller?.needs)).toEqual(
-    new Set(["release-metadata", "release", "post-publish-verify", "installer-mirror"]),
+    new Set(["release-metadata", "release", "post-publish-verify", "installer-mirror", "registry-wait"]),
   )
   expect(caller).not.toHaveProperty("continue-on-error")
   const versionStep = publisher.jobs["release-metadata"]?.steps?.find((item) =>
@@ -169,6 +169,7 @@ const published = {
   release: "success",
   verify: "success",
   mirror: "success",
+  registryWait: "success",
   platform: "success",
   skipPlatform: false,
   lazycodexOnly: false,
@@ -199,6 +200,7 @@ test.each([
   { ...published, name: "skipped verification", verify: "skipped", expected: false },
   { ...published, name: "cancelled verification", verify: "cancelled", expected: false },
   { ...published, name: "cancelled mirror", mirror: "cancelled", expected: false },
+  { ...published, name: "failed registry wait", registryWait: "failure", expected: false },
   { ...published, name: "already existed", created: "false", expected: false },
   { ...published, name: "beta", distTag: "beta", expected: false },
   { ...published, name: "LazyCodex only", lazycodexOnly: true, expected: false },
@@ -230,13 +232,14 @@ test.each([
         "release-metadata": { result: "success", outputs: { dist_tag: scenario.distTag } },
         "installer-mirror": { result: scenario.mirror },
         "post-publish-verify": { result: scenario.verify },
+        "registry-wait": { result: scenario.registryWait },
         "release-announce": {
           result: "announce" in scenario ? scenario.announce : scenario.expected ? "success" : "skipped",
         },
         "publish-platform": { result: scenario.platform },
       },
     }
-    const statuses = [scenario.release, scenario.verify, scenario.mirror, scenario.platform]
+    const statuses = [scenario.release, scenario.verify, scenario.mirror, scenario.registryWait, scenario.platform]
     expect(Boolean(evaluateExpression(condition, context, statuses, scenario.runCancelled))).toBe(scenario.expected)
     const recoveryExpected =
       scenario.created === "true" &&
