@@ -2,10 +2,15 @@ import type { SendManager, SendToolResult } from "./types"
 import { toolErrorResult, toolResult } from "./tool-result"
 import type { RedispatchOutcome } from "../../steering"
 
+export type SendToolScope = { readonly callerSessionId: string | undefined; readonly allScope: boolean }
+
+// The same sentence on every not-found answer of a call without all_scope, whatever exists.
+const OTHER_SESSION_HINT = "A task of another session is reached only with all_scope: true."
+
 export function mapRedispatchOutcome(
   manager: SendManager,
   outcome: RedispatchOutcome,
-  callerSessionId: string | undefined,
+  scope: SendToolScope,
 ): SendToolResult {
   switch (outcome.kind) {
     case "redispatched":
@@ -31,69 +36,26 @@ export function mapRedispatchOutcome(
       })
     case "capacity_deferred":
       return toolResult(outcome.reason, { kind: "capacity_deferred", task_id: outcome.task_id, reason: outcome.reason })
-    case "scope_denied":
-      return toolErrorResult(outcome.reason, {
-        kind: "scope_denied",
-        task_id: outcome.task_id,
-        owning_session_id: outcome.owning_session_id,
-        reason: outcome.reason,
-      })
     case "not_found":
-      return notFound(manager, outcome.reason, callerSessionId)
+      return notFound(manager, outcome.reason, scope)
   }
 }
 
 export function invalidArguments(reason: string): SendToolResult {
   return toolResult(reason, { kind: "invalid_arguments", reason })
 }
-export function notFound(manager: SendManager, reason: string, callerSessionId: string | undefined): SendToolResult {
-  const known = knownTaskNames(manager, callerSessionId)
+export function notFound(manager: SendManager, reason: string, scope: SendToolScope): SendToolResult {
+  const known = knownTaskNames(manager, scope.callerSessionId)
   const listText = known.length > 0 ? ` Known tasks in this session: ${known.join(", ")}.` : ""
-  return toolResult(`${reason}${listText}`, { kind: "not_found", reason, known_tasks: known })
+  const hint = scope.allScope ? "" : ` ${OTHER_SESSION_HINT}`
+  return toolResult(`${reason}${listText}${hint}`, { kind: "not_found", reason, known_tasks: known })
 }
 
 function knownTaskNames(manager: SendManager, callerSessionId: string | undefined): readonly string[] {
-  const scope =
-    callerSessionId === undefined
-      ? ({ scope: "all" } as const)
-      : ({ scope: "parent-session", session_id: callerSessionId } as const)
-  const names: string[] = []
-  for (const listed of manager.list(scope)) {
-    names.push(listed.record.name ?? listed.record.task_id)
-  }
-  return names
-}
-
-export function scopeDenied(
-  manager: SendManager,
-  to: string,
-  callerSessionId: string | undefined,
-  allScope: boolean | undefined,
-): SendToolResult | undefined {
-  if (callerSessionId === undefined || allScope === true) return undefined
-  const record = resolveListedTask(manager, to)
-  if (record === undefined) return undefined
-  if (callerSessionId === record.parent_session_id || callerSessionId === record.root_session_id) return undefined
-  return toolResult(
-    `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`,
-    {
-      kind: "scope_denied",
-      task_id: record.task_id,
-      owning_session_id: record.parent_session_id,
-      reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`,
-    },
-  )
-}
-
-function resolveListedTask(
-  manager: SendManager,
-  to: string,
-): ReturnType<SendManager["list"]>[number]["record"] | undefined {
-  const listed = manager.list({ scope: "all" })
-  return (
-    listed.find((entry) => entry.record.task_id === to)?.record ??
-    listed.find((entry) => entry.record.name === to)?.record
-  )
+  if (callerSessionId === undefined) return []
+  return manager
+    .list({ scope: "parent-session", session_id: callerSessionId })
+    .map((listed) => listed.record.name ?? listed.record.task_id)
 }
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
@@ -174,13 +136,6 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         task_id: outcome.task_id,
         agent: outcome.agent,
         message: outcome.message,
-      })
-    case "scope_denied":
-      return toolResult(outcome.reason, {
-        kind: "scope_denied",
-        task_id: outcome.task_id,
-        owning_session_id: outcome.owning_session_id,
-        reason: outcome.reason,
       })
     case "not_found":
       return toolResult(outcome.reason, { kind: "not_found", reason: outcome.reason, known_tasks: [] })

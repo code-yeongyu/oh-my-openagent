@@ -16,24 +16,19 @@ afterEach(() => {
 })
 
 // Stack review 2 of #15135: the scope decision comes first. A caller outside a task's session sees only
-// steering's scope denial, at once, whatever the task's DAG claim, run status or refused-stop state.
+// steering's missing-id answer, at once, whatever the task's DAG claim, run status or refused-stop state.
 const OUTSIDER = "session-of-someone-else"
 
 const sendFromOutside = (fixture: E2eFixture, taskId: string) => send(fixture, taskId, OUTSIDER, false)
-
-function scopeDenial(taskId: string): SendOutcome {
-  return {
-    kind: "scope_denied",
-    task_id: taskId,
-    owning_session_id: parentSessionId,
-    reason: `Task ${taskId} belongs to session ${parentSessionId}; pass all_scope to send across sessions.`,
-  }
-}
 
 const MISSING = "st_00000000"
 
 function swapped<T>(value: T, input: string): T {
   return JSON.parse(JSON.stringify(value).replaceAll(MISSING, input)) as T
+}
+
+async function missingAnswer(fixture: E2eFixture, taskId: string): Promise<SendOutcome> {
+  return swapped(await sendFromOutside(fixture, MISSING), taskId)
 }
 
 describe("a task outside the caller's scope with a refused stop pending reads as missing", () => {
@@ -60,17 +55,18 @@ describe("a task outside the caller's scope with a refused stop pending reads as
     second.release()
   })
 
-  test("#given another session's task whose refused turn's stop is not confirmed #when a caller outside its session re-dispatches it #then the answer is the scope refusal and nothing of the task changes", async () => {
+  test("#given another session's task whose refused turn's stop is not confirmed #when a caller outside its session re-dispatches it #then the answer equals the missing-id answer and nothing of the task changes", async () => {
     // given
     const { fixture, runner, taskA, first } = await heldTurnPastItsBudget(roots)
     const second = runner.child("A").holdStops()
     const before = { record: fixture.taskStore.load(taskA), events: readEvents(fixture.taskStore, taskA) }
 
     // when
+    const missing = await fixture.taskManager.redispatchTask?.(MISSING, OUTSIDER)
     const answer = await fixture.taskManager.redispatchTask?.(taskA, OUTSIDER)
 
     // then
-    expect(answer).toMatchObject({ kind: "scope_denied", task_id: taskA })
+    expect(answer).toEqual(swapped(missing, taskA))
     expect({ record: fixture.taskStore.load(taskA), events: readEvents(fixture.taskStore, taskA) }).toEqual(before)
     first.release()
     second.release()
@@ -122,8 +118,8 @@ describe("a task outside the caller's scope with a refused stop pending reads as
   })
 })
 
-describe("an out-of-scope send learns nothing but the scope denial", () => {
-  test("#given a superseded attempt's resident child #when a caller outside its session sends to it #then the answer is the scope denial and the child is untouched", async () => {
+describe("an out-of-scope send learns nothing but the missing-id answer", () => {
+  test("#given a superseded attempt's resident child #when a caller outside its session sends to it #then the answer is the missing-id answer and the child is untouched", async () => {
     // given
     const runner = new ControlledRunner()
     const fixture = fixtureWith(roots, runner)
@@ -136,13 +132,13 @@ describe("an out-of-scope send learns nothing but the scope denial", () => {
     const outcome = await sendFromOutside(fixture, earlier)
 
     // then
-    expect(outcome).toEqual(scopeDenial(earlier))
+    expect(outcome).toEqual(await missingAnswer(fixture, earlier))
     expect(fixture.taskStore.load(earlier)?.status).toBe("error")
     runner.settle("A", completed("A again"))
     await fixture.wait(runId)
   })
 
-  test("#given a cancelled run's resident child #when a caller outside its session sends to it #then the answer is the scope denial and the child is untouched", async () => {
+  test("#given a cancelled run's resident child #when a caller outside its session sends to it #then the answer is the missing-id answer and the child is untouched", async () => {
     // given
     const runner = new ControlledRunner()
     const fixture = fixtureWith(roots, runner)
@@ -161,11 +157,11 @@ describe("an out-of-scope send learns nothing but the scope denial", () => {
     const outcome = await sendFromOutside(fixture, done)
 
     // then
-    expect(outcome).toEqual(scopeDenial(done))
+    expect(outcome).toEqual(await missingAnswer(fixture, done))
     expect(fixture.taskStore.load(done)?.status).toBe("completed")
   })
 
-  test("#given a current claim whose refused turn's stop is held at its gate #when a caller outside its session sends to it #then the scope denial answers while the stop is still held, and the record is untouched", async () => {
+  test("#given a current claim whose refused turn's stop is held at its gate #when a caller outside its session sends to it #then the missing-id answer comes while the stop is still held, and the record is untouched", async () => {
     // given
     const { fixture, runner, taskA, first } = await heldTurnPastItsBudget(roots)
     const second = runner.child("A").holdStops()
@@ -179,13 +175,13 @@ describe("an out-of-scope send learns nothing but the scope denial", () => {
 
     // then
     expect(settledFirst).toBe("answered while the stop was held")
-    expect(await answer).toEqual(scopeDenial(taskA))
+    expect(await answer).toEqual(await missingAnswer(fixture, taskA))
     expect(fixture.taskStore.load(taskA)?.status).toBe("completed")
     first.release()
     second.release()
   })
 
-  test("#given a plain resident child no DAG owns #when a caller outside its session sends to it #then the answer is the same scope denial", async () => {
+  test("#given a plain resident child no DAG owns #when a caller outside its session sends to it #then the answer is the same missing-id answer", async () => {
     // given
     const runner = new ControlledRunner()
     const fixture = fixtureWith(roots, runner)
@@ -206,7 +202,7 @@ describe("an out-of-scope send learns nothing but the scope denial", () => {
     const outcome = await sendFromOutside(fixture, started.task_id)
 
     // then
-    expect(outcome).toEqual(scopeDenial(started.task_id))
+    expect(outcome).toEqual(await missingAnswer(fixture, started.task_id))
     expect(fixture.taskStore.load(started.task_id)?.status).toBe("completed")
   })
 })

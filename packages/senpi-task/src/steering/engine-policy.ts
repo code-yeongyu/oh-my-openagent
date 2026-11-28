@@ -4,8 +4,17 @@ import { interactionPolicyForAgent } from "../agents"
 import { type DeferralOutlook, deferralOutlookFor } from "../lifecycle/deferred-revival-reasons"
 import { isHostSessionRecord } from "../lifecycle/host-session"
 import { nextRunEpoch, type TaskRecord } from "../state"
-import { ownsTask } from "./scope-resolver"
-import type { SendInput, SendOutcome } from "./types"
+import type { RedispatchOutcome, SendOutcome } from "./types"
+
+const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
+
+export function sendNotFound(idOrName: string): SendOutcome {
+  return { kind: "not_found", reason: `No task found for "${idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
+}
+
+export function redispatchNotFound(idOrName: string): RedispatchOutcome {
+  return { kind: "not_found", reason: `No task named ${idOrName}.` }
+}
 
 export function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined {
   const agentType = record.agent_type
@@ -13,17 +22,6 @@ export function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined
   const policy = interactionPolicyForAgent(agentType)
   if (policy?.oneShot !== true) return undefined
   return { kind: "one_shot_agent", task_id: record.task_id, agent: agentType, message: policy.sendDenialReminder }
-}
-
-export function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {
-  if (input.callerSessionId === undefined || input.allScope === true) return undefined
-  if (ownsTask(input.callerSessionId, record)) return undefined
-  return {
-    kind: "scope_denied",
-    task_id: record.task_id,
-    owning_session_id: record.parent_session_id,
-    reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`,
-  }
 }
 
 const DEFERRAL_OUTLOOK_TEXT: Readonly<Record<DeferralOutlook, string>> = {
