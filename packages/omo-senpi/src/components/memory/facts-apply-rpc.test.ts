@@ -12,7 +12,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
-import { ONBOARDING_SCAN_RUNTIME_FILE } from "../onboarding/scan-component"
+import { ONBOARDING_SCAN_RUNTIME_FILE } from "../onboarding/scan-runtime-loader"
 import { snapshotTree } from "../onboarding/understand.test-support"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import {

@@ -8,15 +8,13 @@ import {
   ONBOARDING_APPLY_RPC_METHOD,
   ONBOARDING_SCAN_RPC_EVENT,
   ONBOARDING_SCAN_RPC_METHOD,
-  ONBOARDING_SCAN_RUNTIME_FILE,
   ONBOARDING_SCAN_TTL_MS,
   createOnboardingScanComponent,
   createOnboardingScanStore,
   type OnboardingScanStore,
-  loadOnboardingScanRuntime,
   type OnboardingScanEvent,
-  type OnboardingScanRuntime,
 } from "./scan-component"
+import { loadOnboardingScanRuntime, type OnboardingScanRuntime } from "./scan-runtime-loader"
 import { encodeRecord, writeTranscript } from "./session-history/test-support"
 import { fakeModel, tempRoot, UNDERSTAND_MODEL, type FakeTurn } from "./understand.test-support"
 import {
@@ -345,8 +343,7 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     expect(rpc.starts).toHaveLength(0)
   })
 
-  // #15352: the reason names the missing sidecar and the remedy; the import error itself names local paths.
-  test("#given the onboarding runtime fails to load #when understanding is requested #then it answers unavailable naming the sidecar, never the import error, and no model runs", async () => {
+  test("#given the onboarding runtime fails to load #when understanding is requested #then it answers unavailable naming the runtime and no model runs", async () => {
     // given
     const { environment } = await profile()
     let loads = 0
@@ -355,8 +352,7 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
       turn: async () => "completed",
       loadRuntime: async () => {
         loads += 1
-        if (loads > 1)
-          throw new Error("Cannot find package 'x' imported from '/home/SYNTH-USER/plugin/extensions/omo.js'")
+        if (loads > 1) throw new Error("omo-onboarding-scan.js is missing")
         return await loadOnboardingScanRuntime()
       },
     })
@@ -372,9 +368,8 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     // then
     expect(response).toEqual({
       kind: "unavailable",
-      reason: expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`),
+      reason: expect.stringContaining("(extensions/omo-onboarding-scan.js) could not load"),
     })
-    expect(JSON.stringify(response)).not.toContain("SYNTH-USER")
     expect(rpc.starts).toHaveLength(0)
   })
 

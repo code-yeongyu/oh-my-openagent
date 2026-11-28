@@ -5,21 +5,21 @@ import { sendBehindRefusedStop, type RefusedStops } from "./refused-stops"
 
 /**
  * The manager's checks before an explicit send (#11381), in the one order that discloses nothing: the
- * address is resolved once (steering's resolver, the caller's own task first); steering's scope decision
- * comes FIRST, so a caller outside the task's session sees only that refusal, synchronously, whatever the
- * record's owner or a refused turn's stop would say; then the owner's decision; then the wait behind a
- * refused turn's stop. `answer` is undefined, synchronously, when nothing applies, so such a send starts in
- * the caller's tick; every later step uses `taskId`.
+ * address is resolved once, in the caller's scope (steering's resolver), so a task outside it resolves to
+ * nothing and the send goes on to steering's missing-id answer without any record, owner or refused stop
+ * being asked; then the owner's decision; then the wait behind a refused turn's stop. `answer` is
+ * undefined, synchronously, when nothing applies, so such a send starts in the caller's tick; every later
+ * step uses `taskId`.
  */
 export function explicitSendChecks(
-  steering: Pick<SteeringEngine, "resolveSendTarget" | "scopeDenial">,
+  steering: Pick<SteeringEngine, "resolveSendTarget">,
   fence: OwnerResumeFence | undefined,
   stops: RefusedStops,
   input: SendInput,
 ): { readonly taskId: string; readonly answer?: SendOutcome | Promise<SendOutcome | undefined> } {
-  const record = steering.resolveSendTarget(input.idOrName, input.callerSessionId)
+  const record = steering.resolveSendTarget(input.idOrName, input)
   if (record === undefined) return { taskId: input.idOrName }
-  const denied = steering.scopeDenial(record, input) ?? ownerSendRefusal(fence, record)
+  const denied = ownerSendRefusal(fence, record)
   if (denied !== undefined) return { taskId: record.task_id, answer: denied }
   const waiting = sendBehindRefusedStop(stops, record.task_id)
   return waiting === undefined ? { taskId: record.task_id } : { taskId: record.task_id, answer: waiting }

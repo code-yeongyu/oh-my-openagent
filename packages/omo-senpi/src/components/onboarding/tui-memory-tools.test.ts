@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { ONBOARDING_SCAN_RUNTIME_FILE } from "./scan-component"
+import { ONBOARDING_SCAN_RUNTIME_FILE } from "./scan-runtime-loader"
 import { createOnboardingMemoryTools } from "./tui-memory-tools"
 
 describe("TUI onboarding memory tools: lazy runtime", () => {

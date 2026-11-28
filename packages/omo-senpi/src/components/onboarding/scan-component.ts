@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto"
 
+import { isPlainRecord } from "@oh-my-opencode/utils/record-type-guard"
+
 import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveMemoryModelRegistry, type ChildModelRegistry } from "../memory/model-registry-resolver"
-import { reinstallStep } from "../reinstall/reinstall-step"
 import {
   ONBOARDING_APPLY_RPC_METHOD,
   ONBOARDING_APPLY_STAGES,
@@ -13,19 +14,12 @@ import {
   type OnboardingApplyStage,
   type OnboardingScanResponse,
 } from "./scan-contract"
-import type { applyMemoryFacts } from "../memory/facts-apply-runtime"
-import type { reconcileAppliedFactsBatches } from "../memory/facts-applied-reconcile"
-import type { TuiMemoryToolsRuntime } from "./tui-memory-tools"
-import type {
-  applyRetainedScan,
-  claimOnboardingOwned,
-  migrationFactsFromScan,
-  onboardingScanContext,
-  OnboardingScanEnvironment,
-  onboardingHistorySummary,
-  readOnboardingState,
-  runOnboardingScan,
-} from "./scan-runtime"
+import type { OnboardingScanEnvironment, runOnboardingScan } from "./scan-runtime"
+import {
+  loadOnboardingScanRuntime,
+  onboardingRuntimeUnavailable,
+  type OnboardingScanRuntime,
+} from "./scan-runtime-loader"
 import type { createOnboardingUnderstandingHandlers, OnboardingUnderstandingHandlers } from "./understand-component"
 import {
   ONBOARDING_UNDERSTAND_RPC_METHOD,
@@ -33,45 +27,14 @@ import {
   ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
 } from "./understand-contract"
 import type { OnboardingUnderstandingSeams } from "./understand-start"
-import type { runTuiOnboardingScan } from "./tui-scan-runtime"
-import type { executeOnboardingSessionHistory } from "./session-history-tool-runtime"
 
 export * from "./scan-contract"
 export * from "./understand-contract"
 
-declare const OMO_SENPI_BUNDLED: boolean
-
-/** The built runtime sits beside `omo.js`, so the entry bundle carries none of `omo setup`. */
-export const ONBOARDING_SCAN_RUNTIME_FILE = "omo-onboarding-scan.js"
 /** Finished scans an apply can still use; older ones answer `unavailable`. */
 const RETAINED_SCANS = 8
-
-/**
- * Why the lazy onboarding runtime is unavailable: the missing artifact and the remedy, from fixed words. The import
- * error is never shown, because it names local paths (#15352); clients and the model read this text.
- * The artifact is spelled out instead of reusing ONBOARDING_SCAN_RUNTIME_FILE: a single use lets the bundler inline
- * that name into `new URL(...)` below, which is how the dead-file check sees the sidecar as reachable.
- */
-export function onboardingRuntimeUnavailable(): string {
-  return `The onboarding runtime (extensions/omo-onboarding-scan.js) could not load. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
-}
 /** A scan describes the machine only briefly; after this, an apply answers stale instead of writing. */
 export const ONBOARDING_SCAN_TTL_MS = 10 * 60_000
-
-export interface OnboardingScanRuntime extends TuiMemoryToolsRuntime {
-  readonly runOnboardingScan: typeof runOnboardingScan
-  readonly applyRetainedScan: typeof applyRetainedScan
-  readonly readOnboardingState: typeof readOnboardingState
-  readonly claimOnboardingOwned: typeof claimOnboardingOwned
-  readonly migrationFactsFromScan: typeof migrationFactsFromScan
-  readonly onboardingScanContext: typeof onboardingScanContext
-  readonly createOnboardingUnderstandingHandlers: typeof createOnboardingUnderstandingHandlers
-  readonly onboardingHistorySummary: typeof onboardingHistorySummary
-  readonly runTuiOnboardingScan: typeof runTuiOnboardingScan
-  readonly executeOnboardingSessionHistory: typeof executeOnboardingSessionHistory
-  readonly applyMemoryFacts: typeof applyMemoryFacts
-  readonly reconcileAppliedFactsBatches: typeof reconcileAppliedFactsBatches
-}
 
 /** The engine's own credential store (senpi `AuthStorage`), narrowed to the surface an apply uses. */
 export interface OnboardingEngineAuthStore {
@@ -140,8 +103,8 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         pi.on("session_start", (_payload, eventCtx) => {
           modelRegistry = resolveMemoryModelRegistry(eventCtx) ?? modelRegistry
           const registry =
-            isRecord(eventCtx) && isRecord(eventCtx["modelRegistry"]) ? eventCtx["modelRegistry"] : undefined
-          const candidate = isRecord(registry?.["authStorage"]) ? registry?.["authStorage"] : undefined
+            isPlainRecord(eventCtx) && isPlainRecord(eventCtx["modelRegistry"]) ? eventCtx["modelRegistry"] : undefined
+          const candidate = isPlainRecord(registry?.["authStorage"]) ? registry?.["authStorage"] : undefined
           if (
             candidate !== undefined &&
             typeof candidate["getStoragePath"] === "function" &&
@@ -165,6 +128,7 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         try {
           return await pending
         } catch {
+          // no-excuse-ok: catch - the RPC boundary: any load failure answers unavailable with the fixed sentence (#15352).
           if (understandingHandlers === pending) understandingHandlers = undefined
           return onboardingRuntimeUnavailable()
         }
@@ -200,13 +164,13 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
 
       handle(ONBOARDING_SCAN_RPC_METHOD, (request): OnboardingScanResponse => {
         const scanId = randomUUID()
-        const includeCustomProviders = isRecord(request) && request["includeCustomProviders"] === true
+        const includeCustomProviders = isPlainRecord(request) && request["includeCustomProviders"] === true
         const held: HeldScan = { outcome: Promise.resolve(undefined), finishedAt: undefined, applied: false }
         // The client learns the id from this response, so no event may precede it. The clock is
         // read when the final `done` event is emitted - inside the scan - so an apply racing in
         // right after the events never sees a stale-or-missing finish time.
         const emit = (event: unknown): void => {
-          if (isRecord(event) && event["kind"] === "done") {
+          if (isPlainRecord(event) && event["kind"] === "done") {
             held.finishedAt = now()
             // Release the scan, digests included, once it has expired even if no later call prunes it.
             setTimeout(() => {
@@ -244,8 +208,8 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
       })
 
       handle(ONBOARDING_APPLY_RPC_METHOD, async (request): Promise<OnboardingApplyResponse> => {
-        const scanId = isRecord(request) ? request["scanId"] : undefined
-        const stages = isRecord(request) ? request["stages"] : undefined
+        const scanId = isPlainRecord(request) ? request["scanId"] : undefined
+        const stages = isPlainRecord(request) ? request["stages"] : undefined
         if (typeof scanId !== "string" || !Array.isArray(stages))
           return { kind: "invalid", reason: "apply needs a scanId and a stages list" }
         const unknown = stages.filter((stage) => !isApplyStage(stage))
@@ -286,35 +250,3 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
 function isApplyStage(value: unknown): value is OnboardingApplyStage {
   return ONBOARDING_APPLY_STAGES.some((stage) => stage === value)
 }
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-export async function loadOnboardingScanRuntime(): Promise<OnboardingScanRuntime> {
-  const bundled = typeof OMO_SENPI_BUNDLED !== "undefined" && OMO_SENPI_BUNDLED
-  const loaded: unknown = await import(
-    new URL(bundled ? ONBOARDING_SCAN_RUNTIME_FILE : "scan-runtime.ts", import.meta.url).href
-  )
-  if (!isRecord(loaded)) throw new Error("onboarding scan runtime did not load")
-  const missing = RUNTIME_EXPORTS.filter((name) => typeof loaded[name] !== "function")
-  if (missing.length > 0) throw new Error(`onboarding scan runtime is missing ${missing.join(", ")}`)
-  return loaded as unknown as OnboardingScanRuntime
-}
-
-const RUNTIME_EXPORTS: readonly (keyof OnboardingScanRuntime)[] = [
-  "runOnboardingScan",
-  "migrationFactsFromScan",
-  "applyRetainedScan",
-  "createOnboardingUnderstandingHandlers",
-  "onboardingHistorySummary",
-  "onboardingScanContext",
-  "readOnboardingState",
-  "claimOnboardingOwned",
-  "runTuiOnboardingScan",
-  "executeOnboardingSessionHistory",
-  "applyMemoryFacts",
-  "reconcileAppliedFactsBatches",
-  "executeOnboardingUnderstand",
-  "executeOnboardingMemoryApply",
-]

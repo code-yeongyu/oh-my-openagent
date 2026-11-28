@@ -1394,6 +1394,7 @@
     "packages/omo-senpi/src/components/onboarding/index.ts",
     "packages/omo-senpi/src/components/onboarding/scan-component.ts",
     "packages/omo-senpi/src/components/onboarding/scan-contract.ts",
+    "packages/omo-senpi/src/components/onboarding/scan-runtime-loader.ts",
     "packages/omo-senpi/src/components/onboarding/scan-runtime.ts",
     "packages/omo-senpi/src/components/onboarding/session-history-rpc.ts",
     "packages/omo-senpi/src/components/onboarding/session-history-runtime-loader.ts",
