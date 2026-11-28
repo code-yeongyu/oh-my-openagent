@@ -65,8 +65,9 @@ export function createOnboardingMemoryTools(options: TuiMemoryToolsOptions): {
   const runtime = async (): Promise<TuiMemoryToolsRuntime | string> => {
     try {
       return await options.loadRuntime()
-    } catch (error) {
-      return `The onboarding runtime could not load (${error instanceof Error ? error.message : String(error)}); continue with the scan rows only.`
+    } catch {
+      // This text reaches the model, and the import error names local paths (#15352).
+      return "The onboarding runtime could not load; continue with the scan rows only."
     }
   }
 
