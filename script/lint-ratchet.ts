@@ -5,6 +5,17 @@ import * as NodeProcess from "node:process"
 
 import { parseSync } from "oxc-parser"
 
+import {
+  compareValues,
+  describeValueChange,
+  type FileValues,
+  type Finding,
+  FLAKE_MASKING,
+  fileValues,
+  flakeMaskingFindings,
+  type Values,
+} from "./lint-ratchet-values.ts"
+
 // The strictness rules every repo enforces, plus the landmines testing rules (ported from
 // interfere-inc/landmines, MIT; no-module-mock extends its no-test-doubles to bun's mock.module). This repo still has hundreds of old sites, so they ratchet: each
 // file's count must match the baseline exactly. A rise fails, and so does a drop until the baseline
@@ -113,8 +124,14 @@ const run = (root: string, command: string, args: readonly string[]) =>
   NodeChildProcess.spawnSync(command, args, { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
 
 // A diagnostic with no rule code is a parse error: that file's findings cannot be counted. A file
-// oxlint was given but did not lint (`skipped`) cannot be counted either.
-type Lint = { readonly counts: Counts; readonly unparsed: readonly string[]; readonly skipped: number }
+// oxlint was given but did not lint (`skipped`) cannot be counted either. `findings` holds the
+// no-flake-masking findings with their values, for every file that has any (#15114).
+type Lint = {
+  readonly counts: Counts
+  readonly unparsed: readonly string[]
+  readonly skipped: number
+  readonly findings: Readonly<Record<string, readonly Finding[]>>
+}
 
 export const lint = (root: string): Lint => {
   const listed = run(root, "git", ["ls-files", "-z"])
@@ -153,17 +170,42 @@ export const lint = (root: string): Lint => {
     .filter((diagnostic) => typeof diagnostic.code !== "string")
     .map((diagnostic) => `${diagnostic.filename}: ${diagnostic.message ?? "parse error"}`)
   const counts: Record<string, Record<string, number>> = { ...countByFile(ruled, root) }
+  const findings: Record<string, Finding[]> = {}
   for (const file of files) {
-    const count = countSuppressions(file, NodeFS.readFileSync(NodePath.join(root, file), "utf8"))
+    const source = NodeFS.readFileSync(NodePath.join(root, file), "utf8")
+    const count = countSuppressions(file, source)
     if (count > 0) counts[file] = { ...counts[file], [SUPPRESSION]: count }
+    const flakeCount = counts[file]?.[FLAKE_MASKING] ?? 0
+    if (flakeCount === 0) continue
+    // The values are read by running the rule itself over the parsed file; a count that disagrees
+    // with oxlint's would mean the two read different code, so no value could be trusted.
+    const fileFindings = flakeMaskingFindings(file, source)
+    if (fileFindings.length !== flakeCount)
+      throw new Error(
+        `${file}: oxlint reports ${flakeCount} ${FLAKE_MASKING} findings, the value reader ${fileFindings.length}`,
+      )
+    findings[file] = fileFindings
   }
-  return { counts, unparsed, skipped }
+  return { counts, unparsed, skipped, findings }
 }
+
+const valuesOf = (findings: Lint["findings"]): Values =>
+  Object.fromEntries(
+    Object.keys(findings)
+      .toSorted()
+      .flatMap((file): [string, FileValues][] => {
+        const values = fileValues(findings[file] ?? [])
+        return Object.keys(values).length > 0 ? [[file, values]] : []
+      }),
+  )
 
 const main = () => {
   const root = NodePath.resolve(import.meta.dirname, "..")
   const baselinePath = NodePath.join(root, "script/lint-ratchet.baseline.json")
-  const { counts: current, unparsed, skipped } = lint(root)
+  const valuesPath = NodePath.join(root, "script/lint-ratchet.values.json")
+  const { counts: current, unparsed, skipped, findings } = lint(root)
+  const pinnedValues = (): Values =>
+    NodeFS.existsSync(valuesPath) ? JSON.parse(NodeFS.readFileSync(valuesPath, "utf8")) : {}
   if (unparsed.length > 0) {
     for (const line of unparsed) console.error(line)
     console.error("lint-ratchet: a file that fails to parse cannot be counted; fix the syntax first.")
@@ -182,29 +224,42 @@ const main = () => {
       const { increases } = compare(JSON.parse(NodeFS.readFileSync(baselinePath, "utf8")), current)
       for (const { file, rule, before, after } of increases)
         console.error(`${file}: ${rule} went up from ${before} to ${after}`)
-      if (increases.length > 0) {
-        console.error("lint-ratchet: --update only lowers counts; fix the new findings (or pass --allow-increase).")
+      const { raises } = compareValues(pinnedValues(), findings)
+      for (const raise of raises) console.error(describeValueChange(raise))
+      if (increases.length > 0 || raises.length > 0) {
+        console.error(
+          "lint-ratchet: --update only lowers counts and values; fix the new findings (or pass --allow-increase).",
+        )
         NodeProcess.exit(1)
       }
     }
     NodeFS.writeFileSync(baselinePath, `${JSON.stringify(sorted(current), null, 2)}\n`)
-    console.log(`lint-ratchet: baseline written for ${Object.keys(current).length} files`)
+    NodeFS.writeFileSync(valuesPath, `${JSON.stringify(valuesOf(findings), null, 2)}\n`)
+    console.log(`lint-ratchet: baseline and values written for ${Object.keys(current).length} files`)
     return
   }
   const baseline: Counts = JSON.parse(NodeFS.readFileSync(baselinePath, "utf8"))
   const { increases, decreases } = compare(baseline, current)
+  const { raises, lowerings } = compareValues(pinnedValues(), findings)
   for (const { file, rule, before, after } of increases)
     console.error(`${file}: ${rule} went up from ${before} to ${after}`)
+  for (const raise of raises) console.error(describeValueChange(raise))
+  if (raises.length > 0)
+    console.error(
+      "lint-ratchet: a test timeout or retry value must not go up, and every value must be a number or a const in its file; fix the test at its cause instead.",
+    )
   for (const { file, rule, before, after } of decreases)
     console.error(`${file}: ${rule} went down from ${before} to ${after}; lower the baseline in this change`)
+  for (const lowering of lowerings)
+    console.error(`${describeValueChange(lowering)}; lower the pinned value in this change`)
   if (increases.length > 0)
     console.error(`lint-ratchet: new code must not add ${RATCHET_RULES.join(", ")} or a disable comment for them.`)
-  if (decreases.length > 0 && increases.length === 0)
+  if ((decreases.length > 0 || lowerings.length > 0) && increases.length === 0 && raises.length === 0)
     console.error(
-      "lint-ratchet: run `bun run lint:ratchet:update` and commit the baseline, so removed sites cannot come back.",
+      "lint-ratchet: run `bun run lint:ratchet:update` and commit the baseline and values, so removed sites and lowered values cannot come back.",
     )
-  if (increases.length > 0 || decreases.length > 0) NodeProcess.exit(1)
-  console.log("lint-ratchet: every count matches the baseline")
+  if (increases.length > 0 || decreases.length > 0 || raises.length > 0 || lowerings.length > 0) NodeProcess.exit(1)
+  console.log("lint-ratchet: every count matches the baseline, and no pinned value went up")
 }
 
 if (import.meta.main) main()
