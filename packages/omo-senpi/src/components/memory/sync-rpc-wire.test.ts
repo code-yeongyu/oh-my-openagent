@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { registerSyncRpc } from "./sync-rpc-registration"
+import { registerSyncRpcForTest } from "./sync-rpc-test-support"
 import { createSyncRpcClaims } from "./sync-rpc-claims"
 import type { SyncRpcAccount, SyncRpcContext, SyncRpcRegistration, SyncRpcRuntime } from "./sync-rpc-ports"
 import { creatorAnchor } from "../../../../memory-core/src/sync/crypto/anchor"
@@ -163,7 +163,7 @@ async function setup(empty = false) {
         }),
     }
     const handlers = new Map<string, Parameters<SyncRpcRegistration["handle"]>[1]>()
-    const coordinator = registerSyncRpc(
+    const coordinator = registerSyncRpcForTest(
       {
         handle: (name, handler) => {
           handlers.set(name, handler)

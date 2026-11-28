@@ -9,6 +9,7 @@ import { mcpHandler, type McpOptions } from "./mcp.ts";
 import { serveStdio } from "./stdio.ts";
 import {
   describeError,
+  internalError,
   isOp,
   redactValue,
   SurfaceError,
@@ -186,7 +187,15 @@ export const runCli = async <O extends Ops>(
       ? 0
       : 2;
   } catch (error) {
-    const { kind, message, hint } = describeError(error);
+    // Any thrown value is wrapped, never rethrown, so its text still reaches the redactor; the
+    // instanceof check itself is guarded, because it throws for a revoked or trapped Proxy.
+    let reported: Error;
+    try {
+      reported = error instanceof Error ? error : internalError(error);
+    } catch {
+      reported = internalError(error);
+    }
+    const { kind, message, hint } = describeError(reported);
     await say.err(`error: ${kind}: ${message}`);
     if (hint !== undefined) await say.err(`hint: ${hint}`);
     return kind === "usage" ? 2 : 1;

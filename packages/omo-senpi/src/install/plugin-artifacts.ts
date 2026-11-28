@@ -23,6 +23,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo-telemetry-otlp.js"),
   // The sync engine sidecar and the Loro wasm it loads from beside itself.
   join("extensions", "omo-memory-sync.js"),
+  join("extensions", "omo-memory-sync-rpc.js"),
   join("extensions", "loro_wasm_bg.wasm"),
   join("extensions", "CaseFolding.txt"),
   join("extensions", "omo-thread-client.js"),

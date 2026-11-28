@@ -334,6 +334,11 @@ function isConnectRefusal(error: unknown): boolean {
   return code === "ENOENT" || code === "ECONNREFUSED"
 }
 
+/** `dialFor` found nothing to dial: the socket file (POSIX) or the pipe record (Windows) is gone. */
+function isHostUnavailable(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("host_unavailable:")
+}
+
 /**
  * The thread tools' client for every endpoint this agent dir holds: the legacy socket
  * (`resolveThreadSocket`, the operator endpoint `thread_create` opens on), every host shard (`i-*`, `p-*`)
@@ -793,6 +798,11 @@ export function createLiveThreadSurface(
       // the answer when nothing answers at all. A Windows pipe is no file, so only a terminal is judged by it there.
       if ((tui || process.platform !== "win32") && !exists(endpoint.socket))
         return degraded(endpoint, tui ? new Error("dead") : error, "dead")
+      // A host that is gone and is judged by its dial instead (a Windows pipe, or a socket file nobody serves) holds
+      // nothing either: it keeps the same `host_unavailable:<socket>` answer, never the dialed address, and is `dead`
+      // as the gateway's `liveness()` judges it, unless the host's own verdict says otherwise.
+      if (!tui && (isConnectRefusal(error) || isHostUnavailable(error)))
+        return degraded(endpoint, new Error(`host_unavailable:${endpoint.socket}`), endpoint.verdict.reason ?? "dead")
       if (isIdentityRefusal(error)) return degraded(endpoint, error, "identity_unproven")
       const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
       return degraded(
@@ -912,7 +922,7 @@ export function createLiveThreadSurface(
       )
       return "routable"
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith("host_unavailable:")) return "dead"
+      if (isHostUnavailable(error)) return "dead"
       return isConnectRefusal(error) ? "dead" : "live_unresponsive"
     }
   }

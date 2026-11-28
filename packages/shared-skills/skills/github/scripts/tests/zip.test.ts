@@ -8,7 +8,8 @@ const kindOf = (fn: () => unknown) => {
     fn();
     return "returned";
   } catch (error) {
-    return String(Reflect.get(Object(error), "kind"));
+    if (!(error instanceof Error)) throw error;
+    return String(Reflect.get(error, "kind"));
   }
 };
 const text = (data: Uint8Array) => new TextDecoder().decode(data);

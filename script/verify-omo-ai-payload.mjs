@@ -18,6 +18,7 @@ const REQUIRED_ARTIFACTS = [
   "plugin/extensions/omo.js",
   // The session gateway's SQLite store runs as a worker thread started from this sidecar beside omo.js.
   "plugin/extensions/gateway-store-worker.mjs",
+  "plugin/extensions/omo-memory-sync-rpc.js",
   // Both inline the macOS sign-in store, which finds the keychain helper two levels up (#11262).
   "plugin/extensions/omo-device-account.js",
   "plugin/extensions/omo-feedback.js",
