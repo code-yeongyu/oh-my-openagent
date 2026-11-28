@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterAll, afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -17,6 +17,14 @@ const tempDirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
+})
+
+// Staging the 220 seed notes is the slow git step (it hit the 30 s git timeout on windows-latest, #10821), so the
+// seeded repository is built once per file and each test gets a copy of it.
+let seededTemplate: Promise<string> | undefined
+const templateDirs: string[] = []
+afterAll(async () => {
+  await Promise.all(templateDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 // A fixed corpus large enough for the hybrid strategy (200+ notes), in four languages, with notes that
@@ -81,10 +89,18 @@ function rankAll(documents: readonly RecallDocument[]): unknown {
 }
 
 async function createRepo(): Promise<{ readonly dir: string; readonly repo: GitMemoryRepo; readonly store: string }> {
+  seededTemplate ??= (async () => {
+    const template = realpathSync.native(await mkdtemp(join(tmpdir(), "recall-terms-template-")))
+    templateDirs.push(template)
+    await new GitMemoryRepo({ dir: template, agentId: "recall-agent" }).init({ seedFiles: fixtureNotes() })
+    return template
+  })()
+  const template = await seededTemplate
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "recall-terms-")))
   tempDirs.push(dir)
+  await cp(template, dir, { recursive: true })
   const repo = new GitMemoryRepo({ dir, agentId: "recall-agent" })
-  await repo.init({ seedFiles: fixtureNotes() })
+  await repo.init()
   return { dir, repo, store: join(dir, ".git", RECALL_TERM_STORE_NAME) }
 }
 
