@@ -38,7 +38,9 @@ describe("the omo a session host unit renders for", () => {
     const home = homeWithRuntimes()
     const current = join(home, ".omo", "binary-runtime", "5.1.78", "omo")
     const older = join(home, ".omo", "binary-runtime", "5.1.72", "omo")
-    const omo = omoBinaryPath({ OMO_BIN: older }, { execPath: current, argv1: current, compiled: true })
+    // A compiled binary's argv[1] is its embedded entry under $bunfs, never the binary itself, so only the compiled
+    // branch can answer with execPath here.
+    const omo = omoBinaryPath({ OMO_BIN: older }, { execPath: current, argv1: "/$bunfs/root/omo", compiled: true })
     expect(omo).toBe(current)
     const unit = systemdSessionHostUnit(
       SessionHostLaunch.from({ omoBin: omo, execPath: current, agentDir: "/srv/profile-b/agent" }),
