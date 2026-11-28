@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { readRow, readRows } from "./sqlite-rows.js"
+import { describeReadFailure } from "./read-failure.js"
 import { credentialGuidance } from "./setup-guidance.js"
 import { literalConfigValue, readAuthStore, writeAuthStore } from "./auth-store.js"
 import providerMap from "./provider-map.json" with { type: "json" }
@@ -50,7 +51,7 @@ function readOpencode(path, providerMap, plan) {
       }
     }
   } catch (error) {
-    plan.notices.push(`WARN opencode: could not parse auth.json: ${error.message}`)
+    plan.notices.push(`WARN opencode: could not parse auth.json: ${describeReadFailure(error)}`)
   }
 }
 
@@ -85,7 +86,7 @@ function readSqliteStore(id, path, expectedVersion, DatabaseSync, providerMap, p
       }
     }
   } catch (error) {
-    plan.notices.push(`WARN ${id}: could not inspect agent.db: ${error.message}`)
+    plan.notices.push(`WARN ${id}: could not inspect agent.db: ${describeReadFailure(error)}`)
   } finally {
     database?.close()
   }
