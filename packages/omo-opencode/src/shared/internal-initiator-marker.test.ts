@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test"
 import {
   createInternalAgentContinuationTextPart,
   createInternalAgentTextPart,
+  createRenderedInternalAgentTextPart,
   hasInternalInitiatorMarker,
   hasInternalNoReplyMarker,
   isRealUserMessage,
@@ -92,6 +93,42 @@ describe("internal-initiator-marker", () => {
 
       // then
       expect(part.text).toBe(`\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+    })
+  })
+
+  describe("createRenderedInternalAgentTextPart", () => {
+    test("#given notification text #when creating a rendered part #then asks the client to render markdown", () => {
+      // given
+      const text = "**Background task complete**"
+
+      // when
+      const part = createRenderedInternalAgentTextPart(text)
+
+      // then
+      expect(part.type).toBe("text")
+      expect(part.text).toBe(`**Background task complete**\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+      expect(part.metadata).toEqual({ render: "markdown" })
+    })
+
+    test("#given a no-reply wake #when marking the rendered part #then the render hint survives", () => {
+      // given
+      const part = createRenderedInternalAgentTextPart("Result ready")
+
+      // when
+      const marked = withInternalNoReplyMarker(part)
+
+      // then
+      expect(marked.metadata).toEqual({ render: "markdown" })
+      expect(hasInternalNoReplyMarker(marked.text)).toBe(true)
+    })
+
+    test("#given a rendered part #when checking authorship #then it stays an internal part, not a real user part", () => {
+      // given
+      const part = createRenderedInternalAgentTextPart("Result ready")
+
+      // then
+      expect(hasInternalInitiatorMarker(part.text)).toBe(true)
+      expect(isRealUserTextPart(part)).toBe(false)
     })
   })
 
