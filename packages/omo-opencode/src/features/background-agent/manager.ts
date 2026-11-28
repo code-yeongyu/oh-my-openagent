@@ -1509,6 +1509,8 @@ The fallback retry session is now created and can be inspected directly.
     // Reset startedAt on resume to prevent immediate completion
     // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
     existingTask.startedAt = new Date()
+    // The earlier run's answer stays in the session; until this run writes its own, the child is not done.
+    existingTask.runOutputSince = existingTask.startedAt.getTime()
     this.taskHistory.record(input.parentSessionId, {
       id: existingTask.id,
       sessionID: existingTask.sessionId,
@@ -1992,7 +1994,7 @@ The fallback retry session is now created and can be inspected directly.
           return resolved?.isCurrent ? resolved.task : undefined
         },
         idleDeferralTimers: this.idleDeferralTimers,
-        validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
+        validateSessionHasOutput: (id, outputSince) => this.validateSessionHasOutput(id, outputSince),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
@@ -2475,10 +2477,12 @@ The task was re-queued on a fallback model after a retryable failure.
 
   /**
    * Validates that a session has actual assistant/tool output before marking complete.
-   * Prevents premature completion when session.idle fires before agent responds.
+   * Prevents premature completion when session.idle fires before agent responds. A resumed child's session still
+   * holds its earlier run's answer, so `outputSince` counts only messages created from then on.
    */
-  private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
-    if (this.observedOutputSessions.has(sessionID)) {
+  private async validateSessionHasOutput(sessionID: string, outputSince?: number): Promise<boolean> {
+    // The earlier run of a resumed child fills this cache too, so a resumed run reads its own messages.
+    if (outputSince === undefined && this.observedOutputSessions.has(sessionID)) {
       return true
     }
 
@@ -2491,9 +2495,15 @@ The task was re-queued on a fallback model after a retryable failure.
         this.directory,
       )
 
-      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, {
-        preferResponseOnMissingData: true,
-      })
+      const all = normalizeSDKResponse(
+        response,
+        [] as Array<{ info?: { role?: string; time?: { created?: number } } }>,
+        {
+          preferResponseOnMissingData: true,
+        },
+      )
+      const messages =
+        outputSince === undefined ? all : all.filter((message) => (message.info?.time?.created ?? 0) >= outputSince)
 
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
@@ -3419,7 +3429,7 @@ The task was re-queued on a fallback model after a retryable failure.
             sessionGoneFromStatus && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
           const completionSource =
             sessionStatus?.type === "idle" ? "polling (idle status)" : "polling (session gone from status)"
-          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+          const hasValidOutput = await this.validateSessionHasOutput(sessionID, task.runOutputSince)
           if (!hasValidOutput) {
             if (sessionGoneThresholdReached) {
               const sessionExists = await this.verifySessionExists(sessionID)

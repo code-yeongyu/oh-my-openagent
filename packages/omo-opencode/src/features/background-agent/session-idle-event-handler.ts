@@ -7,7 +7,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
   findBySession: (sessionID: string) => BackgroundTask | undefined
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
-  validateSessionHasOutput: (sessionID: string) => Promise<boolean>
+  validateSessionHasOutput: (sessionID: string, outputSince?: number) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
   emitIdleEvent: (sessionID: string) => void
@@ -51,7 +51,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     return
   }
 
-  validateSessionHasOutput(sessionID)
+  validateSessionHasOutput(sessionID, task.runOutputSince)
     .then(async (hasValidOutput) => {
       if (task.status !== "running") {
         log("[background-agent] Task status changed during validation, skipping:", {
