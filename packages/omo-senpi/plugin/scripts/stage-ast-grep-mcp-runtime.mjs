@@ -41,7 +41,6 @@ export async function stageAstGrepMcpRuntime(options = {}) {
         {
           sha256: stagedSha256,
           mode: stagedStat.mode & 0o777,
-          stagedAtUtc: new Date().toISOString(),
         },
         null,
         2,
@@ -143,9 +142,7 @@ async function readManifest(manifestPath) {
     parsed === null ||
     typeof parsed !== "object" ||
     !/^[a-f0-9]{64}$/.test(parsed.sha256) ||
-    !Number.isInteger(parsed.mode) ||
-    typeof parsed.stagedAtUtc !== "string" ||
-    Number.isNaN(Date.parse(parsed.stagedAtUtc))
+    !Number.isInteger(parsed.mode)
   ) {
     throw new Error(`ast-grep-mcp runtime stale: manifest is malformed: ${manifestPath}`)
   }
