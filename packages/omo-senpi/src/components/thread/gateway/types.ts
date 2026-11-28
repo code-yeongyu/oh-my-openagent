@@ -298,7 +298,10 @@ export type GatewayDeliveryDelivery =
  * human must answer on that device, a hold on the session, or the wake of a session no engine runs. `device` is the account
  * device it waits on; absent when this install has no device identity (#13014).
  */
-export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
+export type DeliveryWait = {
+  readonly kind: "approval" | "hold" | "wake" | "host_identity_unproven"
+  readonly device?: string
+}
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"
