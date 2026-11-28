@@ -12,7 +12,7 @@ Codex plugin that runs [`@code-yeongyu/comment-checker`](https://github.com/code
 | `write`, `edit`, `multi_edit`, or `multiedit` succeeds | maps the Codex payload to the native checker hook input |
 | non-edit tool succeeds | ignored |
 | checker exits `2` | returns Codex `PostToolUse` blocking feedback so the model fixes or explains the warning |
-| checker binary missing or unavailable on the current platform | emits no hook output |
+| checker binary missing or unavailable on the current platform | never blocks; the first edit in each session adds context telling Codex that edits are not checked and that `npx lazycodex-ai install` installs the checker |
 | checker exits unexpectedly | leaves hook output unchanged |
 
 Deletes are ignored because they cannot introduce new comments.

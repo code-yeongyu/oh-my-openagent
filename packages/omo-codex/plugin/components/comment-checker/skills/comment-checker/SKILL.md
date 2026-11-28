@@ -13,4 +13,4 @@ When comment-checker reports a warning after a patch, Codex receives blocking fe
 
 - No MCP tool is exposed.
 - Non-edit tools are ignored by this plugin.
-- Missing checker binaries emit no hook output so normal Codex work can continue.
+- A missing checker binary never blocks an edit, so normal Codex work can continue. The first edit in each session adds a notice that edits are not being checked; tell the user once and name the install step it gives.
