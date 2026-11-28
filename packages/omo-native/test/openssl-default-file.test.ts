@@ -127,6 +127,16 @@ const fixtures = [
   },
   { id: "mid-cr", text: rootPem + "plain\rtext\n", expected: dropped("pem-noncanonical", 1, true) },
   { id: "form-feed", text: rootPem + "plain\ftext\n", expected: dropped("pem-noncanonical", 1, true) },
+  {
+    id: "long-description-before-root",
+    text: `        Subject: ${"descriptive text ".repeat(40)}\n${rootPem}`,
+    expected: kept,
+  },
+  {
+    id: "long-description-between-blocks",
+    text: `${pem(hex("3000"), "OTHER")}\n# ${"descriptive text ".repeat(40)}\n${rootPem}`,
+    expected: { ...kept, certificates: [{ der: rootDer, index: 1 }] },
+  },
   // Fedora's tls-ca-bundle.pem carries UTF-8 comment lines between blocks; PEM_read_bio skips text outside blocks.
   {
     id: "non-ascii-comment",
