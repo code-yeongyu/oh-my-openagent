@@ -182,11 +182,19 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
         details,
       )
     case "not_wakeable":
-    case "sender_not_admitted":
       return fail(
         "not_resumable",
         `Device ${device} cannot wake that session (${reason}).`,
         "Address another thread.",
+        details,
+      )
+    case "sender_not_admitted":
+      // The refusal is of this device, not of the session: another thread fails the same way, so pointing
+      // elsewhere cannot help (#15276).
+      return fail(
+        "not_resumable",
+        `Device ${device} cannot wake that session (${reason}).`,
+        `Send from the machine that holds the thread, or ask the owner of ${device} to admit this one.`,
         details,
       )
     case "queue_full":
