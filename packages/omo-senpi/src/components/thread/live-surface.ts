@@ -10,6 +10,7 @@ import {
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
 import { holderVersion } from "./tools/thread-state"
+import { isIdentityRefusal } from "./tools/session-error"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { readDiskSessionAsync, type AddressBookHost, type DiskSession } from "./address-book"
@@ -699,7 +700,7 @@ export function createLiveThreadSurface(
   const degraded = async (
     endpoint: KnownEndpoint,
     error: unknown,
-    reason: "live_unresponsive" | "dead" | null,
+    reason: "live_unresponsive" | "dead" | "identity_unproven" | null,
   ): Promise<EndpointListing> => {
     // One file at a time for this endpoint, off the event loop: a host that died holding many claims costs time, not file
     // descriptors. listView lists endpoints concurrently, so open files are bounded by the endpoint count (#13579, #13584).
@@ -714,7 +715,8 @@ export function createLiveThreadSurface(
     return {
       host: {
         socket: endpoint.socket,
-        error: error instanceof Error ? error.message : String(error),
+        // An identity refusal is kept whole: its fixed session sentence, not its message, is what a session is told.
+        error: reason === "identity_unproven" ? error : error instanceof Error ? error.message : String(error),
         endpoint_kind: endpoint.kind,
         alive: false,
         reason,
@@ -784,6 +786,7 @@ export function createLiveThreadSurface(
     } catch (error) {
       // A terminal removes its socket when it exits, so a registered terminal whose socket is gone has ended.
       if (tui && !exists(endpoint.socket)) return degraded(endpoint, new Error("dead"), "dead")
+      if (isIdentityRefusal(error)) return degraded(endpoint, error, "identity_unproven")
       const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
       return degraded(
         endpoint,
