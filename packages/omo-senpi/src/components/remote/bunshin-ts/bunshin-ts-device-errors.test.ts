@@ -1,3 +1,5 @@
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { describe, expect, it } from "bun:test"
 
 import {
@@ -160,7 +162,12 @@ describe("bunshin-ts device operation failures", () => {
   })
 
   it("#given no connected device service and no hub #when the transport is picked #then no_transport names the next action", async () => {
-    const caught: unknown = await pickTransport({}, { relayStatus: async () => ({ connected: false }) }).then(
+    // An env naming its own home: the service it names is not connected (the shipped caller passes process.env).
+    const home = join(tmpdir(), "bunshin-ts-no-service-home")
+    const caught: unknown = await pickTransport(
+      { HOME: home, USERPROFILE: home },
+      { relayStatus: async () => ({ connected: false }) },
+    ).then(
       () => undefined,
       (error: unknown) => error,
     )

@@ -63,7 +63,14 @@ function fakes(overrides: Partial<{ store: Credentials | null; request: (path: s
   return { ports, calls, reads }
 }
 
-const sdkWith = (ports: OmoSdkPorts) => createOmoSdk({ env: { OMO_SERVICE_API_URL: ORIGIN }, cwd: tmpdir(), ports })
+// The env names a home of its own: an SDK given an env resolves its device service there, never this process's home.
+const SANDBOX_HOME = join(tmpdir(), "omo-sdk-test-home")
+const sdkWith = (ports: OmoSdkPorts) =>
+  createOmoSdk({
+    env: { OMO_SERVICE_API_URL: ORIGIN, HOME: SANDBOX_HOME, USERPROFILE: SANDBOX_HOME },
+    cwd: tmpdir(),
+    ports,
+  })
 
 const errorOf = <T>(result: OmoResult<T>) => {
   if (result.kind !== "error") throw new Error(`expected an error, got ${JSON.stringify(result)}`)

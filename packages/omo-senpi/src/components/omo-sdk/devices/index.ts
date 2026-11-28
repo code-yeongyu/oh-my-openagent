@@ -2,6 +2,7 @@ import { ApiRefusal, type LiveDevice, renameDevice } from "@oh-my-opencode/omo-o
 import { type DeviceRow, type RemoteClientDeps, type RemoteFailure, remoteClientForSession } from "../../remote"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import type { AccountAccess } from "../access"
+import { noDeviceServiceHome } from "../device-service"
 import { ok, type OmoResult, refused } from "../result"
 
 export type { LiveDevice }
@@ -20,7 +21,7 @@ export type DevicesApi = {
 }
 
 export type DeviceListing = {
-  readonly stateDir: () => string
+  readonly stateDir: () => string | undefined
   readonly timers?: RemoteClientDeps["timers"]
 }
 
@@ -77,9 +78,11 @@ export function createDevicesApi(access: AccountAccess, listing: DeviceListing):
       // or a credential store that cannot be read refuses before any device-service connection opens.
       const account = await access.signedIn(async () => undefined)
       if (account.kind === "error") return account
+      const stateDir = listing.stateDir()
+      if (stateDir === undefined) return noDeviceServiceHome()
       const client = remoteClientForSession(SENDER, {
         version: createOmoNativeProductConfig().packageVersion,
-        stateDir: listing.stateDir(),
+        stateDir,
         ...(listing.timers === undefined ? {} : { timers: listing.timers }),
       })
       try {

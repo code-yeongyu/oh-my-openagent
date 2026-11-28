@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { type Credentials, KeychainLockedError } from "@oh-my-opencode/omo-opencode/service-auth"
 import { closeClients, type FakeClock, fakeClock, startModeOwner, startOwner } from "../remote/testing/fake-service"
+import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
 import { createOmoSdk, type OmoErrorCode, type OmoResult, type OmoSdk } from "."
 
 // devices.list is the remote module's devices.list (omo#13413, one listing path): the omo SDK builds a session client
@@ -44,6 +45,13 @@ const sdkOn = (stateDir: string, clock: FakeClock = fakeClock(), account: Accoun
   })
   sdks.push(sdk)
   return sdk
+}
+
+// The service's own dir under a temp home, created as the service creates it (private), so a fake owner can listen there.
+const serviceDirUnder = (env: Readonly<Record<string, string>>, home: string): string => {
+  const dir = deviceServiceStateDir(process.platform, env, home)
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  return dir
 }
 
 const errorOf = <T>(result: OmoResult<T>) => {
@@ -138,6 +146,78 @@ describe("omo SDK devices.list through the remote module", () => {
 
     expect(error.code).toBe("device_service_unavailable")
     expect(error.details).toMatchObject({ code: "host_unavailable" })
+  })
+
+  // A root built with an environment reaches the device service that environment names, never the process's own home:
+  // a sandbox env (a test, a script) must not reach the machine's real device service (credential safety).
+  test("#given an env whose home is a temp home and no home option #when devices.list runs #then the service under that home answers", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-sdk-env-home-"))
+    dirs.push(home)
+    const env = { HOME: home, USERPROFILE: home }
+    const owner = await startOwner(undefined, serviceDirUnder(env, home))
+    const sdk = createOmoSdk({
+      env,
+      cwd: tmpdir(),
+      ports: {
+        desktopLaunch: () => false,
+        credentialStore: { read: SIGNED_IN_ACCOUNT.read },
+        remoteTimers: fakeClock(),
+      },
+    })
+    sdks.push(sdk)
+
+    const result = await sdk.devices.list()
+
+    expect(result.kind).toBe("ok")
+    expect([...owner.state.conns].map((conn) => conn.client()?.name)).toEqual(["omo"])
+  })
+
+  test("#given a state dir in the process env and a root given its own env without one #when devices.list runs #then the process's state dir does not leak in", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-sdk-env-home-"))
+    const leaked = mkdtempSync(join(tmpdir(), "omo-sdk-process-state-"))
+    dirs.push(home, leaked)
+    const env = { HOME: home, USERPROFILE: home }
+    const own = await startOwner(undefined, serviceDirUnder(env, home))
+    const other = await startOwner(undefined, leaked)
+    const before = process.env["OMO_DEVICE_SERVICE_STATE_DIR"]
+    process.env["OMO_DEVICE_SERVICE_STATE_DIR"] = leaked
+    try {
+      const sdk = createOmoSdk({
+        env,
+        cwd: tmpdir(),
+        ports: {
+          desktopLaunch: () => false,
+          credentialStore: { read: SIGNED_IN_ACCOUNT.read },
+          remoteTimers: fakeClock(),
+        },
+      })
+      sdks.push(sdk)
+
+      expect((await sdk.devices.list()).kind).toBe("ok")
+      expect(own.state.conns.size).toBe(1)
+      expect(other.state.conns.size).toBe(0)
+    } finally {
+      if (before === undefined) delete process.env["OMO_DEVICE_SERVICE_STATE_DIR"]
+      else process.env["OMO_DEVICE_SERVICE_STATE_DIR"] = before
+    }
+  })
+
+  test("#given an env that names no home and no state dir #when devices.list runs #then it refuses instead of reaching the process's own home", async () => {
+    const sdk = createOmoSdk({
+      env: { PATH: "/usr/bin" },
+      cwd: tmpdir(),
+      ports: {
+        desktopLaunch: () => false,
+        credentialStore: { read: SIGNED_IN_ACCOUNT.read },
+        remoteTimers: fakeClock(),
+      },
+    })
+    sdks.push(sdk)
+
+    expect(errorOf(await sdk.devices.list())).toMatchObject({
+      code: "device_service_unavailable",
+      details: { code: "no_home" },
+    })
   })
 
   test("#given a closed SDK #when devices.list runs #then it answers internal_error and opens no connection", async () => {
