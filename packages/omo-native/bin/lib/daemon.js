@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { observedLaunch, withProductLaunchSpec } from "./host-launch.js"
 import {
   parseEngineLine,
   parseStoreArgs,
@@ -14,6 +15,7 @@ import { runAdoptCommand } from "./daemon-adopt.js"
 import { loadThreadSdk } from "./thread.js"
 import { blockingPause, DAEMON_EXIT, readTimeoutSeconds } from "./daemon-args.js"
 import { readDaemonConfig } from "./daemon-config.js"
+import { daemonSubcommands as SUBCOMMANDS, daemonUsage as USAGE, hostHelp } from "./host-help.js"
 
 export { DAEMON_EXIT } from "./daemon-args.js"
 export { daemonReportLines } from "./daemon-doctor-report.js"
@@ -31,28 +33,8 @@ export { daemonReportLines } from "./daemon-doctor-report.js"
  * gets an exit code it can branch on without reading prose.
  */
 
-const SUBCOMMANDS = new Set(["run", "adopt", "status", "stop", "handoff", "gc", "rollback-prepare"])
 /** The subcommands that can bring a host into existence, and therefore need omo's argv source. */
 const NEEDS_SPEC = new Set(["run", "handoff"])
-
-const USAGE = [
-  "usage: omo daemon <run|adopt|status|stop|handoff|gc|rollback-prepare> [options]",
-  "",
-  "  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)",
-  "  adopt     take a session a host holds into this terminal (--interrupt, --force)",
-  "  status    report who is serving and which sessions exist",
-  "  stop      end the daemon; --drain lets in-flight work finish first",
-  "  handoff   hand the socket to this build, keeping live sessions",
-  "  gc        remove dead endpoint state; --prune-store-index drops missing store paths",
-  "  rollback-prepare migrate retained task records back to rpc.sock before downgrading",
-  "",
-  "  --json            print the engine's JSON line instead of a summary",
-  "  --no-upgrade      never hand off, even from an older build",
-  "  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)",
-  "  --include-workers include subagent sessions in status",
-  "  --all             apply stop to every discovered endpoint",
-  "  --wait            with stop --drain --all, wait for generations and claims to end",
-].join("\n")
 
 /**
  * The policy the engine is allowed to apply. A flag beats config, config beats the default,
@@ -71,10 +53,10 @@ function resolvePolicy(args, config) {
  */
 const ENGINE_SUBCOMMAND = { run: "ensure", status: "status", stop: "stop", handoff: "handoff" }
 
-function buildArgs(subcommand, args, { specPath, policy }) {
+function buildArgs(subcommand, args, { pluginRoot, policy }) {
   const engineArgs = ["host", ENGINE_SUBCOMMAND[subcommand], "--json"]
   if (subcommand === "run" || subcommand === "handoff") {
-    engineArgs.push("--launch-spec", specPath, "--policy", policy)
+    return [...withProductLaunchSpec(engineArgs, pluginRoot), "--policy", policy]
   }
   if (subcommand === "stop" && args.includes("--drain")) engineArgs.push("--drain")
   if (subcommand === "status" && args.includes("--include-workers")) engineArgs.push("--include-workers")
@@ -143,8 +125,9 @@ export function runDaemonCommand(args, options) {
   const { engine, migration, pluginRoot, agentDir, env, stdout, stderr, platform } = options
   const subcommand = args[0]
 
-  if (subcommand === "--help" || subcommand === "-h") {
-    stdout.write(`${USAGE}\n`)
+  const help = hostHelp(["daemon", ...args])
+  if (help !== undefined) {
+    stdout.write(`${help}\n`)
     return DAEMON_EXIT.ok
   }
   if (subcommand === undefined) {
@@ -169,6 +152,17 @@ export function runDaemonCommand(args, options) {
   if (args.includes("--foreground")) {
     stderr.write("omo daemon: --foreground is unsupported; the engine host always detaches\n")
     return DAEMON_EXIT.usage
+  }
+  if (NEEDS_SPEC.has(subcommand)) {
+    const allowed =
+      subcommand === "run" ? ["--json", "--no-upgrade", "--pinned", "--persistent"] : ["--json", "--no-upgrade"]
+    const unknown = args.slice(1).find((arg) => !allowed.includes(arg))
+    if (unknown !== undefined) {
+      stderr.write(
+        `omo daemon ${subcommand}: unknown argument '${unknown}'\n${hostHelp(["daemon", subcommand, "--help"])}\n`,
+      )
+      return DAEMON_EXIT.usage
+    }
   }
 
   // Only the subcommands that may START something need the spec; asking who is serving, or
@@ -243,6 +237,7 @@ export function runDaemonCommand(args, options) {
       config,
       stdout,
       stderr,
+      observe: options.observe,
     })
   }
   if (subcommand === "stop" && args.includes("--all")) {
@@ -261,19 +256,25 @@ export function runDaemonCommand(args, options) {
     })
     if (outcome !== undefined) return outcome
   }
-  const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config) })
+  const engineArgs = buildArgs(subcommand, args, { pluginRoot, policy: resolvePolicy(args, config) })
   const commandEnv = hostCommandEnvironment(env, agentDir, config)
   // omo#13594: the session host unit's run. Only the host this ensure starts is pinned; task hosts drop the variable.
   if (subcommand === "run" && args.includes("--pinned")) commandEnv.SENPI_RPC_HOST_COLD_START = "persistent"
   const result = engine.run(engineArgs, { env: commandEnv })
-  const parsed = parseEngineLine(result.stdout ?? "")
-
-  if (result.stderr) stderr.write(result.stderr)
-
-  if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
-  else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
-  if (subcommand === "run" && result.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
-  return result.exitCode
+  const finish = (answer) => {
+    const parsed = parseEngineLine(answer.stdout ?? "")
+    if (answer.stderr) stderr.write(answer.stderr)
+    if (args.includes("--json") && answer.stdout) stdout.write(answer.stdout.trim() + "\n")
+    else {
+      const profile = parsed?.productPlugin ? `; product plugin: ${parsed.productPlugin}` : ""
+      stdout.write(`${summarize(subcommand, parsed, answer.exitCode)}${profile}\n`)
+    }
+    if (subcommand === "run" && answer.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
+    return answer.exitCode
+  }
+  return subcommand === "run" && options.observe
+    ? observedLaunch(result, { args: engineArgs, agentDir, pluginRoot, observe: options.observe }).then(finish)
+    : finish(result)
 }
 
 /**

@@ -4,6 +4,7 @@ import type { HostSessionCancelPort } from "../lifecycle/host-session"
 import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
+import type { PreparedLimitRevival } from "../manager/usage-limit-revival"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
@@ -42,6 +43,7 @@ export type SteeringPort = {
   // The child's run admission is stopped: the send is held in the child (no turn). Undefined: send normally.
   sendWhileRunHeld?(record: TaskRecord, message: string): Promise<SendOutcome> | undefined
   liveHandle(taskId: string): ManagedChildHandle | undefined
+  prepareRevival?(record: TaskRecord, handle: ManagedChildHandle): Promise<PreparedLimitRevival>
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
   reserveForDetachedRevive?(record: TaskRecord): ReviveReservation
@@ -113,7 +115,13 @@ export type SendOutcome =
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   // The child's run is stopped: the message is held in the child and delivered when the run resumes.
   | { readonly kind: "held"; readonly task_id: string; readonly pause_seq: number; readonly entry_id: string }
-  | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
+  | {
+      readonly kind: "not_continuable"
+      readonly task_id: string
+      readonly reason: string
+      readonly suggestion: string
+      readonly failure_kind?: "usage_limit" | "session_unavailable"
+    }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was delivered. */
   | { readonly kind: "stale"; readonly task_id: string; readonly run_epoch: number; readonly reason: string }
   // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is
@@ -132,11 +140,18 @@ export type InterruptOutcome =
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
+// The session a tool call acts for. When present, only that session's tasks resolve and an undefined
+// session id resolves nothing; the engine's own callers omit it.
+export type CallerScope = { readonly sessionId: string | undefined }
+
+export type InterruptOptions = { readonly caller?: CallerScope }
+
 export type CancelOptions = {
   readonly abort?: "request" | "skip"
   // Cancel only the run a handle minted at this epoch names: any other run answers `stale` and
   // nothing is cancelled. task_cancel never sets it.
   readonly expectedRunEpoch?: number
+  readonly caller?: CallerScope
 }
 
 export type CancelOutcome =
@@ -189,11 +204,18 @@ export type RedispatchOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
+  // The task a cancel acts on, resolved in the caller's scope by steering/scope-resolver.ts: undefined when nothing in
+  // that scope matches, so the entry answers as the engine does for a missing id.
+  resolveCancelTarget(idOrName: string, caller?: CallerScope): TaskRecord | undefined
+  // The task a send addresses: the caller's own first, then any session; scopeDenial then decides.
+  resolveSendTarget(idOrName: string, callerSessionId: string | undefined): TaskRecord | undefined
+  // The one scope decision for a send: the refusal an out-of-scope caller gets, or undefined.
+  scopeDenial(record: TaskRecord, input: SendInput): SendOutcome | undefined
   hasPendingSends(taskId: string): boolean
   hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.
   sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
+  interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.
   notifyStarted(taskId: string): Promise<void>

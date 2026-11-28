@@ -85,10 +85,11 @@ describe("deferred revival retries end with their session (omo#9498 review)", ()
       // A child the next engine queued for the same session while this attempt was still running.
       seedRecord(h.store, { task_id: "st_94980077", status: "pending", parent_session_id: "parent-1", host_pid: 2222 })
       release.resolve()
-      await h.revived
       // Subscribed before the attempt: the late suspend's own record event, not a timing guess.
       expect(await h.suspended).toEqual({ reason: "revived_after_shutdown" })
       await settled()
+      // The scoped pass sees the stop itself (#15138 delta review): the late handle is torn down, never reattached.
+      expect(h.eventLog).not.toContain(`${h.taskId}:reconcile_reattached`)
 
       expect(h.fixture.registry.get(h.taskId)).toBeUndefined()
       expect(h.store.load(h.taskId)?.residency_state).not.toBe("resident")

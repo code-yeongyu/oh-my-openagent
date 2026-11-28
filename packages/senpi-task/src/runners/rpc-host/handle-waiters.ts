@@ -1,6 +1,7 @@
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { exitTurnOutcome } from "../rpc/turn-outcome"
 import type { ChildExitOutcome } from "../types"
+import type { PendingWorkEvidence } from "../pending-async-work"
 
 export interface HandleWaiters {
   settleTurn(settled: RunnerOutcome): void
@@ -11,6 +12,7 @@ export interface HandleWaiters {
     turnOutcome: RunnerOutcome | undefined,
     exitOutcome: ChildExitOutcome | undefined,
     finalText: string | undefined,
+    evidence: PendingWorkEvidence,
   ): Promise<RunnerOutcome>
   waitForExit(outcome: ChildExitOutcome | undefined): Promise<ChildExitOutcome>
 }
@@ -31,12 +33,12 @@ export function createHandleWaiters(): HandleWaiters {
       for (const waiter of exitWaiters.splice(0)) waiter(outcome)
     },
     waitForIdle: (settled) => (settled ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve))),
-    waitForOutcome: (turnOutcome, exitOutcome, finalText) =>
+    waitForOutcome: (turnOutcome, exitOutcome, finalText, evidence) =>
       turnOutcome !== undefined
         ? Promise.resolve(turnOutcome)
         : exitOutcome === undefined
           ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
-          : Promise.resolve(exitTurnOutcome(exitOutcome, finalText)),
+          : Promise.resolve(exitTurnOutcome(exitOutcome, finalText, evidence)),
     waitForExit: (outcome) =>
       outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve)),
   }

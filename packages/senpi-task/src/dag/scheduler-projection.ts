@@ -3,7 +3,9 @@ import * as fs from "node:fs"
 import { relative } from "node:path"
 import { applyDagRunMutation } from "./manager"
 import { applyRunPause } from "./run-pause"
+import { leaseAfterEvent } from "./run-lease"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
+import { applyDiagnostic, clearHeldTrigger } from "./held-trigger-record"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
 import type { TaskRecord } from "../state"
@@ -12,15 +14,26 @@ import { TERMINAL_NODE_STATES, type PendingTerminalResult, type DagNodeWithResul
 import type { DagNode, DagNodeId, DagNodeState, DagNodeError, DagRunId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
+type TerminalResults = {
+  readonly store: DagFileStore
+  readonly pendingTerminalResults: Map<DagNodeId, PendingTerminalResult>
+  readonly now: () => number
+}
+
 export function applyDagSchedulerEvent(
   record: DagRunRecordV1,
   event: DagRunEvent,
   pendingErrors: ReadonlyMap<DagNodeId, DagNodeError> = new Map(),
-  terminalResults?: {
-    readonly store: DagFileStore
-    readonly pendingTerminalResults: Map<DagNodeId, PendingTerminalResult>
-    readonly now: () => number
-  },
+  terminalResults?: TerminalResults,
+): DagRunRecordV1 {
+  return leaseAfterEvent(projectSchedulerEvent(record, event, pendingErrors, terminalResults), event)
+}
+
+function projectSchedulerEvent(
+  record: DagRunRecordV1,
+  event: DagRunEvent,
+  pendingErrors: ReadonlyMap<DagNodeId, DagNodeError>,
+  terminalResults: TerminalResults | undefined,
 ): DagRunRecordV1 {
   if (isPausedDagEvent(event)) return applyPausedDagEvent(record, event)
   const paused = applyRunPause(record, event)
@@ -69,7 +82,7 @@ export function applyDagSchedulerEvent(
         nodes: record.nodes.map((node) => {
           if (node.id !== event.nodeId) return node
           const transitioned: DagNodeWithResult = transitionedNode(
-            node,
+            event.to === "running" ? clearHeldTrigger(node) : node,
             event.to,
             event.at,
             pendingErrors.get(event.nodeId),
@@ -122,10 +135,13 @@ export function applyDagSchedulerEvent(
     // A revived child runs again on its own session: no new task, no attempt bump, just the node
     // leaving its terminal state so the revive watcher can fold the new outcome.
     case "dag.node.steered":
-      if (event.delivery !== "revive") return { ...record, updatedAt: event.at }
       return {
         ...record,
-        nodes: record.nodes.map((node) => (node.id === event.nodeId ? { ...node, taskId: event.taskId } : node)),
+        nodes: record.nodes.map((node) =>
+          node.id !== event.nodeId
+            ? node
+            : { ...clearHeldTrigger(node), ...(event.delivery === "revive" ? { taskId: event.taskId } : {}) },
+        ),
         updatedAt: event.at,
       }
     // The retry and amend record mutations live in ONE shared reducer with the manager so a journal
@@ -134,7 +150,7 @@ export function applyDagSchedulerEvent(
     case "dag.definition.amended":
       return { ...applyDagRunMutation(record, event), updatedAt: event.at }
     case "dag.diagnostic.added":
-      return { ...record, diagnostics: [...record.diagnostics, event.diagnostic], updatedAt: event.at }
+      return applyDiagnostic(record, event)
     case "dag.run.created":
     case "dag.run.paused":
     case "dag.wave.started":

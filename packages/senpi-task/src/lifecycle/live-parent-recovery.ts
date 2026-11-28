@@ -1,11 +1,13 @@
 import { log } from "@oh-my-opencode/utils"
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
-import { retriesStopped } from "./deferred-revival"
+import { claimantAlive, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
+import { retriesStopped, stopAwareRetryContext } from "./deferred-revival"
 import { PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { isHostSessionRecord } from "./host-session"
 import type { IdleReclaimerTimer, LifecycleDeps } from "./port"
 import { reconcileScopedRevival } from "./reconcile-revival"
+import { awaitsLiveParentRecovery, revivalObligation } from "./revival-pending"
 import { isSuspendedResidency } from "./revival-selection"
 import { newestSessionPath } from "./session-path"
 import { suspendHandle } from "./shutdown"
@@ -26,7 +28,11 @@ type Episode = {
   deadlineAttempted: boolean
 }
 
-export function startLiveParentRecovery(context: LifecycleContext, subscribe: LifecycleDeps["onStoreMutation"]) {
+export function startLiveParentRecovery(
+  context: LifecycleContext,
+  subscribe: LifecycleDeps["onStoreMutation"],
+  inspected: () => void = () => undefined,
+) {
   const episodes = new Map<string, Episode>()
   let timer: IdleReclaimerTimer | undefined
   let disposed = false
@@ -41,25 +47,13 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
   }
 
   function eligible(record: TaskRecord): boolean {
-    // All suspension causes (including old records with none) qualify. Terminal statuses, notably
-    // interrupted and completed idle evictions, do not represent unfinished runs. Accepted user
-    // cancels retain their existing confirmed-stop semantics.
-    return (
-      owned(record) &&
-      (record.status === "pending" || record.status === "running") &&
-      (record.residency_state !== "resident" ||
-        record.suspension_reason !== undefined ||
-        (record.recovery_deadline_at !== undefined && context.registry.get(record.task_id) === undefined) ||
-        isSuspensionExpiry(record)) &&
-      record.cancel_requested === undefined &&
-      (record.killed !== true || isSuspensionExpiry(record))
-    )
+    return owned(record) && awaitsLiveParentRecovery(context, record)
   }
 
   async function attempt(record: TaskRecord, episode: Episode): Promise<void> {
+    const attemptable = () => eligible(record) && context.registry.get(record.task_id) === undefined
     try {
-      if (!eligible(record)) return
-      if (context.registry.get(record.task_id) !== undefined) return
+      if (!attemptable()) return
       const expired = context.now() >= episode.deadline
       if (
         isSuspensionExpiry(record) ||
@@ -73,11 +67,13 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
       if (expired) episode.deadlineAttempted = true
       // A live foreign owner may release its claim within the budget. Do not start a second run
       // beside it; at expiry the normal stop/close path must end it (or disclose unconfirmed close).
-      if (
-        record.host_pid !== undefined &&
-        record.host_pid !== context.hostPid &&
-        context.signaller.isAlive(record.host_pid)
-      ) {
+      const observing = observeRecordOwners(context.ownerProcesses, [record], context.hostPid)
+      if (observing !== undefined) {
+        await observing
+        // Reading the owner's start identity is a wait: a shutdown or handle that landed meanwhile ends this attempt.
+        if (!attemptable()) return
+      }
+      if (record.host_pid !== undefined && record.host_pid !== context.hostPid && claimantAlive(context, record)) {
         if (expired) await expireSuspendedChild(context, record, () => owned(record))
         return
       }
@@ -98,7 +94,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
         if (other.task_id !== record.task_id) excludeTaskIds.add(other.task_id)
       const revival = reconcileScopedRevival(
         {
-          ...context,
+          ...stopAwareRetryContext(context, record.parent_session_id),
           deferUnresumable: true,
           reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds },
         },
@@ -165,6 +161,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
         context.registry.get(record.task_id) === undefined
       )
         scan()
+      inspected()
     }
   }
 
@@ -215,6 +212,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
           )
           .finally(() => {
             currentEpisode.expiring = false
+            inspected()
           })
         continue
       }
@@ -230,6 +228,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
       context.idleReclaimerScheduler.clearInterval(timer)
       timer = undefined
     }
+    inspected()
   }
 
   function scan(): void {
@@ -285,11 +284,14 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
         scan()
       }
     },
+    obligation: (taskId: string) =>
+      revivalObligation(context, taskId, { disposed, episode: episodes.get(taskId), eligible, scan }),
     dispose: () => {
       disposed = true
       unsubscribe?.()
       episodes.clear()
       if (timer !== undefined) context.idleReclaimerScheduler.clearInterval(timer)
+      inspected()
     },
   }
 }
