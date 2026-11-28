@@ -1,6 +1,7 @@
 import type { ExtensionFacade } from "./store-extension-facade"
 import type { RemoteReceipt, ReconcileRemoteReceiptRequest, ToolReceiptBegin } from "./store-tool-receipts"
 import type { TargetBacklog } from "./backlog"
+import type { BacklogTransferOutcome, BacklogTransferRequest } from "./store-backlog-transfer"
 import type { ReceiptOutcomeRequest } from "./store-ops"
 import type { IntakeMarkStore, SessionWaitStore } from "./session-wait-types"
 import type { WokenSessionStore } from "./woken-types"
@@ -91,6 +92,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly isReferenced: (durableId: string) => Promise<boolean>
   /** Each session's undelivered deliveries (#14428), keyed by durable id; a session holding none is absent. */
   readonly backlogs: (durableIds: readonly string[]) => Promise<Readonly<Record<string, TargetBacklog>>>
+  /** Cancels or moves one session's queued deliveries in one transaction, keyed by the request (#15187). */
+  readonly transferBacklog: (request: BacklogTransferRequest) => Promise<BacklogTransferOutcome>
   readonly journalMode: () => Promise<string>
   readonly stats: () => Promise<GatewayStoreStats>
   readonly legacyMigrated: () => Promise<number>

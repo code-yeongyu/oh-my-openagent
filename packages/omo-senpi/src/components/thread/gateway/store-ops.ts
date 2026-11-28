@@ -297,7 +297,12 @@ export async function transaction<T>(ctx: StoreContext, op: string, body: () => 
   }
 }
 
-function createMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string, allowExisting: boolean): string {
+export function createMarker(
+  ctx: StoreContext,
+  targetDurableId: string,
+  deliveryId: string,
+  allowExisting: boolean,
+): string {
   const directory = gatewayInboxDirectory(ctx.config.agent_dir, targetDurableId)
   // The marker is created eagerly, inside the transaction like a core enqueue: a committed
   // delivery always has its wake, and the rollback compensation removes it when the joined
@@ -346,7 +351,7 @@ function markerNames(ctx: StoreContext, targetDurableId: string): string[] {
   }
 }
 
-function allocateSeq(ctx: StoreContext, targetDurableId: string): number {
+export function allocateSeq(ctx: StoreContext, targetDurableId: string): number {
   const meta = ctx.sql.one(["next_seq"], "SELECT next_seq FROM session_meta WHERE durable_id = ?", [targetDurableId])
   const seq =
     meta === undefined
@@ -364,7 +369,7 @@ function allocateSeq(ctx: StoreContext, targetDurableId: string): number {
   return seq
 }
 
-function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
+export function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
   write(
     ctx,
     `INSERT INTO deliveries (${DELIVERY_COLUMNS.join(", ")}) VALUES (${DELIVERY_COLUMNS.map(() => "?").join(", ")})`,

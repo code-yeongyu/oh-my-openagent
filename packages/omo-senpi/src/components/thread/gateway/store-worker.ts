@@ -17,6 +17,7 @@ import { isClaimantDead, processStartTime } from "./process-identity"
 import { GatewaySchemaVersionError } from "./schema"
 import { isBusyError, Sql, type SqliteConnection, type SqlRow } from "./sql"
 import { readTargetBacklogs } from "./backlog"
+import { transferBacklog, type BacklogTransferRequest } from "./store-backlog-transfer"
 import * as ops from "./store-ops"
 import * as receipts from "./store-tool-receipts"
 import * as ownership from "./store-ownership"
@@ -954,6 +955,8 @@ async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Pro
       return ops.isReferenced(ctx, args as string)
     case "backlogs":
       return readTargetBacklogs(ctx, args as Parameters<typeof readTargetBacklogs>[1])
+    case "backlog_transfer":
+      return await transferBacklog(ctx, args as BacklogTransferRequest)
     case "journal_mode":
       return ops.journalMode(ctx)
     case "stats":
