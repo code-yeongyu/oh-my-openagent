@@ -13,8 +13,8 @@ import {
   readSupervisorClockNow,
   recordSupervisorGracefulDeadline,
   scheduleSupervisorDeadline,
-  signalSupervisorProcessGroup,
-  terminateSupervisorChildHard,
+  signalOwnSupervisorGroup,
+  taskkillTree,
   terminateSupervisorWin32Tree,
   type SupervisorChildExit,
 } from "./supervisor-process-identity"
@@ -34,15 +34,32 @@ function writeBootstrapStatus(status: SupervisorChildExit): void {
   }
 }
 
-export async function runChildBootstrap(runDir: string): Promise<void> {
+export async function runChildBootstrap(runDir: string, entry: string): Promise<void> {
   if (!(await readRelease())) return
   const manifest = await readRunJson<RunLaunchManifest>(join(runDir, "launch.json"))
   const platform = getSupervisorRuntimePlatform()
+  let finishGuard: (() => void) | undefined
+  if (platform === "posix") {
+    // No model exists yet and the guard may not even be reading commands. Only the
+    // detached bootstrap can enforce this deadline without relying on the handshake.
+    const cancelStartup = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () =>
+      signalOwnSupervisorGroup(process.pid, "SIGKILL"),
+    )
+    try {
+      finishGuard = await (await import("./supervisor-group-guard")).startGroupGuard(entry)
+      if (readSupervisorClockNow() >= manifest.hardDeadlineAt) signalOwnSupervisorGroup(process.pid, "SIGKILL")
+    } finally {
+      cancelStartup()
+    }
+  }
   const child = spawn(manifest.command, [...manifest.args], {
     cwd: manifest.cwd,
     env: manifest.env,
     detached: false,
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio:
+      platform === "posix" && process.platform !== "win32"
+        ? ["ignore", "inherit", "inherit", 5]
+        : ["ignore", "inherit", "inherit"],
     // The bootstrap itself runs without a console on win32, so a console-subsystem child would
     // allocate a fresh visible one for the whole run unless it is created hidden.
     windowsHide: true,
@@ -68,11 +85,12 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
       // the entire tree at the deadline, while this bootstrap stays alive to record child-exit.
       recordSupervisorGracefulDeadline(child.pid)
       killModelTree()
-    } else signalSupervisorProcessGroup(process.pid, "SIGTERM")
+    } else signalOwnSupervisorGroup(process.pid, "SIGTERM")
   })
   const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
     deadlineFired = true
-    terminateSupervisorChildHard(platform, process.pid)
+    if (platform === "win32") taskkillTree(process.pid)
+    else signalOwnSupervisorGroup(process.pid, "SIGKILL")
   })
   const status = await new Promise<SupervisorChildExit>((resolve) => {
     let settled = false
@@ -95,7 +113,10 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
     process.exitCode = 1
     return
   }
-  cancelKill()
+  const timedOut = deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt)
+  // The POSIX model can exit on SIGTERM while descendants in our group are still running.
+  // Keep the timer (and this group leader) alive so containment works without the supervisor.
+  if (platform === "win32") cancelKill()
   // Durable before it is reported: a supervisor that dies after this point loses the pipe message,
   // and recovery may only trust a tip whose child is recorded as having finished cleanly in time.
   await writeRunJsonAtomic(join(runDir, CHILD_EXIT_FILENAME), {
@@ -105,9 +126,16 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
     code: status.code,
     signal: status.signal,
     finishedAt: new Date().toISOString(),
-    timedOut: deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt),
+    timedOut,
   } satisfies RunChildExit)
   writeBootstrapStatus(status)
+  if (finishGuard && !timedOut && !reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt)) {
+    cancelKill()
+    // Our IPC closes on exit. The guard contains any remaining group members before
+    // its own witness descriptor disappears. The model's exit is already durable.
+    if (process.platform !== "win32") process.exit(0)
+    finishGuard()
+  }
 }
 
 /** A clock the bootstrap cannot read counts as past the deadline, so recovery stays closed. */

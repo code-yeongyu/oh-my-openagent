@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process"
+import { once } from "node:events"
 import { closeSync, openSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { runMemoryHook } from "@oh-my-opencode/memory-core/memory-hook"
-import type { RunOutcome } from "./run-artifacts"
+import type { RunChildExit, RunLaunchManifest, RunOutcome } from "./run-artifacts"
 import type { SupervisorChildExit } from "./supervisor-process-identity"
 
 async function runSupervisor(runDir: string): Promise<void> {
@@ -18,8 +19,7 @@ async function runSupervisor(runDir: string): Promise<void> {
     readSupervisorClockNow,
     recordSupervisorGracefulDeadline,
     scheduleSupervisorDeadline,
-    terminateSupervisorChildGracefully,
-    terminateSupervisorChildHard,
+    taskkillTree,
   } = await import("./supervisor-process-identity")
   const { publishRunOutcome } = await import("./run-outcome-publication")
   const { admitSupervisor } = await import("./supervisor-admission")
@@ -28,9 +28,13 @@ async function runSupervisor(runDir: string): Promise<void> {
   const { manifest, lease } = await admitSupervisor(runDir)
   const platform = getSupervisorRuntimePlatform()
   let childPid: number | undefined
+  let requestGroupSignal: ((signal: NodeJS.Signals) => void) | undefined
   const containChild = () => {
     try {
-      terminateSupervisorChildHard(platform, childPid, true)
+      if (childPid !== undefined) {
+        if (platform === "win32") taskkillTree(childPid, true)
+        else requestGroupSignal?.("SIGKILL")
+      }
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
       return
@@ -45,13 +49,41 @@ async function runSupervisor(runDir: string): Promise<void> {
 
   const stdoutFd = openSync(manifest.stdoutPath, "w")
   const stderrFd = openSync(manifest.stderrPath, "w")
+  const witness =
+    platform === "posix" && process.platform !== "win32"
+      ? await startContainmentWitness(() => requestGroupSignal?.("SIGKILL"))
+      : undefined
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
     detached: true,
-    stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
+    stdio: ["pipe", stdoutFd, stderrFd, "pipe", platform === "posix" ? "pipe" : "ignore", witness?.input ?? "ignore"],
     windowsHide: true,
   })
+  witness?.input.destroy()
   childPid = bootstrap.pid
+  const commands = bootstrap.stdio[4]
+  if (commands && "write" in commands) {
+    commands.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPIPE" && error.code !== "ECONNRESET") throw error
+    })
+    requestGroupSignal = (signal) => {
+      if (commands.writable) commands.write(`${signal}\n`)
+    }
+  }
+  let cancelTerm = () => {}
+  let cancelKill = () => {}
+  let bootstrapExited = false
+  bootstrap.once("exit", () => {
+    bootstrapExited = true
+    if (platform !== "posix") return
+    cancelTerm()
+    cancelKill()
+    requestGroupSignal = undefined
+  })
+  const closed = new Promise<SupervisorChildExit>((resolve, reject) => {
+    bootstrap.once("error", reject)
+    bootstrap.once("close", (code, signal) => resolve({ code, signal }))
+  })
   let modelPid: number | undefined
   let bootstrapStatus = ""
   const control = bootstrap.stdio[3]
@@ -70,45 +102,36 @@ async function runSupervisor(runDir: string): Promise<void> {
     })
   }
 
-  if (bootstrap.pid === undefined) throw new Error("child bootstrap did not receive a pid")
-  const childProcessStart = await getSupervisorProcessStart(bootstrap.pid)
+  const bootstrapPid = bootstrap.pid
+  if (bootstrapPid === undefined) throw new Error("child bootstrap did not receive a pid")
+  const childProcessStart = await getSupervisorProcessStart(bootstrapPid)
   // The pipe gate keeps the child idle until its lease ownership and ledger are durable.
-  await lease.retainFor(bootstrap.pid, childProcessStart)
+  // The supervisor releases on EOF. If it dies instead, reclaim must also prove
+  // the detached group empty, even if the reader and bootstrap have both died.
+  if (witness) await lease.retainFor(process.pid, await getSupervisorProcessStart(process.pid), bootstrapPid)
+  else await lease.retainFor(bootstrapPid, childProcessStart)
   await updateRunLedger(ledgerPath, {
-    childPid: bootstrap.pid,
+    childPid: bootstrapPid,
     childProcessStart,
   })
   bootstrap.stdin?.end("1\n")
 
   let timedOut = false
-  let hardKillFinished = Promise.resolve()
-  let finishHardKill: (() => void) | undefined
-  if (platform === "win32")
-    hardKillFinished = new Promise<void>((resolve) => {
-      finishHardKill = resolve
+  const { promise: hardKillFinished, resolve: finishHardKill } = Promise.withResolvers<undefined>()
+  if (!bootstrapExited) {
+    cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
+      timedOut = true
+      if (platform === "win32") recordSupervisorGracefulDeadline(bootstrapPid)
+      else requestGroupSignal?.("SIGTERM")
     })
-  const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
-    timedOut = true
-    if (platform === "win32") recordSupervisorGracefulDeadline(bootstrap.pid)
-    else terminateSupervisorChildGracefully(platform, bootstrap)
-  })
-  const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
-    terminateSupervisorChildHard(platform, modelPid ?? childPid)
-    finishHardKill?.()
-  })
-  const wrapperExit = await new Promise<SupervisorChildExit>((resolve, reject) => {
-    let settled = false
-    bootstrap.once("error", (error) => {
-      if (settled) return
-      settled = true
-      reject(error)
+    cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
+      if (platform === "win32") taskkillTree(modelPid ?? bootstrapPid)
+      else requestGroupSignal?.("SIGKILL")
+      finishHardKill(undefined)
     })
-    bootstrap.once("close", (code, signal) => {
-      if (settled) return
-      settled = true
-      resolve({ code, signal })
-    })
-  })
+  }
+  const wrapperExit = await closed
+  if (witness) await witness.waitForEof()
   const childExit = parseSupervisorChildExit(bootstrapStatus)
   if (platform === "win32" && timedOut && childExit === undefined) await hardKillFinished
   cancelTerm()
@@ -123,20 +146,68 @@ async function runSupervisor(runDir: string): Promise<void> {
   // the child before the supervisor's callback fires, and the cancels above would otherwise
   // erase a deadline that was in fact exceeded.
   const clockNow = readSupervisorClockNow()
+  const deadlineReached = timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt)
+  // If the pipe was lost after the atomic write, keep the model's status, not the
+  // bootstrap's exit code or the signal that ended the group.
+  const recordedExit =
+    platform === "posix" && childExit === undefined ? await readRecordedChildExit(runDir, manifest) : undefined
   const finishedAt = new Date().toISOString()
   const outcome: RunOutcome = {
     version: 1,
     runId: manifest.runId,
     attempt: manifest.attempt,
     finishedAt,
-    childExit: childExit ?? wrapperExit,
-    timedOut: timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt),
+    childExit: childExit ?? recordedExit ?? wrapperExit,
+    timedOut: deadlineReached,
   }
   await lease.release()
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
   process.exit(0)
 }
+
+/** Only the detached group has writers after spawn. Reader failure requests containment,
+ * but neither that request nor the reader's disappearance proves EOF. */
+async function startContainmentWitness(onFailure: () => void) {
+  const reader = spawn("/bin/cat", [], { detached: true, stdio: ["pipe", "ignore", "ignore"], windowsHide: true })
+  await once(reader, "spawn")
+  const exit = once(reader, "exit").then(([code, signal]) => {
+    if (code !== 0) onFailure()
+    return { code, signal }
+  })
+  return {
+    input: reader.stdin,
+    async waitForEof() {
+      const { code, signal } = await exit
+      if (code !== 0) throw new Error(`containment witness exited without EOF: ${code ?? signal}`)
+    },
+  }
+}
+
+async function readRecordedChildExit(
+  runDir: string,
+  manifest: Pick<RunLaunchManifest, "runId" | "attempt">,
+): Promise<SupervisorChildExit | undefined> {
+  const { CHILD_EXIT_FILENAME, readRunJson } = await import("./run-artifacts")
+  try {
+    const exit = await readRunJson<Partial<RunChildExit> | null>(join(runDir, CHILD_EXIT_FILENAME))
+    if (
+      exit?.version === 1 &&
+      exit.runId === manifest.runId &&
+      exit.attempt === manifest.attempt &&
+      (typeof exit.code === "number" || exit.code === null) &&
+      (typeof exit.signal === "string" || exit.signal === null)
+    ) {
+      return { code: exit.code, signal: exit.signal }
+    }
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+      throw error
+    }
+  }
+  return undefined
+}
+
 const args = process.argv.slice(2)
 try {
   if (args[0] === "--memory-hook") {
@@ -144,7 +215,10 @@ try {
   } else if (args[0] === "--child-bootstrap") {
     if (args[1] === undefined) throw new TypeError("run directory is required")
     const { runChildBootstrap } = await import("./supervisor-child-bootstrap")
-    await runChildBootstrap(args[1])
+    await runChildBootstrap(args[1], fileURLToPath(import.meta.url))
+  } else if (args[0] === "--group-guard") {
+    const { runGroupGuard } = await import("./supervisor-group-guard")
+    runGroupGuard(Number(args[1]))
   } else {
     if (args[0] === undefined) throw new TypeError("run directory is required")
     await runSupervisor(args[0])

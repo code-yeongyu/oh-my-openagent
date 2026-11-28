@@ -57,6 +57,8 @@
         "src/components/memory/sync-runtime.ts",
         // spawned by path as the supervisor in spawn-supervisor-exit.test.ts
         "src/components/memory/worker/__fixtures__/supervisor-exits-unpublished.ts",
+        // spawned by path as the signal-observing supervisor in memory-run-supervisor.ic8.test.ts
+        "src/components/memory/worker/__fixtures__/supervisor-signal-spy.ts",
         "src/components/onboarding/session-history/runtime.ts",
         "src/components/onboarding/session-history/test-support.ts",
         "src/components/onboarding/test-harness.ts",
