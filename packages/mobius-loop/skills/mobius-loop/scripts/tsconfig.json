@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": true,
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "types": ["bun-types"],
+    "skipLibCheck": true
+  },
+  "files": ["./mobius.mjs"],
+  "include": ["./*.mjs", "./*.mts", "./*.ts", "./tests/*.ts"]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "mobius-loop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A durable outcome navigation skill with a dependency-free Node engine",
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agno01/mobius-loop.git"
+  },
+  "keywords": ["pi-package", "agent-skill", "mobius-loop"],
+  "files": [
+    "skills/mobius-loop/SKILL.md",
+    "skills/mobius-loop/references/",
+    "skills/mobius-loop/scripts/*.mjs",
+    "skills/mobius-loop/scripts/*.d.mts",
+    "docs/releasing.md",
+    "LICENSE.md",
+    "NOTICE.md"
+  ],
+  "pi": {
+    "skills": ["./skills"]
+  },
+  "engines": {
+    "node": ">=24.22.2"
+  },
+  "packageManager": "bun@1.4.4",
+  "scripts": {
+    "test": "bun test --timeout 30000",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "lint": "oxlint --deny-warnings skills script test",
+    "validate": "bun script/validate.ts",
+    "check": "bun run typecheck && bun run lint && bun run validate && bun run test"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "bun-types": "1.4.4",
+    "oxlint": "1.89.0"
+  }
+}
