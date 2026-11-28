@@ -150,20 +150,23 @@ export async function withContractHost(
   const recordPath = join(keyRoot, "rpc", "keys", launchId)
   mkdirSync(join(keyRoot, "rpc", "keys"), { recursive: true, mode: 0o700 })
   for (const directory of [keyRoot, join(keyRoot, "rpc")]) chmodSync(directory, 0o700)
-  writeFileSync(
-    recordPath,
-    JSON.stringify({
-      version: 1,
-      launch_id: launchId,
-      key: key.toString("hex"),
-      pid: process.pid,
-      process_start: null,
-      endpoint: socket,
-      created_at: new Date().toISOString(),
-    }),
-    { mode: 0o600 },
-  )
-  options.prepareRecord?.(recordPath, root)
+  // Only a host that challenges publishes a key record, as senpi does; one that never challenges has none.
+  if (options.auth) {
+    writeFileSync(
+      recordPath,
+      JSON.stringify({
+        version: 1,
+        launch_id: launchId,
+        key: key.toString("hex"),
+        pid: process.pid,
+        process_start: null,
+        endpoint: socket,
+        created_at: new Date().toISOString(),
+      }),
+      { mode: 0o600 },
+    )
+    options.prepareRecord?.(recordPath, root)
+  }
   const frames: ContractHost["frames"] = []
   const mutations: Frame[] = []
   const sockets = new Set<Socket>()

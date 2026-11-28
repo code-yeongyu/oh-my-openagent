@@ -1,5 +1,6 @@
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
-import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
 import { LOST_ON_EXHAUSTION, SCOPED_RETRY_REASONS, PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { expireSuspendedChild } from "./suspended-expiry"
 import { destroyResidentTask } from "./destroy"
@@ -40,6 +41,19 @@ export function retriesStopped(context: LifecycleContext, parentSessionId: strin
   return disposedContexts.has(context) || stoppedSessions.get(context)?.has(parentSessionId) === true
 }
 
+/**
+ * The context a retry hands to a scoped reconcile pass for `parentSessionId`. The pass waits again inside (owner
+ * observation, admission lease, respawn), and every one of its `reconciliationActive` checks must see this session's
+ * stop, so admission itself is stop-aware; a retry's own post-attempt suspend stays only a fallback.
+ */
+export function stopAwareRetryContext(context: LifecycleContext, parentSessionId: string): LifecycleContext {
+  const active = context.reconcileActive
+  return {
+    ...context,
+    reconcileActive: () => active?.() !== false && !retriesStopped(context, parentSessionId),
+  }
+}
+
 /** Retry only this resumed session's child, using the same fenced admission as session_start. */
 export async function retryDeferredScopedChild(
   context: LifecycleContext,
@@ -52,6 +66,11 @@ export async function retryDeferredScopedChild(
   let expected = context.store.load(taskId)
   for (const backoffMs of context.hostRetry.deferredRetryBackoffMs) {
     await context.hostRetry.wait(backoffMs)
+    // Reading the owner's start identity is a second wait: the stop check follows the last one.
+    const observedOwner = context.store.load(taskId)
+    const observing =
+      observedOwner === null ? undefined : observeRecordOwners(context.ownerProcesses, [observedOwner], context.hostPid)
+    if (observing !== undefined) await observing
     if (retriesStopped(context, parentSessionId)) return
     const fresh = context.store.load(taskId)
     if (!canRetry(context, fresh, parentSessionId)) return
@@ -91,7 +110,7 @@ export async function retryDeferredScopedChild(
     }
     const outcomes = await reconcileScopedRevival(
       {
-        ...context,
+        ...stopAwareRetryContext(context, parentSessionId),
         deferUnresumable: context.registry.ownsRecord?.(fresh) === true || context.deferUnresumable,
         reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds },
       },
@@ -181,7 +200,5 @@ function canRetry(context: LifecycleContext, record: TaskRecord | null, parentSe
 }
 
 function foreignOwnerAlive(context: LifecycleContext, record: TaskRecord): boolean {
-  return (
-    record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
-  )
+  return record.host_pid !== undefined && record.host_pid !== context.hostPid && claimantAlive(context, record)
 }

@@ -37,7 +37,9 @@ export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean>
 // rename-then-inspect instead of unlink: rename is atomic, so exactly one reaper obtains the
 // inode. If the bytes it obtained are not the dead record it saw, another contender already
 // reaped that record and published a fresh live holder in between, so the file is handed back
-// with link (EEXIST means yet another contender republished first, and nothing is lost).
+// with link (EEXIST means yet another contender republished first, and nothing is lost: the
+// displaced holder's fence refuses once its record left the path). A tombstone a dead-owner sweep
+// collected meanwhile reads as gone, which leaves the recovery path free to publish.
 // The tombstone name must not match LEAKED_CANDIDATE_NAME in candidate-sweep.ts, otherwise a
 // concurrent stale-candidate sweep could delete it while it is still being inspected.
 async function isRecoverableOwner(owner: OwnerSnapshot, now: number, incompleteLockGraceMs: number): Promise<boolean> {
@@ -64,18 +66,28 @@ async function reclaimStaleRecoveryLock(
   }
 
   const moved = await readOwner(tombstonePath)
-  if (moved !== null && isSameOwner(moved, stale)) {
-    await unlink(tombstonePath)
+  if (moved === null) return true
+  if (isSameOwner(moved, stale)) {
+    await unlinkUnlessGone(tombstonePath)
     return true
   }
 
   try {
     await link(tombstonePath, recoveryPath)
   } catch (error) {
-    if (errorCode(error) !== "EEXIST") throw error
+    const code = errorCode(error)
+    if (code !== "EEXIST" && code !== "ENOENT") throw error
   }
-  await unlink(tombstonePath)
+  await unlinkUnlessGone(tombstonePath)
   return false
+}
+
+async function unlinkUnlessGone(target: string): Promise<void> {
+  try {
+    await unlink(target)
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") throw error
+  }
 }
 
 export async function recoverStaleOwner(

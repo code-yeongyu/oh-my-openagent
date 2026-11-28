@@ -1,5 +1,6 @@
 //! The gate run again after time passed (the busy wait, another holder of the interaction lock).
 
+use omo_computer_core::backend::Route;
 use omo_computer_safety::{Gate, GateRefusal};
 
 use super::super::{Mutation, Refused};
@@ -25,14 +26,16 @@ pub(super) fn gate_refused(refused: GateRefusal, plan: &Plan) -> (String, Refuse
 impl Session {
     /// The four steps of a re-admission: the stop reconciled through the funnel, the stop epoch
     /// read fresh, the plan (consent, lease, reservations) made again, and the gate run on that
-    /// plan's stages. Answers the fresh plan and epoch, or the refusal and its stage.
+    /// plan's stages, for the call's resolved `route`. Answers the fresh plan and epoch, or the
+    /// refusal and its stage.
     pub(super) fn readmit(
         &mut self,
         mutation: &Mutation<'_>,
+        route: &Route,
     ) -> Result<(Plan, u64), Box<(String, Refused)>> {
         self.reconcile_stop();
         let epoch = self.guard.supervisor().stop_epoch();
-        let call = (mutation.method, &mutation.call.target, mutation.route);
+        let call = (mutation.method, &mutation.call.target, route.clone());
         let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         match self
             .guard
@@ -77,15 +80,16 @@ mod tests {
             chord: None,
             force: false,
         };
+        let route = Route::BackgroundWindow { window: "101".to_owned() };
         let mutation = Mutation::exec(
             Method::Click,
             call,
             Vec::new(),
-            Route::BackgroundWindow,
+            Ok(route.clone()),
             &CallAuthority::default(),
         );
         let refused = s
-            .readmit(&mutation)
+            .readmit(&mutation, &route)
             .expect_err("the stored identity differs from the observed one");
         let (stage, out) = *refused;
         assert_eq!(stage, "Consent");

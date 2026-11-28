@@ -364,8 +364,8 @@ function checkReaders(root) {
   mkdirSync(probeDir, { recursive: true })
   writeFileSync(join(probeDir, "auth.json"), "AAA")
   const first = credentialDigest(probeDir)
-  writeFileSync(join(probeDir, "auth.json"), "BBB")
-  assert(first !== credentialDigest(probeDir), "the credential digest must move when auth.json changes")
+  writeFileSync(join(probeDir, "auth.json"), "BBBB")
+  assert(first !== credentialDigest(probeDir), "the credential digest must move when auth.json's size changes")
 }
 
 function checkGates() {

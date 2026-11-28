@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { deriveBundleGuards, withScratchHome } from "./bundle-guards"
+import { deriveBundleGuards, failingTests, withScratchHome } from "./bundle-guards"
 
 const cli = fileURLToPath(new URL("./bundle-guards.ts", import.meta.url))
 const bundlePath = "packages/omo-senpi/plugin/extensions/omo.js"
@@ -240,4 +240,29 @@ describe("bundle guard push gate (#15072)", () => {
       "script/omo-bundle-fresh.test.ts",
     ])
   })
+
+  test.each([
+    ["a relative Windows name", "D:\\a\\omo", "script\\omo-bundle-fresh.test.ts"],
+    ["an absolute drive-letter name", "D:\\a\\omo", "D:\\a\\omo\\script\\omo-bundle-fresh.test.ts"],
+    ["a drive letter in another case", "D:\\a\\omo", "d:\\a\\omo\\script\\omo-bundle-fresh.test.ts"],
+    ["an absolute POSIX name", "/srv/omo/", "/srv/omo/script/omo-bundle-fresh.test.ts"],
+    ["a dot-relative POSIX name", "/srv/omo", "./script/omo-bundle-fresh.test.ts"],
+  ])(
+    "#given bun test output naming the file as %s #when failures are named #then the file is the repo-relative POSIX path",
+    (_form, root, name) => {
+      // given
+      const output = [
+        `${name}:`,
+        "(fail) the shipped bundle carries the source marker [12.30ms]",
+        "",
+        "1 test failed:",
+      ].join("\n")
+
+      // when
+      const failures = failingTests(root, output)
+
+      // then
+      expect(failures).toEqual(["script/omo-bundle-fresh.test.ts > the shipped bundle carries the source marker"])
+    },
+  )
 })

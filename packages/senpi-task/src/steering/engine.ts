@@ -291,6 +291,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   return {
+    resolveCancelTarget: (idOrName, caller) => resolveTask(lookup, idOrName, caller),
+    resolveSendTarget: (idOrName, callerSessionId) => resolveTaskCallerFirst(lookup, idOrName, callerSessionId),
+    scopeDenial: scopeDenied,
     sendToTask,
     ...createSteeringControls(
       port,

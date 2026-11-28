@@ -7,6 +7,7 @@ import { baseSpec, cleanupProjects, launchSettled, makeManager, settings } from 
 import { normalizeSenpiTeamSpec, spawnTeamMembers } from "../team"
 import { bounded } from "../workpool/__fixtures__/admission"
 import { hostRunnerHarness } from "./rpc-host.test-support"
+import { createDagRunReservations } from "../dag/run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const harness = hostRunnerHarness()
@@ -56,6 +57,7 @@ test("workflow node wire uses the manager task ID, not the workflow node ID", as
     definition: { key: "ancestry", name: "ancestry", nodes: [{ id: "node", category: "quick", prompt: "work" }] },
   })
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store,
     taskManager: f.manager,
     initialRecord: dag.record(snapshot.runId, "nested-parent"),

@@ -23,6 +23,19 @@ impl Session {
         Refused { warning, ..refused }
     }
 
+    /// Stamps the refusal for the session's report mode (`object`), then writes its audit line
+    /// and answers it.
+    pub(super) fn refuse_stamped(
+        &mut self,
+        record: Record,
+        stage: Option<String>,
+        refused: Refused,
+        object: bool,
+    ) -> Refused {
+        let refused = self.stamp(refused, object);
+        self.refuse(record, stage, refused)
+    }
+
     /// Appends one audit line. A failure degrades the sink (every later admission refuses);
     /// it is logged and answers `write_failed`.
     pub(super) fn append_or_warn(&mut self, event: AuditEvent) -> Option<String> {
