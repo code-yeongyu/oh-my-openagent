@@ -42,13 +42,14 @@ type RunChildStopper = Pick<TaskManager, "findOwnedTasks" | "cancelTask" | "self
 
 /**
  * Stops every live child the run owns and returns what the cancel must raise, if anything (#11381).
- * The first stop of a child this controller attached, on the run it attached, keeps its deferred
- * in-process teardown (`abort: "skip"`, disposed at the outcome boundary the scheduler awaits), bound
- * to that run by `expectedRunEpoch`; any other stop - a finished node's child that resumed on its own,
- * an attached child on a run it started itself - is an outright cancel, since no outcome the
- * scheduler awaits belongs to that run. Stop completion is re-read from the run's whole live set: a
- * `cancel_pending` answer or a noop on a record that is still live is a child still running, never
- * success. The obligation stays derivable from the store, so a later cancel finds the same children.
+ * The first stop of a child this controller attached, on the run it attached, is the controller's own
+ * stop (`abort: "skip"`: the child is torn down inside the cancel, an in-process one aborted even when
+ * its turn is active, #15191), bound to that run by `expectedRunEpoch`; any other stop - a finished
+ * node's child that resumed on its own, an attached child on a run it started itself - is an outright
+ * cancel, since that run is not the one this controller attached. Stop completion is re-read from the
+ * run's whole live set: a `cancel_pending` answer or a noop on a record that is still live is a child
+ * still running, never success. The obligation stays derivable from the store, so a later cancel finds
+ * the same children.
  */
 export async function stopRunChildren(
   taskManager: RunChildStopper,
@@ -75,7 +76,7 @@ export async function stopRunChildren(
       pass.map((taskId) => {
         const task = owned.find((entry) => entry.task_id === taskId)
         const firstAttachedStop = attached.has(taskId) && !answers.has(taskId)
-        return askToStop(taskManager, taskId, reason, firstAttachedStop ? deferredTeardown(task) : undefined)
+        return askToStop(taskManager, taskId, reason, firstAttachedStop ? attachedRunStop(task) : undefined)
       }),
     )
     pass.forEach((taskId, index) => {
@@ -93,8 +94,8 @@ export async function stopRunChildren(
   return survivors.length === 0 ? undefined : new DagRunChildrenLiveError(record.runId, survivors)
 }
 
-// The run the controller attached keeps its deferred teardown; a run the child started on its own does not.
-function deferredTeardown(task: TaskRecord | undefined): CancelOptions | undefined {
+// The run the controller attached gets the controller's stop; a run the child started on its own does not.
+function attachedRunStop(task: TaskRecord | undefined): CancelOptions | undefined {
   if (task === undefined) return { abort: "skip" }
   if (task.resumed_run_epoch === task.notification.run_epoch) return undefined
   return { abort: "skip", expectedRunEpoch: task.notification.run_epoch }

@@ -11,6 +11,8 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        // run by path by src/runners/in-process/cancel-active-turn.integration.test.ts (Bun.spawn), one fresh process per case (#15191)
+        "src/runners/in-process/__fixtures__/cancel-run.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

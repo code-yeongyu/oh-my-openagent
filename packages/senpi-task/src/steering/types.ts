@@ -10,13 +10,7 @@ import type { SendScope } from "./scope-resolver"
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
 export type DestructionCause =
-  | "cancel"
-  | "cancel_without_abort"
-  | "fallback_handoff"
-  | "revive_failure"
-  | "reconcile_lost"
-  | "recovery_detach"
-  | "redispatch"
+  "cancel" | "fallback_handoff" | "revive_failure" | "reconcile_lost" | "recovery_detach" | "redispatch"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -142,6 +136,9 @@ export type CallerScope = { readonly sessionId: string | undefined }
 export type InterruptOptions = { readonly caller?: CallerScope }
 
 export type CancelOptions = {
+  // "skip" is a run controller stopping a child it attached: steering sends no abort of its own (the
+  // teardown in the same call stops the child), a finished resident is neither released nor counted for
+  // undelivered messages, and a child whose connection is recovering is cancelled now, not on reconnect.
   readonly abort?: "request" | "skip"
   // Cancel only the run a handle minted at this epoch names: any other run answers `stale` and
   // nothing is cancelled. task_cancel never sets it.

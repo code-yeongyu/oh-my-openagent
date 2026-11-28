@@ -130,7 +130,7 @@ test("#10487 #given a node whose in-process child is held on its own detached ce
   // then
   expect(child.outcome).toEqual({ status: "cancelled" })
   await within(child.session.whenDisposed, 2_000, "the held child's session to be destroyed")
-  expect(destroyed).toEqual([`${taskId}:cancel_without_abort`])
+  expect(destroyed).toEqual([`${taskId}:cancel`])
   const run = await fixture.running(runId)
   expect(run.status).toBe("cancelled")
   expect(run.nodes.find((node) => node.id === "A")?.state).toBe("cancelled")

@@ -8,7 +8,7 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
 import { createRuntimeFallbackSettings } from "../in-process/runtime-fallback-settings"
 
-type StopReason = "stop" | "error" | "toolUse"
+type StopReason = "stop" | "error" | "toolUse" | "aborted"
 
 type AssistantMessage = {
   readonly role: "assistant"
