@@ -25,5 +25,5 @@
    elif (.name as $name | $macosNames | index($name) | not) and (.name | test("macos"; "i"))
    then (if $macosRan then "success" else "no-tests" end)
    else "no-tests" end) as $result
-| [.name, $result, .html_url, (.labels | join(", "))]
+| [.name, $result, .html_url, (.labels | join(", ")), (.id // "")]
 | @tsv
