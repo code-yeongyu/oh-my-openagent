@@ -14,6 +14,9 @@ export type SessionHistoryRuntimeLoader = () => Promise<SessionHistoryRuntimeMod
 
 export const SESSION_HISTORY_RUNTIME_ARTIFACT = "extensions/omo-session-history.js"
 
+/** The sidecar did not load. Its message is built from fixed words (artifact and remedy), so callers may show it. */
+export class SessionHistoryRuntimeUnavailable extends Error {}
+
 /** One shared import per process; a failed import is not cached, so the next scan retries. */
 export function createSessionHistoryRuntimeLoader(
   importRuntime: () => Promise<SessionHistoryRuntimeModule>,
@@ -22,7 +25,7 @@ export function createSessionHistoryRuntimeLoader(
   return () => {
     pending ??= importRuntime().catch((error: unknown) => {
       pending = undefined
-      throw new Error(sessionHistoryRuntimeLoadFailure(), { cause: error })
+      throw new SessionHistoryRuntimeUnavailable(sessionHistoryRuntimeLoadFailure(), { cause: error })
     })
     return pending
   }

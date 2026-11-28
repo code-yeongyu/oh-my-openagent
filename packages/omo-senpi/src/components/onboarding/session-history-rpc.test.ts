@@ -203,13 +203,18 @@ describe("onboarding session-history rpc", () => {
     expect(host.emits).toEqual([])
   })
 
-  it("#given a scan that throws #when projects is called #then it answers unavailable with the reason", async () => {
+  // #15358: the desktop shows the reason, and a scanner error's own text names local paths.
+  it("#given a scan that throws #when projects is called #then it answers unavailable with the failure kind only", async () => {
     // given
     const host = rpcOnlyHost()
+    const path = "/home/SYNTH-USER/.claude/projects"
     registerSessionHistoryRpc(host.pi, {
       createScanner: (options: SessionHistoryOptions) => ({
         ...createSessionHistoryScanner(options),
-        scanProjects: () => Promise.reject(new Error("disk gone")),
+        scanProjects: () =>
+          Promise.reject(
+            Object.assign(new Error(`EACCES: permission denied, scandir '${path}'`), { code: "EACCES", path }),
+          ),
       }),
     })
 
@@ -222,7 +227,7 @@ describe("onboarding session-history rpc", () => {
     })
 
     // then
-    expect(reply).toEqual({ kind: "unavailable", reason: "disk gone" })
+    expect(reply).toEqual({ kind: "unavailable", reason: "EACCES" })
   })
 
   it("#given the desktop's sessions request #when answered #then it replies a scanId before any event, then pushes each outcome in wire shape and ends with done", async () => {
@@ -328,7 +333,7 @@ describe("onboarding session-history rpc", () => {
     ])
   })
 
-  it("#given a scan that fails mid-way #when sessions runs #then the outcomes so far are followed by failed with the reason", async () => {
+  it("#given a scan that fails mid-way #when sessions runs #then the outcomes so far are followed by failed with the failure kind only", async () => {
     // given
     const host = rpcOnlyHost()
     registerSessionHistoryRpc(host.pi, {
@@ -339,7 +344,7 @@ describe("onboarding session-history rpc", () => {
           counts: () => ({ found: 1, read: 0, cap: 100 }),
           async *[Symbol.asyncIterator]() {
             yield { _tag: "Skipped" as const }
-            throw new Error("transcript vanished")
+            throw new Error("transcript vanished: /home/SYNTH-USER/.codex/sessions/rollout.jsonl")
           },
         }),
       }),
@@ -360,7 +365,7 @@ describe("onboarding session-history rpc", () => {
     expect(reply).toEqual({ scanId: "scan-2" })
     expect(host.emits.map((emit) => emit.data)).toEqual([
       { scanId: "scan-2", kind: "outcome", outcome: { _tag: "Skipped" } },
-      { scanId: "scan-2", kind: "failed", reason: "transcript vanished" },
+      { scanId: "scan-2", kind: "failed", reason: "an unexpected error" },
     ])
   })
 
