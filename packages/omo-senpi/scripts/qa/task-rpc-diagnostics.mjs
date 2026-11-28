@@ -1,4 +1,6 @@
-import { execFile } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
+import { once } from "node:events"
+import { createInterface } from "node:readline"
 
 export const RECONCILE_WATCHDOG_MS = 360_000
 export const RELAUNCH_TIMEOUT_MS = 120_000
@@ -84,21 +86,40 @@ export async function withinDeadline(promise, ms, beforeTimeout) {
   }
 }
 
-export function captureCommand(file, args) {
+export function captureCommand(file, args, maxBuffer = 1024 * 1024) {
   return new Promise((resolve) => {
-    execFile(file, args, { encoding: "utf8", timeout: 5_000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(file, args, { encoding: "utf8", timeout: 5_000, maxBuffer }, (error, stdout, stderr) => {
       resolve({ stdout, stderr, error: error?.message ?? null })
     })
   })
 }
 
+const PS_DUMP_COMMAND_LIMIT = 200
+
 export async function runProcesses(rootPids, namespace) {
-  const ps = await captureCommand("ps", ["-axo", "pid=,ppid=,stat=,command="])
-  if (ps.error !== null) throw new Error(`process enumeration failed: ${ps.error}`)
-  const rows = ps.stdout.split("\n").flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)
-    return match ? [{ pid: Number(match[1]), ppid: Number(match[2]), state: match[3], command: match[4] }] : []
+  const ps = spawn("ps", ["-ww", "-axo", "pid=,ppid=,stat=,command="], {
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5_000,
   })
+  const closed = once(ps, "close")
+  let stderr = ""
+  ps.stderr.setEncoding("utf8").on("data", (chunk) => {
+    stderr = (stderr + chunk).slice(-OUTPUT_TAIL_LIMIT)
+  })
+  const rows = []
+  const lines = createInterface({ input: ps.stdout, crlfDelay: Infinity })
+  lines.on("line", (line) => {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)
+    if (match) rows.push({ pid: Number(match[1]), ppid: Number(match[2]), state: match[3], command: match[4] })
+  })
+  const [status, signal] = await closed.catch((error) => {
+    throw new Error(`process enumeration failed: ${error.message}`, { cause: error })
+  })
+  if (status !== 0) {
+    const reason = signal ? `ps terminated by ${signal}` : `ps exited with code ${status}`
+    const detail = stderr.trim()
+    throw new Error(`process enumeration failed: ${reason}${detail ? `: ${detail}` : ""}`)
+  }
   const owned = new Set(rootPids.filter(Number.isSafeInteger))
   const ancestors = new Set([process.pid])
   let ancestor = process.ppid
@@ -126,7 +147,10 @@ export async function dumpRunProcesses(rootPids, namespace) {
   if (process.platform === "win32") {
     return { tasklist: await captureCommand("tasklist.exe", ["/FO", "CSV"]), roots: rootPids }
   }
-  const processes = await runProcesses(rootPids, namespace)
+  const processes = (await runProcesses(rootPids, namespace)).map((row) => ({
+    ...row,
+    command: row.command.slice(0, PS_DUMP_COMMAND_LIMIT),
+  }))
   const sockets = await Promise.all(
     processes.map(async ({ pid }) => ({
       pid,
