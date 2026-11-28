@@ -9,7 +9,7 @@
       "packages/coding-agent/src/cli/auth-account-check.ts"
     ]
   },
-  "note": "A copy of what the engine exports at that commit, for engine.auth.check, until omo's engine pin carries @code-yeongyu/senpi/engine. The awaiting entry in authority-expected.ts fails once it does; then delete this file and import the engine's contract.",
+  "note": "A copy of what the engine exports at that commit, for engine.auth.check, until omo's engine pin exports that contract from @code-yeongyu/senpi/engine (RESULT_FREE_FIELDS, AUTH_ACCOUNT_CHECK_CODES, toSessionAuthStatus; the ./engine entry alone, as in senpi 2026.11.27, carries none of them). The awaiting entry in authority-expected.ts fails once it does; then delete this file and import the engine's contract.",
   "free_fields": [
     {
       "call": "auth.check",

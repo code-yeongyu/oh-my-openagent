@@ -15,6 +15,7 @@ import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host-key-root"
 
 // Two revivals race the runtime-fallback close from the lifecycle side, where steering's closing fence
 // does not reach: a session reload that revives the task, and a cancel that lands while a dead owner's
@@ -190,7 +191,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
         hostSessionClose: async (request) => {
           closeEntered.resolve()
           await releaseClose.promise
-          await defaultHostSessionCloser(request)
+          await defaultHostSessionCloser(FAKE_HOST_KEY_ROOT)(request)
         },
       })
       const promptsBefore = host.commands.filter((command) => command.type === "prompt").length
