@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -70,9 +70,29 @@ function otherKeyRoot(root: string): string {
   return other
 }
 
+/** A fresh path that is a symlink to `target`, so a dir spelled through it resolves to whatever `target` holds. */
+function symlinkTo(target: string): string {
+  const parent = mkdtempSync(join(tmpdir(), "rh-key-link-"))
+  roots.push(parent)
+  const link = join(parent, "link")
+  symlinkSync(target, link)
+  return link
+}
+
+const CHILD_SESSION = join("sessions", "child.jsonl")
+
+/**
+ * The host lists a session by its canonical path while omo keeps the path it asked for; the lifecycle compares the two
+ * canonically (#8932), so these checks do too. The temp root keeps its as-given spelling (macOS hands out /var/... for
+ * /private/var/...), so every key-root proof here still runs under the spelling a caller passes.
+ */
+function listedSessionPath(root: string): string {
+  return join(realpathSync(root), CHILD_SESSION)
+}
+
 function childOpen(root: string): HostSessionOpenInput {
   return {
-    sessionPath: join(root, "sessions", "child.jsonl"),
+    sessionPath: join(root, CHILD_SESSION),
     cwd: root,
     provider: "anthropic",
     modelId: "claude-opus-5",
@@ -112,7 +132,7 @@ describe.skipIf(process.platform === "win32")("a task host proven under the agen
     // then
     expect(info).toMatchObject({ protocolVersion: TASK_DAEMON_PROTOCOL_VERSION })
     expect(child.sessionId).toBeDefined()
-    expect(await liveSessionPaths(socket, launchDir)).toContain(childOpen(root).sessionPath)
+    expect(await liveSessionPaths(socket, launchDir)).toContain(listedSessionPath(root))
   })
 
   test("#given a key root that holds no record of the host's launch #when omo probes the host or opens a child naming it #then the host is refused as unproven and no session opens", async () => {
@@ -125,7 +145,7 @@ describe.skipIf(process.platform === "win32")("a task host proven under the agen
     await expect(client(socket, elsewhere).open(childOpen(root))).rejects.toMatchObject({
       code: "host_identity_unproven",
     })
-    expect(await liveSessionPaths(socket, launchDir)).not.toContain(childOpen(root).sessionPath)
+    expect(await liveSessionPaths(socket, launchDir)).not.toContain(listedSessionPath(root))
   })
 
   test("#given a retained child session #when the lifecycle names no key root #then nothing is listed or closed, and naming the launch dir closes it", async () => {
@@ -143,8 +163,38 @@ describe.skipIf(process.platform === "win32")("a task host proven under the agen
     // then
     expect(unnamed).toBe("unreachable")
     await expect(liveSessionPaths(socket, undefined)).rejects.toThrow("no key root")
-    expect(await liveSessionPaths(socket, launchDir)).toContain(hostSession.session_path)
+    expect(await liveSessionPaths(socket, launchDir)).toContain(listedSessionPath(root))
     expect(await closeHostSession({ hostSession, cwd: root }, { keyRoot: launchDir })).toBe("closed")
-    expect(await liveSessionPaths(socket, launchDir)).not.toContain(hostSession.session_path)
+    expect(await liveSessionPaths(socket, launchDir)).not.toContain(listedSessionPath(root))
+  })
+
+  test("#given a key root that reaches the launch dir through a symlinked parent #when omo probes the host and opens a child naming it #then the host is proven and the child's session opens on it", async () => {
+    // given: the launch dir spelled another way, as macOS spells /private/var/... through /var
+    const { root, socket } = await hostInOwnAgentDir()
+    const aliased = join(symlinkTo(root), "agent")
+
+    // when
+    const info = await probeWithEngine(socket, aliased)
+    const child = client(socket, aliased)
+    await child.open(childOpen(root))
+
+    // then
+    expect(info).toMatchObject({ protocolVersion: TASK_DAEMON_PROTOCOL_VERSION })
+    expect(await liveSessionPaths(socket, aliased)).toContain(listedSessionPath(root))
+  })
+
+  test("#given a key root with the launch dir's name under a symlinked parent that points at another agent tree #when omo probes the host or opens a child naming it #then the host is refused as unproven and no session opens", async () => {
+    // given: the same shape as the aliased case; only the symlink's target differs, and that tree holds no record of this launch
+    const { root, socket, launchDir } = await hostInOwnAgentDir()
+    const otherTree = join(root, "other-tree")
+    mkdirSync(join(otherTree, "agent", "rpc", "keys"), { recursive: true, mode: 0o700 })
+    const elsewhere = join(symlinkTo(otherTree), "agent")
+
+    // when / then
+    await expect(probeWithEngine(socket, elsewhere)).rejects.toMatchObject({ code: "host_identity_unproven" })
+    await expect(client(socket, elsewhere).open(childOpen(root))).rejects.toMatchObject({
+      code: "host_identity_unproven",
+    })
+    expect(await liveSessionPaths(socket, launchDir)).not.toContain(listedSessionPath(root))
   })
 })
