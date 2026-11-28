@@ -222,11 +222,12 @@ describe("redactUrl", () => {
         // A 400k-character minimum keeps every input a real scan, not a short-circuit.
         if (input.length < 400_000) throw new Error(`${family}: hostile input is only ${input.length} characters`)
         const started = performance.now()
-        const elapsed = () => performance.now() - started
+        const redacted = redactUrl(input)
+        const elapsed = performance.now() - started
         // aws/credential/authorization/seam/split inputs complete a trigger but never a value tail, so they stay unchanged;
         // the two unbounded-tail families match, which is fine because only the time bound is asserted for them.
-        if (family !== "openai_key" && family !== "vendor_token") expect(redactUrl(input)).toBe(input)
-        expect({ family, bounded: elapsed() < 2_000 }).toEqual({ family, bounded: true })
+        if (family !== "openai_key" && family !== "vendor_token") expect(redacted).toBe(input)
+        expect({ family, bounded: elapsed < 2_000 }).toEqual({ family, bounded: true })
       }
     }, 30_000)
   })
