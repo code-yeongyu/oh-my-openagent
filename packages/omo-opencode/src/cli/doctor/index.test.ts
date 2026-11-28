@@ -4,7 +4,7 @@ import { describe, expect, it } from "bun:test"
 import { formatDoctorFailure } from "./index"
 
 describe("formatDoctorFailure", () => {
-  it("surfaces the real error message and stack instead of blaming memory pressure", () => {
+  it("omits raw error messages and stacks that can contain config values", () => {
     // given
     const error = new ReferenceError("Bun is not defined")
 
@@ -13,12 +13,13 @@ describe("formatDoctorFailure", () => {
 
     // then
     const output = lines.join("\n")
-    expect(output).toContain("Doctor failed unexpectedly: Bun is not defined")
-    expect(output).toContain("ReferenceError")
+    expect(output).toContain("Doctor failed unexpectedly")
+    expect(output).not.toContain(error.message)
+    expect(output).not.toContain("ReferenceError")
     expect(output).not.toContain("memory pressure")
   })
 
-  it("stringifies non-Error throwables without a stack", () => {
+  it("omits non-Error throwables that can contain config values", () => {
     // given
     const thrown = "boom"
 
@@ -26,7 +27,8 @@ describe("formatDoctorFailure", () => {
     const lines = formatDoctorFailure(thrown)
 
     // then
-    expect(lines.join("\n")).toContain("Doctor failed unexpectedly: boom")
+    expect(lines.join("\n")).toContain("Doctor failed unexpectedly")
+    expect(lines.join("\n")).not.toContain(thrown)
     expect(lines.join("\n")).not.toContain("memory pressure")
   })
 

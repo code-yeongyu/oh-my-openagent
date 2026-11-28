@@ -3,6 +3,7 @@ import { posix, win32 } from "node:path"
 
 import {
   runMigrations,
+  migrationDiagnosticError,
   type MigrationBoundary,
   type MigrationClock,
   type MigrationEnvironment,
@@ -126,7 +127,7 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
     }
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : String(error),
+      error: migrationDiagnosticError(error),
       journalResumed: false,
       migratedFrom: [],
       results: [],

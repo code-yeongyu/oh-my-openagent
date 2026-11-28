@@ -1,4 +1,5 @@
-import { BrowserAutomationConfigSchema } from "../../../config/schema/browser-automation"
+import { BROWSER_PROVIDER_ERROR, BrowserAutomationConfigSchema } from "../../../config/schema/browser-automation"
+import { configIssueSummary } from "@oh-my-opencode/omo-config-core"
 import { loadOmoOpenCodeConfigChain } from "../../../plugin-config/omo-config-chain"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 
@@ -15,7 +16,7 @@ export async function checkBrowserProvider(): Promise<CheckResult> {
       const path = ["browser_automation_engine", ...issue.path].join(".")
       issues.push({
         title: "Invalid browser provider configuration",
-        description: `${view.path}: ${path}: ${issue.message}`,
+        description: `${view.path}: ${path}: ${issue.path.length === 1 && issue.path[0] === "provider" ? BROWSER_PROVIDER_ERROR : configIssueSummary(issue)}`,
         severity: "error",
         affects: [path],
       })

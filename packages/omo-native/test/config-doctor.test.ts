@@ -83,7 +83,7 @@ describe("omo doctor config lines", () => {
       },
     })
 
-    expect(lines).toEqual(["WARN config: diagnostics unavailable: missing bundle"])
+    expect(lines).toEqual(["WARN config: diagnostics unavailable; check the installed config runtime"])
   })
 
   test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", () => {

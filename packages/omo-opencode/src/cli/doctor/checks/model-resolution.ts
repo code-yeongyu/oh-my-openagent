@@ -1,4 +1,5 @@
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../../shared/model-requirements"
+import { displayConfigIdentifier } from "@oh-my-opencode/omo-config-core"
 import { getModelCapabilities } from "../../../shared/model-capabilities"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
@@ -108,7 +109,8 @@ export function collectCapabilityResolutionIssues(info: ModelResolutionInfo): Do
 
   const summary = fallbackEntries
     .map(
-      (entry) => `${entry.name}=${entry.effectiveModel} (${entry.capabilityDiagnostics?.resolutionMode ?? "unknown"})`,
+      (entry) =>
+        `${entry.name}=${displayConfigIdentifier(entry.effectiveModel)} (${entry.capabilityDiagnostics?.resolutionMode ?? "unknown"})`,
     )
     .join(", ")
 

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { displayConfigIdentifier } from "@oh-my-opencode/omo-config-core"
 
 import {
   LEGACY_PLUGIN_NAME,
@@ -34,12 +35,12 @@ function parsePluginVersion(entry: PluginEntry): string | null {
   if (name.startsWith(`${PLUGIN_NAME}@`)) {
     const value = name.slice(PLUGIN_NAME.length + 1)
     if (!value || value === "latest") return null
-    return value
+    return displayConfigIdentifier(value)
   }
   if (name.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
     const value = name.slice(LEGACY_PLUGIN_NAME.length + 1)
     if (!value || value === "latest") return null
-    return value
+    return displayConfigIdentifier(value)
   }
   return null
 }

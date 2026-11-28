@@ -17,8 +17,7 @@ export async function doctorConfigLines(options = {}) {
   try {
     const runtime = await (options.loadRuntime ?? loadRuntime)()
     return [...runtime.configDoctorLines({ cwd: options.cwd ?? process.cwd(), env: options.env ?? process.env })]
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return [`WARN config: diagnostics unavailable: ${message}`]
+  } catch {
+    return ["WARN config: diagnostics unavailable; check the installed config runtime"]
   }
 }

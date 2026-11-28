@@ -3,7 +3,7 @@ import { setSkillSourceProvenance } from "@oh-my-opencode/skills-loader-core/ope
 import { knownUserSkillRoots } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
 import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
-import { omoConfigDiagnosticLines, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { configIssueSummary, omoConfigDiagnosticLines, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 import type * as z from "zod"
 
 import { applyDisabledProviders } from "../shared/disabled-providers"
@@ -46,7 +46,7 @@ function schemaMessages(
   issues: readonly z.core.$ZodIssue[],
 ): readonly string[] {
   const validationMessages = issues.map(
-    (issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`,
+    (issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${configIssueSummary(issue)}`,
   )
   const unknownKeyMessages = findUnknownKeyPaths(OhMyOpenCodeConfigSchema, rawConfig).map(
     (path) => `${shortPath(configPath)}: Unknown config key: ${formatIssuePath(path)}`,

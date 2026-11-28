@@ -111,6 +111,8 @@ describe("createOmoConfigValidator", () => {
 
   it("#given individually valid team layers that newly fail after merge #when the changed layer validates #then rejects the merged diagnostic", () => {
     const fixture = createFixture()
+    const secret = "sk-test-MERGED-TEAM-DO-NOT-PRINT"
+    const token = "eyJhbGci.MERGED-TEAM-DO-NOT-PRINT.signature"
     const farPath = configPath(fixture.workDir)
     const changedPath = configPath(fixture.projectDir)
     writeConfig(
@@ -121,13 +123,18 @@ describe("createOmoConfigValidator", () => {
     const validator = createValidator(fixture)
     writeConfig(
       changedPath,
-      '{"teams":{"alpha":{"members":[{"name":"one","kind":"category","category":"quick","prompt":"go"},{"name":"two","kind":"category","category":"quick","prompt":"go"}]}}}',
+      JSON.stringify({ teams: { alpha: { members: [
+        { name: "one", kind: "category", category: "quick", prompt: secret },
+        { name: "two", kind: "category", category: "quick", prompt: token },
+      ] } } }),
     )
 
     const validation = validator.validate([changedPath])
 
     expect(validation.ok).toBe(false)
     expect(rejectedErrors(validation).join("\n")).toContain("leadAgentId")
+    expect(rejectedErrors(validation).join("\n")).not.toContain(secret)
+    expect(rejectedErrors(validation).join("\n")).not.toContain(token)
   })
 
   it("#given a pre-existing merged-config diagnostic #when an unrelated valid layer changes #then accepts", () => {
