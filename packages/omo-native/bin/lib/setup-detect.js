@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { describeReadFailure } from "./read-failure.js"
 import { readRow, readRows } from "./sqlite-rows.js"
 
 export const KNOWN_AUTH_SCHEMA_VERSIONS = new Set([4, 7])
@@ -29,7 +30,8 @@ function readAuthJson(id, path) {
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8"))
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("expected an object")
+      result.notices.push("could not parse auth.json: not an object")
+      return result
     }
     for (const [provider, entry] of Object.entries(parsed)) {
       result.providers.push(provider)
@@ -42,7 +44,7 @@ function readAuthJson(id, path) {
     result.credentialTypes = sorted(result.credentialTypes)
     result.entryCount = result.providers.length
   } catch (error) {
-    result.notices.push(`could not parse auth.json: ${error.message}`)
+    result.notices.push(`could not parse auth.json: ${describeReadFailure(error)}`)
   }
   return result
 }
@@ -57,7 +59,7 @@ function readSenpiModels(path, result) {
       result.modelHint = ids.length > 0 ? `providers: ${ids.join(", ")}` : "providers: none"
     }
   } catch (error) {
-    result.notices.push(`could not parse models.json: ${error.message}`)
+    result.notices.push(`could not parse models.json: ${describeReadFailure(error)}`)
   }
 }
 
@@ -122,7 +124,7 @@ function inspectSqlite(id, path, DatabaseSync, modelHint) {
       (row) => row.disabled_cause === null && row.credential_type === "api_key",
     ).length
   } catch (error) {
-    result.notices.push(`could not inspect agent.db: ${error.message}`)
+    result.notices.push(`could not inspect agent.db: ${describeReadFailure(error)}`)
   } finally {
     database?.close()
   }
