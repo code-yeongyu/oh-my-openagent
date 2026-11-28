@@ -130,7 +130,7 @@ describe("#given every workflow a pull request triggers", () => {
       .filter((file) => /\.ya?ml$/.test(file))
       .filter((file) => /pull_request\.labels|'ci:full-matrix'/.test(readFileSync(new URL(file, workflowsDir), "utf8")))
     // ci.yml and pr-platform-decision.yml feed the labels to the classifier; changelog-gate.yml reads changelog labels;
-    // the label workflow's trigger tests the labeled event's own label name.
+    // the label workflow's job gate reads the label from the pull request itself (edited/synchronize included, #15329).
     expect(readers.sort()).toEqual([
       "changelog-gate.yml",
       "ci-full-matrix-label.yml",
@@ -240,11 +240,15 @@ describe("#given the path-filtered workflows that also run macOS/Windows on dev 
 
 describe("#given the label-triggered full-matrix run", () => {
   test.each([
-    [OPT_IN_LABEL, true],
-    ["run-full-ci", false],
-    ["bug", false],
-  ])("#then the %s label starts it: %p", (label, starts) => {
-    const condition = job("ci-full-matrix-label.yml", "full-matrix")["if"]
-    expect(evaluate(condition, { github: { event: { label: { name: label } } } })).toBe(starts)
+    ["labeled", OPT_IN_LABEL, [OPT_IN_LABEL], true],
+    ["labeled", "bug", [OPT_IN_LABEL, "bug"], false],
+    ["edited", undefined, [OPT_IN_LABEL], true],
+    ["synchronize", undefined, [OPT_IN_LABEL], true],
+    ["opened", undefined, [OPT_IN_LABEL], true],
+    ["reopened", undefined, [OPT_IN_LABEL], true],
+    ["edited", undefined, ["bug"], false],
+  ] as const)("#then %s with new label %s and PR labels %p starts the matrix: %p", (action, added, names, starts) => {
+    const event = { action, label: added && { name: added }, pull_request: { labels: names.map((name) => ({ name })) } }
+    expect(evaluate(job("ci-full-matrix-label.yml", "gate")["if"], { github: { event } })).toBe(starts)
   })
 })
