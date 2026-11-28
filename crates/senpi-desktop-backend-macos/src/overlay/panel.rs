@@ -16,6 +16,16 @@ use std::io;
 const WIDTH: f64 = 76.0;
 const HEIGHT: f64 = 42.0;
 
+/// On every Space and beside full-screen apps, but `Transient` (not `Stationary`): of the three mutually exclusive
+/// Mission Control behaviours only `Transient` keeps this display-only helper out of Mission Control and App Expose,
+/// where it showed as an empty window labelled `omo` (#13687).
+const COLLECTION_BEHAVIOR: NSWindowCollectionBehavior = NSWindowCollectionBehavior(
+    NSWindowCollectionBehavior::CanJoinAllSpaces.0
+        | NSWindowCollectionBehavior::FullScreenAuxiliary.0
+        | NSWindowCollectionBehavior::Transient.0
+        | NSWindowCollectionBehavior::IgnoresCycle.0,
+);
+
 define_class!(
     // SAFETY: NSPanel superclass; override only its main-thread methods with
     // unchanged signatures and no object ivars.
@@ -51,12 +61,7 @@ impl CursorPanel {
         panel.setHidesOnDeactivate(false);
         panel.setBecomesKeyOnlyIfNeeded(true);
         panel.setLevel(super::WINDOW_LEVEL as isize);
-        panel.setCollectionBehavior(
-            NSWindowCollectionBehavior::CanJoinAllSpaces
-                | NSWindowCollectionBehavior::FullScreenAuxiliary
-                | NSWindowCollectionBehavior::Stationary
-                | NSWindowCollectionBehavior::IgnoresCycle,
-        );
+        panel.setCollectionBehavior(COLLECTION_BEHAVIOR);
         let view = NSView::initWithFrame(NSView::alloc(mtm), rect);
         // Reading an arrow image does not change the system cursor.
         let cursor = NSCursor::arrowCursor();
@@ -112,5 +117,22 @@ impl CursorPanel {
             can_become_key: self.canBecomeKeyWindow(),
             can_become_main: self.canBecomeMainWindow(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::COLLECTION_BEHAVIOR;
+    use objc2_app_kit::NSWindowCollectionBehavior;
+
+    #[test]
+    fn the_overlay_floats_on_every_space_but_stays_out_of_mission_control() {
+        let has = |flag: NSWindowCollectionBehavior| COLLECTION_BEHAVIOR.0 & flag.0 == flag.0;
+        assert!(has(NSWindowCollectionBehavior::Transient));
+        assert!(has(NSWindowCollectionBehavior::CanJoinAllSpaces));
+        assert!(has(NSWindowCollectionBehavior::FullScreenAuxiliary));
+        assert!(has(NSWindowCollectionBehavior::IgnoresCycle));
+        assert!(!has(NSWindowCollectionBehavior::Stationary));
+        assert!(!has(NSWindowCollectionBehavior::Managed));
     }
 }
