@@ -180,13 +180,15 @@ export function readDefaultFileCandidates(
   let headerEnd = -1
   for (let line = 0; line < lines.length; line++) {
     const current = lines[line] ?? ""
-    // latin1 makes characters equal bytes, so the cap prevents BIO_gets' 253-byte splitting. PEM_read_bio skips
+    // latin1 makes characters equal bytes, so a line is exactly the bytes BIO_gets reads. PEM_read_bio skips
     // text outside blocks, so bytes 0x80-0xff are allowed there (Fedora's bundle has UTF-8 comments); a block
     // line, and control bytes anywhere, still drop the file.
-    if (current.length > 200 || (label === undefined ? /[\x00-\x1f\x7f]/ : /[^\x20-\x7e]/).test(current)) {
-      return drop("pem-noncanonical")
-    }
+    if ((label === undefined ? /[\x00-\x1f\x7f]/ : /[^\x20-\x7e]/).test(current)) return drop("pem-noncanonical")
     const boundary = /^-----(BEGIN|END) ([A-Z0-9][A-Z0-9 ]*)-----$/.exec(current)
+    // The cap prevents BIO_gets' 253-byte splitting inside a block and on its boundaries. Text outside a
+    // block is exempt: a split read can only start with "-----" when the line holds "-----", which is
+    // refused below at any length. LibreSSL bundles (macOS /etc/ssl/cert.pem) carry long subject comments.
+    if (current.length > 200 && (label !== undefined || boundary !== null)) return drop("pem-noncanonical")
     if (label === undefined) {
       if (boundary?.[1] === "BEGIN") {
         label = boundary[2]

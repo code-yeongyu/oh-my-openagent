@@ -56,6 +56,29 @@ const rootPem = pem(rootDer)
 const c4 = hex("30123010a0030201020201013000300030003000")
 const x = seq(seq(...rootPrefix))
 const short = pem(hex("3000"))
+// The shape of the LibreSSL bundle macOS ships at /etc/ssl/cert.pem: comments, a subject line longer than the
+// in-block cap, and an `openssl x509 -text` dump before each PEM block (omo#12157). Synthetic; no Apple bytes.
+const subjectLine = `=== /CN=synthetic default-file R${"/OU=synthetic organisational unit".repeat(7)}`
+const textDump = [
+  subjectLine,
+  "Certificate:",
+  "    Data:",
+  "        Version: 3 (0x2)",
+  "        Serial Number: 1 (0x1)",
+  "    Signature Algorithm: ecdsa-with-SHA256",
+  "        Issuer: CN=synthetic default-file R",
+  "        Validity",
+  "            Not Before: Jan  1 00:00:00 2025 GMT",
+  "            Not After : Jan  1 00:00:00 2049 GMT",
+  "        X509v3 extensions:",
+  "            X509v3 Basic Constraints: critical",
+  "                CA:TRUE",
+].join("\n")
+const libresslBundle =
+  ["# $OpenBSD: cert.pem,v 1.0 synthetic $", "### /CN=synthetic default-file R", "", textDump].join("\n") +
+  "\n" +
+  rootPem +
+  "\n"
 // The importer takes raw file bytes; fixtures are written to disk with the same UTF-8 encoding.
 const read = (text: string, isBundledRoot: (der: Buffer) => boolean) =>
   readDefaultFileCandidates(Buffer.from(text, "utf8"), isBundledRoot)
@@ -157,6 +180,38 @@ const fixtures = [
   {
     id: "mismatched-end",
     text: rootPem + "-----BEGIN OTHER-----\nMAA=\n-----END WRONG-----\n",
+    expected: dropped("pem-noncanonical", 1, true),
+  },
+  { id: "libressl-bundle", text: libresslBundle, expected: kept },
+  // The same long subject comment and text dump between two blocks, as every entry after the first has it.
+  {
+    id: "libressl-between-blocks",
+    text: pem(hex("3000"), "OTHER") + textDump + "\n" + rootPem,
+    expected: { kind: "kept", certificates: [{ der: rootDer, index: 1 }] } as const,
+  },
+  // Outside a block, BIO_gets can only start a read with "-----" if the line holds "-----"; length alone is inert.
+  { id: "long-comment", text: rootPem + `=== ${"x".repeat(600)}\n`, expected: kept },
+  { id: "long-comment-high-byte", text: rootPem + `${"x".repeat(230)}\u00fftext\n`, expected: kept },
+  {
+    id: "long-comment-cr",
+    text: rootPem + `${"x".repeat(230)}\rtext\n`,
+    expected: dropped("pem-noncanonical", 1, true),
+  },
+  {
+    id: "long-comment-dashes",
+    text: rootPem + `${"x".repeat(230)} ----- text\n`,
+    expected: dropped("pem-noncanonical", 1, true),
+  },
+  // A "-----" run straddling BIO_gets' 253-byte read boundary: no single read starts with it, the whole line holds it.
+  {
+    id: "dashes-across-split",
+    text: rootPem + `${"x".repeat(250)}-----BEGIN OTHER-----\n`,
+    expected: dropped("pem-noncanonical", 1, true),
+  },
+  // Inside a block the cap stays: a body line is read by BIO_gets too, and the gate keeps every block line short.
+  {
+    id: "long-block-line",
+    text: rootPem + `-----BEGIN OTHER-----\n${"A".repeat(204)}\n-----END OTHER-----\n`,
     expected: dropped("pem-noncanonical", 1, true),
   },
 ]
