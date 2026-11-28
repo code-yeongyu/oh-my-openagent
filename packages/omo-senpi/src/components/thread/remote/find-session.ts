@@ -96,8 +96,12 @@ const refusal = (
   result: { kind: "error", error: threadToolFailure(code, message, next, details) },
 })
 
-/** What the device holding a not-live row says of its session (`find_session`), or `unknown` when it cannot say. */
-export type HolderView = "running" | "on_disk" | "absent" | "unknown"
+/**
+ * What the device holding a not-live row says of its session (`find_session`): `unknown` when its engine cannot say (it
+ * predates the lookup), `silent` when it did not answer (no answer in time, or no route to the engine it named), which
+ * proves neither that the session stopped nor that it runs (#15004).
+ */
+export type HolderView = "running" | "on_disk" | "absent" | "unknown" | "silent"
 
 /**
  * The holder's own answer for a row this surface reads as not live, asked before any send path is chosen (#14184): the
@@ -111,7 +115,7 @@ export async function holderView(remote: RemoteThreadSurface, row: RemoteSession
   const thread = row.durable_id ?? ""
   if (thread === "") return "unknown"
   const { outcome } = await findSession(remote, row.device, thread)
-  if (outcome.kind !== "ok") return "unknown"
+  if (outcome.kind !== "ok") return isNonAnswer(outcome) ? "silent" : "unknown"
   const data = replyData(outcome.response)
   const found = recordOf(data["found"])
   if (found !== undefined) return found["open"] === true ? "running" : "on_disk"

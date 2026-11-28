@@ -207,6 +207,11 @@ export function createRemoteThreadFixture() {
       plan?: string
       online?: boolean
       refuse?: string
+      /**
+       * #15004: only commands addressed to a session (get_state, admit, ...) are refused with this reason, while b's
+       * endpoint commands (find_session) still answer: a starved host whose engine runs but misses its routing deadline.
+       */
+      refuseSessionCommands?: string
       aliases?: Map<string, AliasHolder>
       noRegistry?: boolean
       engine?: Engine
@@ -466,6 +471,8 @@ export function createRemoteThreadFixture() {
         response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data },
       })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
+      if (attachedTo !== undefined && options.refuseSessionCommands !== undefined)
+        return { kind: "refused", reason: options.refuseSessionCommands }
       if (attachedTo !== undefined && attachedTo === lagged && lagging > 0) {
         lagging -= 1
         return { kind: "refused", reason: options.unlistedReason ?? "route_unlisted" }

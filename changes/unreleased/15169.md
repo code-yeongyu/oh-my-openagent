@@ -1,0 +1,3 @@
+### Fixed
+
+- `thread_send` to a live thread on a busy device no longer answers `not_resumable` ("not running") when that device's host merely failed to route it: when the device says an engine runs the thread but routes no key to it, or does not answer whether it runs it, the send answers `host_unavailable` (`reason: "route_unlisted"`) with a retry, since nothing was sent and nothing shows the thread stopped. A send the device refused before any engine took it (`route_unlisted`, `host_not_answering`) no longer holds its `idempotency_key`: the advised retry under the same key is a fresh send, with or without its optional fields, instead of a replay of the refusal or `idempotency_conflict`. (fixes [#15004](https://github.com/code-yeongyu/oh-my-openagent/issues/15004))
