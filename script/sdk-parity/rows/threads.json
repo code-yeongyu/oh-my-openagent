@@ -1433,6 +1433,10 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "children_of": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": []
@@ -1493,7 +1497,8 @@
           "reads": [
             "all_scope",
             "state",
-            "idempotency_key"
+            "idempotency_key",
+            "children_of"
           ]
         }
       ],

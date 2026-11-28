@@ -48,6 +48,7 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
+import { withParentage, withReadParentage } from "./tools/parentage"
 import { listAcross } from "./remote/cross-device"
 import { lazySameDeviceWake } from "./wake/lazy-same-device-wake"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
@@ -122,7 +123,9 @@ export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and send of this SDK is keyed by. */
   readonly principal: string
   /** `state`: the thread states to list; the default lists every state but archived. */
-  readonly list: (request?: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
+  readonly list: (
+    request?: Scoped & { readonly state?: readonly ThreadState[]; readonly children_of?: string },
+  ) => Promise<ThreadToolResult>
   readonly read: (
     request: Scoped & { readonly thread: string; readonly max_bytes?: number; readonly cursor?: string },
   ) => Promise<ThreadToolResult>
@@ -221,7 +224,7 @@ function unknownKeys(request: unknown, known: readonly string[]): Failure | unde
   )
 }
 
-const LIST_KEYS = ["all_scope", "state"] as const
+const LIST_KEYS = ["all_scope", "state", "children_of"] as const
 const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
 const SEND_KEYS = [
   "thread",
@@ -335,27 +338,34 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       guarded(
         async () =>
           unknownKeys(request, LIST_KEYS) ??
-          listAcross(
-            options.remote,
-            await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
-            request.all_scope === true,
-            request.state,
+          withParentage(
+            surface.store,
+            await listAcross(
+              options.remote,
+              await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
+              request.all_scope === true,
+              request.state,
+            ),
+            request.children_of,
           ),
       ),
     read: (request) =>
       guarded(
         async () =>
           unknownKeys(request, READ_KEYS) ??
-          readThread(
-            { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
-            await view(),
-            {
-              thread: request.thread,
-              max_bytes: request.max_bytes,
-              cursor: request.cursor,
-              all_scope: request.all_scope,
-            },
-            UNKNOWN_CALLER,
+          withReadParentage(
+            surface.store,
+            await readThread(
+              { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
+              await view(),
+              {
+                thread: request.thread,
+                max_bytes: request.max_bytes,
+                cursor: request.cursor,
+                all_scope: request.all_scope,
+              },
+              UNKNOWN_CALLER,
+            ),
           ),
       ),
     send: (request) =>

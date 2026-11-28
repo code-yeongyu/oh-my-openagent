@@ -42,6 +42,13 @@ export const ThreadListParams = Type.Object({
       },
     ),
   ),
+  children_of: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "List only the threads this thread opened (a row's created_by.thread). Each listed row names its opener as created_by.",
+    }),
+  ),
   idempotency_key: IdempotencyKey,
 })
 

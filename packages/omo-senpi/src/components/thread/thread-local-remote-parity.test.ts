@@ -207,7 +207,7 @@ const ENGINE_STATE = {
   controls: ["send", "read"],
 }
 // A create given no prompt says `prompt: null` on both legs, beside the thread's summary.
-const SUMMARY_KEYS = ["created_at", "cwd", "link", "name", "prompt", "state", "status", "thread", "updated_at"]
+const SUMMARY_KEYS = ["created_at", "created_by", "cwd", "link", "name", "prompt", "state", "status", "thread", "updated_at"]
 const threadKeys = (result: ThreadToolResult) => {
   if (result.kind !== "ok" || !("thread" in result)) throw new Error(`expected a thread, got ${JSON.stringify(result)}`)
   return Object.keys(result)
