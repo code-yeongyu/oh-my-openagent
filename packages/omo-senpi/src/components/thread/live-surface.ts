@@ -788,8 +788,11 @@ export function createLiveThreadSurface(
         disk: [],
       }
     } catch (error) {
-      // A terminal removes its socket when it exits, so a registered terminal whose socket is gone has ended.
-      if (tui && !exists(endpoint.socket)) return degraded(endpoint, new Error("dead"), "dead")
+      // A terminal or a host removes its socket when it exits, so an endpoint whose socket is gone has ended: it holds
+      // nothing (`dead`), never a host that did not answer. A host keeps its `host_unavailable:<socket>` error, which is
+      // the answer when nothing answers at all. A Windows pipe is no file, so only a terminal is judged by it there.
+      if ((tui || process.platform !== "win32") && !exists(endpoint.socket))
+        return degraded(endpoint, tui ? new Error("dead") : error, "dead")
       if (isIdentityRefusal(error)) return degraded(endpoint, error, "identity_unproven")
       const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
       return degraded(
