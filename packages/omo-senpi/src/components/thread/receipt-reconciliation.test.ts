@@ -8,8 +8,20 @@ import { createDeliveryConsumer } from "./consumer/consumer"
 import { createFakeDeliveryService } from "./consumer/testing/fake-delivery-service"
 import { writeSessionFile } from "./wake/testing/fake-wake-host"
 import type { JsonObject, RemoteThreadSurface } from "./remote/ports"
+import type { GatewayStore } from "./gateway/store"
 
-async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
+type Timer = { readonly run: () => void; readonly ms: number; cancelled: boolean }
+
+async function setup(
+  noticeMode: "deliver" | "drop" | "duplicate" = "deliver",
+  options: {
+    readonly timers?: Timer[]
+    /** Wraps the store the holder's consumer reads, to hold or count its reads. */
+    readonly holderStore?: (store: GatewayStore) => GatewayStore
+    /** Collects what the holder's consumer reports through onError. */
+    readonly errors?: unknown[]
+  } = {},
+) {
   const h = createGatewayHarness()
   const f = createRemoteThreadFixture()
   const store = h.store()
@@ -34,7 +46,7 @@ async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
   // that reads what a notice did waits for every notice it started, then for the sender's consumer to apply them.
   const notices: Promise<void>[] = []
   const consumer = createDeliveryConsumer({
-    store,
+    store: options.holderStore?.(store) ?? store,
     port: {
       ...service.port,
       notice: (n) => {
@@ -64,6 +76,18 @@ async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
     wake: async () => {
       counts.wakes++
     },
+    ...(options.errors === undefined ? {} : { onError: (error: unknown) => options.errors?.push(error) }),
+    ...(options.timers === undefined
+      ? {}
+      : {
+          schedule: (run: () => void, ms: number) => {
+            const timer: Timer = { run, ms, cancelled: false }
+            options.timers?.push(timer)
+            return () => {
+              timer.cancelled = true
+            }
+          },
+        }),
   })
   await consumer.start()
   const account = f.account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
@@ -431,6 +455,246 @@ test("expiry and a deadline claim cannot both win", async () => {
   }
 })
 
+// #14266: the holder answered queued and asked for the wake, but the session never ran (this fixture's wake only counts).
+// The intake row is left to the target's own reconcile, which never comes, so at its deadline the holder settles it and
+// tells the sender; the sender never has to ask.
+test.each([86_399_999, 86_400_000])(
+  "a delivery whose holder never woke the session is reported to the sender at its deadline, unasked (%i ms)",
+  async (elapsed) => {
+    const x = await setup()
+    try {
+      setSystemTime(x.h.clock.now)
+      const first = await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+      if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+        throw new Error("send did not return a delivery id")
+      expect(first).toMatchObject({ delivery: { kind: "queued", waiting_on: { kind: "wake" } } })
+      x.h.clock.now += elapsed
+      setSystemTime(x.h.clock.now)
+      await x.consumer.reportDrained()
+      await x.noticesSettled()
+      const due = elapsed >= 86_400_000
+      expect(await x.store.list({ target_durable_id: "dur-on-b" })).toMatchObject([
+        due ? { state: "refused", reason: "expired" } : { state: "queued" },
+      ])
+      const held = await x.sender.store.remoteReceipt({
+        now: x.sender.store.now(),
+        principal: "session:dur-caller",
+        delivery_id: first.delivery_id,
+      })
+      expect(held?.result.outcome).toEqual(due ? { kind: "refused", reason: "expired" } : undefined)
+      expect(x.runtime.enqueueCalls).toHaveLength(0)
+      expect(x.counts).toEqual({ forward: 1, reverse: due ? 1 : 0, wakes: 1, queries: 0 })
+    } finally {
+      await x.cleanup()
+    }
+  },
+)
+
+test("the holder's own timer reports a never-woken delivery at its deadline, with no other drained report", async () => {
+  const timers: Timer[] = []
+  const x = await setup("deliver", { timers })
+  try {
+    setSystemTime(x.h.clock.now)
+    const first = await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+    if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+      throw new Error("send did not return a delivery id")
+    await x.consumer.idle()
+    const armed = timers.filter((timer) => !timer.cancelled)
+    expect(armed.map((timer) => timer.ms)).toEqual([86_400_000])
+    x.h.clock.now += 86_400_000
+    setSystemTime(x.h.clock.now)
+    armed[0]?.run()
+    await x.consumer.idle()
+    await x.noticesSettled()
+    const held = await x.sender.store.remoteReceipt({
+      now: x.sender.store.now(),
+      principal: "session:dur-caller",
+      delivery_id: first.delivery_id,
+    })
+    expect(held?.result.outcome).toEqual({ kind: "refused", reason: "expired" })
+    // Nothing is left queued, so nothing is armed again.
+    expect(timers.filter((timer) => !timer.cancelled && timer !== armed[0])).toEqual([])
+    expect(x.counts).toEqual({ forward: 1, reverse: 1, wakes: 1, queries: 0 })
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a settlement pass that read the rows before a send was committed never cancels the timer the newer pass armed", async () => {
+  const timers: Timer[] = []
+  // The startup pass reads the open sessions before the send exists, and is held until the send's own pass has armed.
+  let release: (() => void) | undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let reads = 0
+  const x = await setup("deliver", {
+    timers: new Proxy(timers, {
+      get: (target, key) =>
+        key === "push"
+          ? (timer: Timer) => {
+              const length = target.push(timer)
+              release?.()
+              return length
+            }
+          : Reflect.get(target, key),
+    }),
+    holderStore: (store) => ({
+      ...store,
+      intakeMarks: {
+        ...store.intakeMarks,
+        openSessions: async () => {
+          const sessions = await store.intakeMarks.openSessions()
+          if (reads++ === 0) await held
+          return sessions
+        },
+      },
+    }),
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+    await x.consumer.idle()
+    expect(timers.filter((timer) => !timer.cancelled).map((timer) => timer.ms)).toEqual([86_400_000])
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a settlement pass that fails with nothing armed arms a retry, so the deadline is not left to a later send", async () => {
+  const timers: Timer[] = []
+  const errors: unknown[] = []
+  let failing = false
+  const x = await setup("deliver", {
+    timers,
+    holderStore: (store) => ({
+      ...store,
+      intakeMarks: {
+        ...store.intakeMarks,
+        openSessions: async () => {
+          if (failing) throw new Error("injected store failure")
+          return await store.intakeMarks.openSessions()
+        },
+      },
+    }),
+    errors,
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    failing = true
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+    await x.consumer.idle()
+    expect(errors.map(String)).toContain("Error: injected store failure")
+    const retry = timers.filter((timer) => !timer.cancelled)
+    expect(retry.map((timer) => timer.ms)).toEqual([60_000])
+    failing = false
+    x.h.clock.now += 60_000
+    setSystemTime(x.h.clock.now)
+    retry[0]?.run()
+    await x.consumer.idle()
+    expect(timers.filter((timer) => !timer.cancelled && timer !== retry[0]).map((timer) => timer.ms)).toEqual([
+      86_400_000 - 60_000,
+    ])
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a send while the holder's timer is armed reads no rows to re-arm it", async () => {
+  const timers: Timer[] = []
+  let reads = 0
+  const x = await setup("deliver", {
+    timers,
+    holderStore: (store) => ({
+      ...store,
+      intakeMarks: {
+        ...store.intakeMarks,
+        openSessions: async () => {
+          reads++
+          return await store.intakeMarks.openSessions()
+        },
+      },
+    }),
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k1" })
+    await x.consumer.idle()
+    const after = reads
+    x.h.clock.now += 1_000
+    setSystemTime(x.h.clock.now)
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "two", idempotency_key: "k2" })
+    await x.consumer.idle()
+    expect(reads).toBe(after)
+    expect(timers.filter((timer) => !timer.cancelled).map((timer) => timer.ms)).toEqual([86_400_000])
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a holder that wakes the session late but before the deadline delivers once, and nothing is reported expired", async () => {
+  const x = await setup()
+  try {
+    setSystemTime(x.h.clock.now)
+    const args = { thread: "dur-on-b", message: "one", idempotency_key: "k" }
+    const first = await x.sender.run("thread_send", args)
+    if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+      throw new Error("send did not return a delivery id")
+    const ledgerId = `device:a/${first.delivery_id}`
+    x.h.clock.now += 86_399_999
+    setSystemTime(x.h.clock.now)
+    await x.drain.drain({ reason: "command" })
+    x.runtime.endTurn()
+    x.h.clock.now += 1
+    setSystemTime(x.h.clock.now)
+    await x.consumer.reportDrained()
+    await x.noticesSettled()
+    expect(x.runtime.enqueueCount(ledgerId)).toBe(1)
+    expect(x.runtime.transcriptEntries(ledgerId)).toBe(1)
+    expect(await x.sender.run("thread_send", args)).toMatchObject({ outcome: { kind: "applied" } })
+    expect(x.counts).toEqual({ forward: 1, reverse: 0, wakes: 1, queries: 1 })
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test.each(["settled first", "woken first"] as const)(
+  "a holder that wakes the session after the deadline delivers nothing the sender was told expired (%s)",
+  async (order) => {
+    const x = await setup()
+    try {
+      setSystemTime(x.h.clock.now)
+      const args = { thread: "dur-on-b", message: "one", idempotency_key: "k" }
+      const first = await x.sender.run("thread_send", args)
+      if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+        throw new Error("send did not return a delivery id")
+      x.h.clock.now += 86_400_000
+      setSystemTime(x.h.clock.now)
+      if (order === "settled first") {
+        await x.consumer.reportDrained()
+        await x.drain.drain({ reason: "command" })
+      } else {
+        await x.drain.drain({ reason: "command" })
+        await x.consumer.reportDrained()
+      }
+      await x.noticesSettled()
+      expect(x.runtime.enqueueCalls).toHaveLength(0)
+      expect(await x.store.list({ target_durable_id: "dur-on-b" })).toMatchObject([
+        { state: "refused", reason: "expired" },
+      ])
+      const held = await x.sender.store.remoteReceipt({
+        now: x.sender.store.now(),
+        principal: "session:dur-caller",
+        delivery_id: first.delivery_id,
+      })
+      expect(held?.result.outcome).toEqual({ kind: "refused", reason: "expired" })
+      expect(x.counts).toEqual({ forward: 1, reverse: 1, wakes: 1, queries: 0 })
+    } finally {
+      await x.cleanup()
+    }
+  },
+)
+
 test("a partition across the deadline returns unavailable until authorized recovery", async () => {
   const x = await setup()
   try {
@@ -445,6 +709,42 @@ test("a partition across the deadline returns unavailable until authorized recov
     x.link.connected = true
     expect(await x.sender.run("thread_send", args)).toMatchObject({ outcome: { kind: "refused", reason: "expired" } })
     expect(x.counts).toEqual({ forward: 1, reverse: 0, wakes: 1, queries: 1 })
+  } finally {
+    await x.cleanup()
+  }
+})
+
+// #15241 review L2: every expired intake row of one session is settled in ONE store call, so the store worker reads that
+// session's transcript once per pass (the drain's reconcile shares one transcript read the same way), not once per row.
+test("a deadline pass settles all of one session's expired rows in one store call", async () => {
+  const calls = { single: 0, batched: 0 }
+  const x = await setup("deliver", {
+    holderStore: (store) => ({
+      ...store,
+      receiptOutcome: async (request) => {
+        calls.single++
+        return await store.receiptOutcome(request)
+      },
+      receiptOutcomes: async (requests) => {
+        calls.batched++
+        return await store.receiptOutcomes(requests)
+      },
+    }),
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    for (const key of ["k1", "k2", "k3"])
+      await x.sender.run("thread_send", { thread: "dur-on-b", message: key, idempotency_key: key })
+    x.h.clock.now += 86_400_000
+    setSystemTime(x.h.clock.now)
+    await x.consumer.reportDrained()
+    await x.noticesSettled()
+    expect((await x.store.list({ target_durable_id: "dur-on-b" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "expired"],
+      ["refused", "expired"],
+      ["refused", "expired"],
+    ])
+    expect(calls).toEqual({ single: 0, batched: 1 })
   } finally {
     await x.cleanup()
   }

@@ -940,6 +940,8 @@ async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Pro
       return ops.deliveryView(ctx, args as string)
     case "receipt_outcome":
       return await ops.receiptOutcome(ctx, args as ops.ReceiptOutcomeRequest)
+    case "receipt_outcomes":
+      return await ops.receiptOutcomes(ctx, args as readonly ops.ReceiptOutcomeRequest[])
     case "refusal_notices":
       return ops.refusalNotices(ctx, args as number)
     case "claim_refusal_notice":

@@ -359,6 +359,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
         options.chainCountLimit ??
         (async (cwd) => (await loadSenpiBarrel()).SettingsManager.create(cwd, agentDir).getThreadChainCountLimit()),
       sameDevice: (cwd) => input.settings(cwd).sameDevice,
+      schedule: options.schedule ?? unrefSchedule,
       log: reportConsumerFailure,
     }).catch((error: unknown) => {
       // A rejected start (an injected deliveries that throws) is a death like the others: reported once and retried

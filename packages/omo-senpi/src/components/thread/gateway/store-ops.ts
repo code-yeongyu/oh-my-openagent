@@ -1222,7 +1222,11 @@ export async function claimRefusalNotice(
 }
 
 /** Query-only. It writes no receipt, admission, marker, or wake, even after retention. */
-export async function receiptOutcome(ctx: StoreContext, request: ReceiptOutcomeRequest): Promise<ReceiptOutcome> {
+export async function receiptOutcome(
+  ctx: StoreContext,
+  request: ReceiptOutcomeRequest,
+  transcripts: Map<string, string> = new Map(),
+): Promise<ReceiptOutcome> {
   const key = request.principal.startsWith("device:")
     ? `${request.principal}/${request.delivery_id}`
     : request.delivery_id
@@ -1239,7 +1243,7 @@ export async function receiptOutcome(ctx: StoreContext, request: ReceiptOutcomeR
     // still authoritative application evidence; absence proves neither expiry nor admission.
     if (request.principal.startsWith("device:") && request.session_path !== undefined) {
       try {
-        if (sessionHasToken(request.session_path, key, new Map())) return { kind: "applied" }
+        if (sessionHasToken(request.session_path, key, transcripts)) return { kind: "applied" }
       } catch {
         return { kind: "outcome_unavailable" }
       }
@@ -1270,7 +1274,7 @@ export async function receiptOutcome(ctx: StoreContext, request: ReceiptOutcomeR
   let written = false
   if (paths.length === 1) {
     try {
-      written = sessionHasToken(paths[0]?.session_path ?? null, engineKey(before), new Map())
+      written = sessionHasToken(paths[0]?.session_path ?? null, engineKey(before), transcripts)
     } catch {
       return { kind: "outcome_unavailable" }
     }
@@ -1289,6 +1293,21 @@ export async function receiptOutcome(ctx: StoreContext, request: ReceiptOutcomeR
     }
     return remember(row, currentReceiptOutcome(ctx, row, request.now))
   })
+}
+
+/**
+ * `receiptOutcome` for several deliveries of one session, reading its transcript once (#15241 review L2): the holder's
+ * deadline settlement asks this for every expired intake row of a session, as the drain's reconcile pass shares one
+ * transcript read for its rows.
+ */
+export async function receiptOutcomes(
+  ctx: StoreContext,
+  requests: readonly ReceiptOutcomeRequest[],
+): Promise<readonly ReceiptOutcome[]> {
+  const transcripts = new Map<string, string>()
+  const outcomes: ReceiptOutcome[] = []
+  for (const request of requests) outcomes.push(await receiptOutcome(ctx, request, transcripts))
+  return outcomes
 }
 
 /**
