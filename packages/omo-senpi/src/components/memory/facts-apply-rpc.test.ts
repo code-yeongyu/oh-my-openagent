@@ -12,6 +12,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { ONBOARDING_SCAN_RUNTIME_FILE } from "../onboarding/scan-runtime-loader"
 import { snapshotTree } from "../onboarding/understand.test-support"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import {
@@ -89,22 +90,25 @@ describe("omo.memory.facts.apply", () => {
     expect(commit?.trailers["Generated-By"]).toBe("facts-extractor")
   }, 60_000)
 
-  test("#given the apply runtime cannot load #when the session applier is called #then it answers unavailable with the reason and writes nothing", async () => {
+  // #15352: the reason reaches the desktop and, through onboarding_memory_apply, the model; the import error names local paths.
+  test("#given the apply runtime cannot load #when the session applier is called #then it answers unavailable naming the sidecar, never the import error, and writes nothing", async () => {
     const { context, repo } = await boundIdentity()
     const head = await repo.head()
     const before = await snapshotTree(context.identityPaths.root)
     const applier = createSessionFactsApplier({
       resolveContext: () => context,
       people: () => PEOPLE,
-      loadApply: () => Promise.reject(new Error("omo-onboarding-scan.js is missing")),
+      loadApply: () =>
+        Promise.reject(new Error("Cannot find package 'x' imported from '/home/SYNTH-USER/plugin/extensions/omo.js'")),
     })
 
     const response = await applier({ records: [PROJECT] }, "s1")
 
     expect(response).toEqual({
       kind: "unavailable",
-      reason: expect.stringContaining("omo-onboarding-scan.js is missing"),
+      reason: expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`),
     })
+    expect(JSON.stringify(response)).not.toContain("SYNTH-USER")
     expect(await repo.head()).toBe(head)
     expect(await snapshotTree(context.identityPaths.root)).toEqual(before)
   }, 60_000)

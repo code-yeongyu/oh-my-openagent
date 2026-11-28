@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:d520b4381f043adcbf6b5f434aac19d9dff26e7ea49e4b877b7a7b1129ebb42d:3a181286e59c69174578fbc129d7c7c506f4b01c5652808459635fafffe76eb4
+// omo-codex-install:e42c0f130a9ef0c59e978f0a5f9375b9ed7796eb1f0528718ab3b0b9479ffcba:befe9ce8b1d7ab3191416eededd5b53a9213eef88a38f1e830b31a9bc386e2f0
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -20638,25 +20638,30 @@ async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
 }
 
 // packages/omo-codex/src/install/codex-cache-payload.ts
-import { cp as cp2, lstat as lstat5, mkdtemp, readdir as readdir4, rename, rm as rm4 } from "node:fs/promises";
+import { cp as cp2, lstat as lstat5, mkdtemp, readdir as readdir4, rename, rm as rm4, stat as stat4 } from "node:fs/promises";
 import { join as join9, relative as relative4, sep as sep4 } from "node:path";
 var NPM_BIN_PATH_SEGMENT = `${sep4}node_modules${sep4}.bin${sep4}`;
+var isNpmBinEntry = (pluginRoot, path) => `${sep4}${relative4(pluginRoot, path)}`.includes(NPM_BIN_PATH_SEGMENT);
 async function finalizeCachedPluginPayload(pluginRoot) {
-  await materializeDirectory(pluginRoot);
+  await materializeDirectory(pluginRoot, pluginRoot);
   const unsupported = await unsupportedEntries(pluginRoot, pluginRoot);
-  if (unsupported.length > 0) {
-    throw new Error(`Codex plugin contains unsupported entry types: ${unsupported.sort().join(", ")}`);
-  }
+  if (unsupported.length > 0)
+    throw unsupportedEntryError(unsupported);
 }
-async function materializeDirectory(directory) {
+var unsupportedEntryError = (paths) => new Error(`Codex plugin contains unsupported entry types: ${[...paths].sort().join(", ")}`);
+async function materializeDirectory(pluginRoot, directory) {
   for (const name of await readdir4(directory)) {
     const path = join9(directory, name);
     let entry = await lstat5(path);
-    if (path.includes(NPM_BIN_PATH_SEGMENT) && !entry.isFile() && !entry.isDirectory()) {
+    if (isNpmBinEntry(pluginRoot, path) && !entry.isFile() && !entry.isDirectory()) {
       await rm4(path, { recursive: true, force: true });
       continue;
     }
     if (entry.isSymbolicLink()) {
+      if (await stat4(path).catch(() => {
+        return;
+      }) === undefined)
+        throw unsupportedEntryError([relative4(pluginRoot, path)]);
       const staging = await mkdtemp(join9(directory, ".omo-materialize-"));
       try {
         const copyPath = join9(staging, "entry");
@@ -20664,7 +20669,7 @@ async function materializeDirectory(directory) {
           recursive: true,
           dereference: true,
           filter: async (source) => {
-            if (!source.includes(NPM_BIN_PATH_SEGMENT))
+            if (!isNpmBinEntry(pluginRoot, source))
               return true;
             const sourceEntry = await lstat5(source);
             return sourceEntry.isFile() || sourceEntry.isDirectory();
@@ -20678,7 +20683,7 @@ async function materializeDirectory(directory) {
       entry = await lstat5(path);
     }
     if (entry.isDirectory())
-      await materializeDirectory(path);
+      await materializeDirectory(pluginRoot, path);
   }
 }
 async function unsupportedEntries(root, directory) {
@@ -20972,7 +20977,7 @@ function repoRootForCodexPluginSource(sourcePath) {
   return dirname4(packagesRoot);
 }
 // packages/omo-codex/src/install/codex-cache-prune.ts
-import { lstat as lstat6, readdir as readdir6, rm as rm6, stat as stat4 } from "node:fs/promises";
+import { lstat as lstat6, readdir as readdir6, rm as rm6, stat as stat5 } from "node:fs/promises";
 import { join as join12 } from "node:path";
 async function pruneMarketplaceCache(input) {
   const cacheRoot = join12(input.codexHome, "plugins", "cache", input.marketplaceName);
@@ -21028,7 +21033,7 @@ async function isBrokenCacheSymlink(path) {
     throw error;
   }
   try {
-    await stat4(path);
+    await stat5(path);
     return false;
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
@@ -21037,7 +21042,7 @@ async function isBrokenCacheSymlink(path) {
   }
 }
 // packages/omo-codex/src/install/codex-cached-marketplace-manifest.ts
-import { mkdir as mkdir4, rename as rename3, rm as rm7, stat as stat5, writeFile as writeFile4 } from "node:fs/promises";
+import { mkdir as mkdir4, rename as rename3, rm as rm7, stat as stat6, writeFile as writeFile4 } from "node:fs/promises";
 import { join as join13 } from "node:path";
 async function writeCachedMarketplaceManifest(input) {
   const marketplaceDir = join13(input.marketplaceRoot, ".agents", "plugins");
@@ -21066,7 +21071,7 @@ async function writeCachedMarketplaceManifest(input) {
 }
 async function isDirectory2(path) {
   try {
-    return (await stat5(path)).isDirectory();
+    return (await stat6(path)).isDirectory();
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT")
       return false;

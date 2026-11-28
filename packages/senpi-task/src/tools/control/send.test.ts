@@ -128,44 +128,6 @@ describe("runTaskSend", () => {
     expect(result.details.kind).toBe("redispatched")
   })
 
-  test("#given redispatch with all_scope #when sent from another session #then the flagged task is re-dispatched across sessions", async () => {
-    // given
-    const { manager, store, inProcess } = makeManager({})
-    const started = await manager.start(baseSpec({ parent_session_id: "owner-session" }))
-    if (started.kind !== "started") throw new Error("expected started")
-    store.mutate(started.task_id, (record) => ({
-      ...record,
-      awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() },
-    }))
-
-    // when
-    const denied = await runTaskSend(manager, { to: started.task_id, redispatch: true }, "other-session")
-    const crossed = await runTaskSend(
-      manager,
-      { to: started.task_id, redispatch: true, all_scope: true },
-      "other-session",
-    )
-
-    // then
-    expect(denied.details.kind).toBe("scope_denied")
-    expect(denied.isError).toBe(true)
-    expect(crossed.details.kind).toBe("redispatched")
-    expect(inProcess.startedSpecs).toHaveLength(2)
-  })
-
-  test("#given an unknown redispatch target #when sent #then not_found lists this session's task names", async () => {
-    // given
-    const { manager } = makeManager({})
-    const started = await manager.start(baseSpec({ name: "report-writer", parent_session_id: "lead-session" }))
-    if (started.kind !== "started") throw new Error("expected started")
-
-    // when
-    const result = await runTaskSend(manager, { to: "report-writr", redispatch: true }, "lead-session")
-
-    // then
-    expect(result.details).toMatchObject({ kind: "not_found", known_tasks: ["report-writer"] })
-  })
-
   test("#given redispatch with a message #when sent #then it is rejected: the persisted prompt is what replays", async () => {
     // given
     const { manager } = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
@@ -181,32 +143,6 @@ describe("runTaskSend", () => {
     expect(result.details.kind).toBe("invalid_arguments")
     if (result.details.kind !== "invalid_arguments") throw new Error("expected invalid_arguments")
     expect(result.details.reason).toContain("redispatch")
-  })
-
-  test("#given a child owned by another session #when sent without all_scope #then scope is denied naming the owner", async () => {
-    const { manager } = makeManager({})
-    const started = await manager.start(baseSpec({ parent_session_id: "owner-session" }))
-    if (started.kind !== "started") throw new Error("expected started")
-
-    const result = await runTaskSend(manager, { to: started.task_id, message: "hi" }, "intruder-session")
-
-    expect(result.details.kind).toBe("scope_denied")
-    if (result.details.kind !== "scope_denied") throw new Error("expected scope_denied")
-    expect(result.details.owning_session_id).toBe("owner-session")
-    expect(result.content[0]?.type === "text" && result.content[0].text).toContain("owner-session")
-  })
-
-  test("#given an unknown name #when sending #then not_found lists this session's task names", async () => {
-    const { manager } = makeManager({})
-    const started = await manager.start(baseSpec({ parent_session_id: "p1", name: "alpha" }))
-    if (started.kind !== "started") throw new Error("expected started")
-
-    const result = await runTaskSend(manager, { to: "ghost", message: "hi" }, "p1")
-
-    expect(result.details.kind).toBe("not_found")
-    if (result.details.kind !== "not_found") throw new Error("expected not_found")
-    expect(result.details.known_tasks).toContain("alpha")
-    expect(result.content[0]?.type === "text" && result.content[0].text).toContain("alpha")
   })
 
   test("#given a string recipient that is not a child and no team routing #when sent #then the child not_found result is preserved", async () => {

@@ -9,11 +9,12 @@
 // "NOT INSTALLED / npm install -g" message instead of diagnostics.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { fileFingerprint } from "../../../omo-senpi/scripts/qa/isolation-state.mjs"
 import { withTelemetryOptOut } from "../../../omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -58,7 +59,7 @@ function digestDirectory(root) {
   for (const file of listFiles(root).sort()) {
     hash.update(relative(root, file))
     hash.update("\0")
-    hash.update(createHash("sha256").update(readFileSync(file)).digest("hex"))
+    hash.update(fileFingerprint(file))
     hash.update("\0")
   }
   return hash.digest("hex")

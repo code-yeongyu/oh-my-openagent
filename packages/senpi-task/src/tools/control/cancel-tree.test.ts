@@ -75,7 +75,7 @@ function managerWithLifecycle() {
 
 describe("a root's cancel of a grandchild is the terminal state its middle child reads", () => {
   test("#given a running middle child and its running task #when the root session cancels that task #then the middle child reads it cancelled and is itself untouched", async () => {
-    const { manager, store, lifecycle } = managerWithLifecycle()
+    const { manager, store } = managerWithLifecycle()
     const middle = await manager.start(baseSpec({ parent_session_id: ROOT, root_session_id: ROOT }))
     if (middle.kind !== "started") throw new Error(`middle child did not start: ${middle.kind}`)
     await launchSettled(manager, middle.task_id)

@@ -7,6 +7,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { parseJsonc } from "./jsonc.js"
+import { describeReadFailure } from "./read-failure.js"
 
 // `interpolateString` in the engine's mcp config rejects any string value that looks like command
 // substitution - one containing `$(` or starting (after leading whitespace) with `!` - and one bad
@@ -68,7 +69,9 @@ function readDocuments(files, label, notices) {
     try {
       parsed = parseJsonc(readFileSync(path, "utf8"))
     } catch (error) {
-      notices.push(`WARN opencode: could not parse ${path}: ${error.message}; its ${label} were not imported`)
+      notices.push(
+        `WARN opencode: could not parse ${path}: ${describeReadFailure(error)}; its ${label} were not imported`,
+      )
       continue
     }
     if (!isPlainObject(parsed)) {

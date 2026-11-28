@@ -329,13 +329,17 @@ describe("task 13 senpi QA scripts", () => {
       expect(payload.realSenpiChangedPaths).toEqual([])
       expect(payload.realSenpiProtectedStateComplete).toBe(process.platform !== "win32")
       expect(payload.realSenpiProtectedErrors.map((error: { code: string }) => error.code)).toEqual(
-        process.platform === "win32" ? Array(12).fill("NO_FOLLOW_UNAVAILABLE") : [],
+        // The four content-compared protected files need no-follow reads, before and after; the two secret-bearing files
+        // are observed by lstat alone (#15314), so they add no error.
+        process.platform === "win32" ? Array(8).fill("NO_FOLLOW_UNAVAILABLE") : [],
       )
       expect(payload.realOmoUntouched).toBe(directoryIdentity)
       expect(payload.realOmoChangedPaths).toEqual([])
       expect(payload.realOmoProtectedStateComplete).toBe(process.platform !== "win32")
       expect(payload.realOmoProtectedErrors.map((error: { code: string }) => error.code)).toEqual(
-        process.platform === "win32" ? Array(12).fill("NO_FOLLOW_UNAVAILABLE") : [],
+        // The four content-compared protected files need no-follow reads, before and after; the two secret-bearing files
+        // are observed by lstat alone (#15314), so they add no error.
+        process.platform === "win32" ? Array(8).fill("NO_FOLLOW_UNAVAILABLE") : [],
       )
       expect(payload.realSenpiObservedChangedPaths).toEqual([])
       expect(payload.realOmoObservedChangedPaths).toEqual([])

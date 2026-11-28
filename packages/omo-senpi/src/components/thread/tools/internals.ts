@@ -32,6 +32,7 @@ import {
   type ThreadToolSurfaceOptions,
 } from "./ports"
 import { activityDetail, retryWait, threadModel, threadState } from "./thread-state"
+import { claimedRowProof, engineRowProof } from "./row-liveness"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -120,6 +121,8 @@ export type ThreadToolSummary = Omit<
   /** Deprecated beside `state`: `resumable` when no engine holds the thread, else `live`. */
   readonly status: "live" | "resumable"
   readonly state: ThreadState
+  readonly liveness?: import("./row-liveness").RowLiveness
+  readonly verification?: "unverified"
   /** The engine's finer activity of a held thread (senpi#6688); `state` folds it. */
   readonly activity?: ThreadActivity
   /** With `errored`: the failed turn's category. */
@@ -179,7 +182,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     thread_id: id,
     name: entry?.title ?? threadTitle(session.name, null) ?? "",
     status: held ? "live" : "resumable",
-    state: threadState({ archived, held, activity, opening }),
+    ...engineRowProof(threadState({ archived, held, activity, opening }), session),
     ...(opening ? { controls: [] } : {}),
     ...threadModel(model),
     ...activityDetail(held && !opening && archived !== true, activity, error_code, turn_id),
@@ -289,7 +292,7 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     thread_id: entry.thread_id,
     name: entry.title ?? "",
     status: "resumable",
-    state: threadState({ archived: entry.archived, held: false }),
+    ...claimedRowProof(threadState({ archived: entry.archived, held: false }), entry),
     created_at: entry.created_at,
     updated_at: entry.updated_at,
     endpoint: entry.endpoint,

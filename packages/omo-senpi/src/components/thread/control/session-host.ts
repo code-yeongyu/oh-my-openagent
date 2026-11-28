@@ -60,7 +60,9 @@ export type HostedThread = ThreadToolSummary & {
  */
 export function openedThread(session: ThreadHostSession): ThreadToolSummary {
   const { sessionId, durableSessionId, cwd, name, status, createdAt, updatedAt, created_at, updated_at } = session
-  return summary({
+  // An open reply carries no listing's row evidence, so `summary()` would mark the new thread `unverified`: that flag is
+  // a listing's proof, not part of what thread_create answers on either leg.
+  const { verification: _unverifiedListing, ...opened } = summary({
     sessionId,
     cwd,
     ...(durableSessionId === undefined ? {} : { durableSessionId }),
@@ -71,6 +73,7 @@ export function openedThread(session: ThreadHostSession): ThreadToolSummary {
     ...(created_at === undefined ? {} : { created_at }),
     ...(updated_at === undefined ? {} : { updated_at }),
   })
+  return opened
 }
 
 /** The engine's reply state as the tools report a thread (`openedThread()`), with `device` when it is not this device's. */
