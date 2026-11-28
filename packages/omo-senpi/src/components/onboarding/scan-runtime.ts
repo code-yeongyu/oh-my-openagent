@@ -12,6 +12,7 @@ import {
   type SetupPlans,
   type SetupStageResult,
 } from "../../../../omo-native/bin/lib/setup-stream.js"
+import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
 import type { OnboardingEngineAuthStore } from "./scan-component"
 import type {
   OnboardingApplyResponse,
@@ -98,7 +99,8 @@ export async function runOnboardingScan(
     if (result.disabled === true) continue
     const source: OnboardingScanSource = result.source
     if (result.error !== undefined) {
-      send({ kind: "source_failed", source, reason: result.error.message })
+      // A source's error can carry runtime text quoting a file it read; the reason keeps the kind only.
+      send({ kind: "source_failed", source, reason: describeReadFailure(result.error) })
       continue
     }
     for (const item of result.items) send({ kind: "item", source, item })

@@ -16,6 +16,8 @@ export type GatewayTarget = {
   readonly durable_id: string
   readonly endpoint: GatewayEndpointRef | null
   readonly liveness: EndpointLiveness
+  /** Set when the target's endpoint answered but its dial was refused for the host's identity. */
+  readonly refusal?: "host_identity_unproven"
 }
 
 export type GatewayResolution =
@@ -27,6 +29,7 @@ export type GatewayResolve = (address: string, options: { readonly all_scope?: b
 export type GatewayAddressEntry = ThreadAddressEntry & {
   readonly endpoint: GatewayEndpointRef | null
   readonly liveness: EndpointLiveness
+  readonly refusal?: "host_identity_unproven"
 }
 
 export type GatewayDeliverRequest = {
@@ -77,7 +80,15 @@ export function resolveFromEntries(
       return { kind: "error", error: threadToolFailure(resolved.code, resolved.message, resolved.next_action, details) }
     }
     const entry = resolved.entry as GatewayAddressEntry
-    return { kind: "ok", target: { durable_id: entry.thread_id, endpoint: entry.endpoint, liveness: entry.liveness } }
+    return {
+      kind: "ok",
+      target: {
+        durable_id: entry.thread_id,
+        endpoint: entry.endpoint,
+        liveness: entry.liveness,
+        ...(entry.refusal === undefined ? {} : { refusal: entry.refusal }),
+      },
+    }
   }
 }
 
@@ -235,7 +246,10 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       return await settle(absorbed.kind === "ok" ? { ...absorbed, collapsed: true } : absorbed)
     }
     try {
-      if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))
+      if (endpoint === null) {
+        const offline = resultFromRow(outcome.row, outcome.queue_position, null, false, true)
+        return await settle(target.refusal === undefined ? offline : waitingOnHostIdentity(offline))
+      }
       let reply: Awaited<ReturnType<GatewayEndpointPort["wake"]>> | undefined
       try {
         reply = await options.endpoints.wake(endpoint, [deliveryId])
@@ -266,4 +280,20 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
   }
 
   return { deliver }
+}
+
+/**
+ * A target whose endpoint answered but was refused for its host's identity is not offline: a live host holds the session
+ * and its own drain takes the row from the store, while this process never wakes or dials it.
+ */
+function waitingOnHostIdentity(result: GatewayDeliveryResult): GatewayDeliveryResult {
+  if (result.kind !== "ok" || result.delivery.kind !== "queued_offline") return result
+  return {
+    ...result,
+    delivery: {
+      kind: "queued",
+      queue_position: result.delivery.queue_position,
+      waiting_on: { kind: "host_identity_unproven" },
+    },
+  }
 }
