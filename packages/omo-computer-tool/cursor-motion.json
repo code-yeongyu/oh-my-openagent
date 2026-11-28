@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "minMs": 150,
+  "maxMs": 450,
+  "baseMs": 150,
+  "perDoublingMs": 75,
+  "distanceUnitPoints": 16,
+  "easing": [0.2, 0, 0, 1],
+  "fadeMs": 150
+}

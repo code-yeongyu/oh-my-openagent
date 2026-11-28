@@ -59,7 +59,8 @@ ADP-57	goat-cu	40c6f6ebf8	MIT	adapt	Approval that cannot arrive through the agen
 ADP-58	goat-cu	40c6f6ebf8	MIT	adapt	Authority bound to an inherited connection; end of that connection revokes every delegated session	18
 ADP-59	agent-desktop	54855b6225	Apache-2.0	adapt	An agent-owned macOS desktop: a guest set up once by a person and cloned headless afterwards, with a fresh host key per clone; our engine runs persistently in the guest instead of one process per command	44
 ADP-60	goat-cu	40c6f6ebf8	MIT	adapt	Action history as metadata only: start and completion pairs from the dispatch seam, a bounded queue that never blocks an action, an encrypted store keyed by the OS credential store; no screenshots, text or titles	47
-ADP-61	goat-cu	40c6f6ebf8	MIT	adapt	A cursor that carries state: a colour per session, an action badge, one shared motion planner on every desktop	47
+ADP-61	goat-cu	40c6f6ebf8	MIT	adapt	A cursor that carries state: a colour per session, an action badge, one shared motion planner on every desktop	47, 52
 ADP-62	goat-cu	40c6f6ebf8	MIT	adopt	A batching nudge: after three single actions in a row the result suggests one cell	14
 ADP-63	goat	ef32f951c4	MIT	reject	Treating an unknown secure-field state as secure and refusing	
 ADP-64	goat-cu	40c6f6ebf8	MIT	reject	A bundled screen-parsing model for element detection	
+ADP-65	goat	ef32f951c4	MIT	adapt	Glide timing in the screen overlay: the duration grows with the logarithm of the distance inside fixed bounds, a newer target retargets the running glide from the point reached, reduced motion skips the glide	52

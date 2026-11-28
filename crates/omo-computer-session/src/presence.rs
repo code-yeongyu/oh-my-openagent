@@ -5,6 +5,10 @@
 //! `Suspended` - on `display.release`, a lock, the surface going away or any stop.
 //! `computer.foreground_input_lock` is opt-in and off: the user wins every race.
 
+pub mod look;
+pub mod motion;
+pub mod units;
+
 use omo_computer_core::backend::{Backend, Presence};
 use omo_computer_safety::gate::verdicts::LeaseRefusal;
 

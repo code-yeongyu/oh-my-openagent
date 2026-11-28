@@ -8,10 +8,18 @@
 		".": {
 			"types": "./src/index.ts",
 			"import": "./src/index.ts"
-		}
+		},
+		"./cursor-motion.json": "./cursor-motion.json",
+		"./cursor-look.json": "./cursor-look.json"
 	},
 	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"cursor-motion.json",
+		"cursor-look.json"
+	],
 	"scripts": {
+		"generate": "bun scripts/generate-cursor-tables.ts",
 		"typecheck": "tsgo --noEmit -p tsconfig.json",
 		"test": "vitest --run test"
 	},
