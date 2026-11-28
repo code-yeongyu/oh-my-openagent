@@ -194,7 +194,7 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/src/components/computer-use/permission-registry.test-fixture.ts": 1,
   "packages/omo-senpi/src/components/init-deep-advisor/component.ts": 1,
   "packages/omo-senpi/src/components/lsp/daemon-tool-client.ts": 1,
-  "packages/omo-senpi/src/components/onboarding/scan-component.ts": 1,
+  "packages/omo-senpi/src/components/onboarding/scan-runtime-loader.ts": 1,
   "packages/omo-senpi/src/components/side-panel/index.ts": 1,
   "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": 1,
   // A test fixture for the paged thread_read tests (#14053); it loads senpi's projector by a computed specifier.

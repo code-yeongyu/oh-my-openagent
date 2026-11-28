@@ -27,7 +27,8 @@ describe("describeReadFailure", () => {
       "not valid JSON",
     ],
     ["a filesystem error", withCode("EACCES"), "EACCES"],
-    ["a filesystem error with its path", withCode("EISDIR", "/tmp/omo.jsonc"), "EISDIR (/tmp/omo.jsonc)"],
+    // #15352: the path is absolute and names the user's home; every notice already names its file.
+    ["a filesystem error with its path", withCode("EISDIR", `/home/${TOKEN}/.omo/omo.jsonc`), "EISDIR"],
     ["a non-filesystem code", withCode("ERR_SOMETHING"), "an unexpected error"],
     ["an arbitrary error", new Error(`failed near ${TOKEN}`), "an unexpected error"],
     ["a thrown non-error", TOKEN, "an unexpected error"],
