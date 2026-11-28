@@ -13,6 +13,10 @@ export const TmuxConfigSchema = z.object({
   main_pane_min_width: z.number().min(40).default(120),
   agent_pane_min_width: z.number().min(20).default(40),
   isolation: TmuxIsolationSchema.default("inline"),
+  server_url_override: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : val),
+    z.string().url().optional(),
+  ),
 }) satisfies z.ZodType<TmuxConfig>
 
 export type { TmuxConfig, TmuxIsolation, TmuxLayout }
