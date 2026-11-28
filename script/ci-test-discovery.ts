@@ -1,7 +1,77 @@
 import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 
 // The test files one `bun --config=<config> test <filters...>` invocation selects, run from the repository root.
-// ci-shard-coverage.ts checks recorded shards against it; ci-macos-partition.test.ts checks the macOS jobs with it.
+// ci-shard-coverage.ts checks recorded shards against it; ci-macos-partition.test.ts and ci-windows-partition.test.ts
+// check the macOS and Windows jobs with it.
+
+export interface Invocation {
+  readonly config: string
+  readonly filters: readonly string[]
+}
+
+// The unsplit suites the platform partitions must cover exactly: root shard 1 (omo-opencode + memory-core, which the
+// Linux parts and the macOS and Windows jobs each split differently) and the Senpi package suite.
+export const ROOT_SHARD_1: Invocation = {
+  config: "bunfig.toml",
+  filters: ["packages/omo-opencode", "packages/memory-core"],
+}
+export const SENPI_SUITE: Invocation = { config: "bunfig.toml", filters: ["packages/omo-senpi"] }
+
+// The split Windows suites (#14942): each named invocation writes <name>.timings.json through windows-ci-telemetry.ps1
+// -TimingRecord, and the Linux status job checks the records against the unsplit suite.
+export const WINDOWS_SPLITS = {
+  "windows-root": { suite: ROOT_SHARD_1, records: ["shard-1a", "shard-1b"] },
+  "windows-senpi": {
+    suite: SENPI_SUITE,
+    records: ["senpi-one", "senpi-two", "senpi-three-worker", "senpi-three-rest"],
+  },
+} as const satisfies Record<string, { suite: Invocation; records: readonly string[] }>
+export type WindowsSplit = keyof typeof WINDOWS_SPLITS
+
+// One `bun [--config=<file>] test <flags and filters>` command line; an unmodeled flag fails instead of being guessed.
+export function parseBunTest(line: string): Invocation {
+  const tokens = line
+    .replace(/\$\(junit [^)]*\)/g, "")
+    .trim()
+    .split(/\s+/)
+  if (tokens[0] !== "bun") throw new Error(`not a bun command: ${line}`)
+  let config = "bunfig.toml"
+  let index = 1
+  for (; tokens[index] !== "test"; index++) {
+    const token = tokens[index]
+    if (token === undefined || !token.startsWith("--config=")) throw new Error(`unmodeled bun command: ${line}`)
+    config = token.slice("--config=".length)
+  }
+  const filters: string[] = []
+  for (index++; index < tokens.length; index++) {
+    const token = tokens[index] ?? ""
+    if (token === "--timeout") index++
+    else if (token.startsWith("--") && token.includes("=")) continue
+    else if (token.startsWith("-")) throw new Error(`unmodeled bun test flag ${token}: ${line}`)
+    else filters.push(token)
+  }
+  return { config, filters }
+}
+
+export interface TimedInvocation {
+  readonly record: string
+  readonly invocation: Invocation
+}
+
+// Every `windows-ci-telemetry.ps1 -Invocation "<name>" -TimingRecord -TestArguments @(...)` call of one pwsh step.
+export function windowsTimedInvocations(run: string): TimedInvocation[] {
+  return [...run.matchAll(/-Invocation "([a-z0-9-]+)" `\s*-TimingRecord `\s*-TestArguments @\(([^)]*)\)/g)].map(
+    ([, record = "", args = ""]) => ({
+      record,
+      invocation: parseBunTest(
+        `bun ${args
+          .split(",")
+          .map((arg) => arg.trim().replace(/^"|"$/g, ""))
+          .join(" ")}`,
+      ),
+    }),
+  )
+}
 
 const testName = /[._](?:test|spec)\.(?:[jt]sx?|[cm][jt]s)$/i
 

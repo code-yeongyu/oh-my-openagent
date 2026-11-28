@@ -1,17 +1,25 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { discoverTestFiles } from "./ci-test-discovery.ts"
+import {
+  discoverTestFiles,
+  type Invocation,
+  SENPI_SUITE,
+  WINDOWS_SPLITS,
+  type WindowsSplit,
+} from "./ci-test-discovery.ts"
 
+// Linux groups: each part uploads one ci-shard-<group>-<part>/ci-shard-record.json artifact.
 const groups = {
-  root: { config: "bunfig.win2.parallel.toml", filter: "", parts: ["remainder-1", "remainder-2"] },
-  senpi: { config: "bunfig.toml", filter: "packages/omo-senpi", parts: ["one", "two"] },
-} as const
+  root: { suite: { config: "bunfig.win2.parallel.toml", filters: [] }, parts: ["remainder-1", "remainder-2"] },
+  senpi: { suite: SENPI_SUITE, parts: ["one", "two"] },
+} as const satisfies Record<string, { suite: Invocation; parts: readonly string[] }>
 type Group = keyof typeof groups
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+// Bun writes Windows record keys with backslashes; discovery lists repository paths with forward slashes.
 function readTimings(path: string): Map<string, number> {
   const data: unknown = JSON.parse(readFileSync(path, "utf8"))
   if (!isRecord(data) || data["version"] !== 1 || !isRecord(data["files"])) {
@@ -22,24 +30,24 @@ function readTimings(path: string): Map<string, number> {
     if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) {
       throw new Error(`${path}: invalid duration for ${file}`)
     }
-    files.set(file, ms)
+    files.set(file.replaceAll("\\", "/"), ms)
   }
   return files
 }
 
-function verify(group: Group, dir: string): Map<string, number> {
-  const { config, filter } = groups[group]
-  const expected = discoverTestFiles(config, filter === "" ? [] : [filter])
-  const record = (part: string) => readTimings(join(dir, `ci-shard-${group}-${part}`, "ci-shard-record.json"))
-  const [one, two] = groups[group].parts
-  const first = record(one)
-  const second = record(two)
-  const combined = new Map([...first, ...second])
-  const differences = [
-    ...[...first.keys()]
-      .filter((file) => second.has(file))
-      .sort()
-      .map((file) => `duplicate: ${file}`),
+function compare(label: string, suite: Invocation, records: ReadonlyMap<string, Map<string, number>>) {
+  const expected = discoverTestFiles(suite.config, suite.filters)
+  const seen = new Set<string>()
+  const differences: string[] = []
+  for (const files of records.values()) {
+    for (const file of files.keys()) {
+      if (seen.has(file)) differences.push(`duplicate: ${file}`)
+      else seen.add(file)
+    }
+  }
+  const combined = new Map([...records.values()].flatMap((files) => [...files]))
+  differences.sort()
+  differences.push(
     ...[...expected]
       .filter((file) => !combined.has(file))
       .sort()
@@ -48,15 +56,40 @@ function verify(group: Group, dir: string): Map<string, number> {
       .filter((file) => !expected.has(file))
       .sort()
       .map((file) => `unexpected: ${file}`),
-  ]
-  if (differences.length > 0) throw new Error(`${group} shard coverage mismatch:\n${differences.join("\n")}`)
-  console.log(`${group}: ${expected.size} files match discovery exactly (${first.size} + ${second.size}; no overlap)`)
+  )
+  if (differences.length > 0) throw new Error(`${label} shard coverage mismatch:\n${differences.join("\n")}`)
+  const sizes = [...records.values()].map((files) => files.size).join(" + ")
+  console.log(`${label}: ${expected.size} files match discovery exactly (${sizes}; no overlap)`)
   return combined
+}
+
+function verify(group: Group, dir: string): Map<string, number> {
+  const records = new Map(
+    groups[group].parts.map((part) => [
+      part,
+      readTimings(join(dir, `ci-shard-${group}-${part}`, "ci-shard-record.json")),
+    ]),
+  )
+  return compare(group, groups[group].suite, records)
+}
+
+// The artifact directory names carry run ids, so each record is found by its file name, exactly once.
+function verifyWindows(group: WindowsSplit, dir: string): void {
+  const records = new Map<string, Map<string, number>>()
+  for (const name of WINDOWS_SPLITS[group].records) {
+    const found = [...new Bun.Glob(`**/${name}.timings.json`).scanSync({ cwd: dir })]
+    if (found.length !== 1)
+      throw new Error(`${group}: expected one ${name}.timings.json under ${dir}, found ${found.length}`)
+    records.set(name, readTimings(join(dir, found[0] ?? "")))
+  }
+  compare(group, WINDOWS_SPLITS[group].suite, records)
 }
 
 const [mode, records, output, ...extra] = process.argv.slice(2)
 if (!records || extra.length > 0) {
-  throw new Error("Usage: bun script/ci-shard-coverage.ts <root|senpi|merge> <records-dir> [merged-file]")
+  throw new Error(
+    "Usage: bun script/ci-shard-coverage.ts <root|senpi|windows-root|windows-senpi|merge> <records-dir> [merged-file]",
+  )
 }
 if (mode === "merge" && output) {
   const root = verify("root", records)
@@ -67,6 +100,10 @@ if (mode === "merge" && output) {
   writeFileSync(output, `${JSON.stringify({ version: 1, files }, null, 2)}\n`)
 } else if ((mode === "root" || mode === "senpi") && output === undefined) {
   verify(mode, records)
+} else if ((mode === "windows-root" || mode === "windows-senpi") && output === undefined) {
+  verifyWindows(mode, records)
 } else {
-  throw new Error("Expected root or senpi without an output path, or merge with an output path")
+  throw new Error(
+    "Expected root, senpi, windows-root or windows-senpi without an output path, or merge with an output path",
+  )
 }

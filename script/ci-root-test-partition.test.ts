@@ -3,6 +3,23 @@ import { existsSync, readFileSync } from "node:fs"
 import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineCommand } from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
+const workflowJobs = (Bun.YAML.parse(workflow) as { jobs: Record<string, WorkflowJob> }).jobs
+
+interface WorkflowJob {
+  readonly name?: string
+  readonly needs?: readonly string[]
+  readonly if?: string
+  readonly "runs-on"?: string
+  readonly strategy?: { readonly matrix?: { readonly include?: ReadonlyArray<Record<string, string>> } }
+  readonly steps?: ReadonlyArray<{ readonly id?: string; readonly run?: string }>
+}
+
+// The arguments of every `windows-ci-telemetry.ps1 -Invocation <name>` call in a job, keyed by invocation name.
+function telemetryInvocations(jobId: string): Map<string, string> {
+  const runs = (workflowJobs[jobId]?.steps ?? []).map((step) => step.run ?? "").join("\n")
+  const calls = runs.split("& .github/scripts/windows-ci-telemetry.ps1").slice(1)
+  return new Map(calls.map((call) => [/-Invocation "([^"]+)"/.exec(call)?.[1] ?? "", call]))
+}
 const posixShard2 = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
 const windowsTelemetryScript = readFileSync(
   new URL("../.github/scripts/windows-ci-telemetry.ps1", import.meta.url),
@@ -13,7 +30,7 @@ const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
 const win2WindowsParallelConfigPath = new URL("../bunfig.win2.parallel.windows.toml", import.meta.url)
 const win2RestConfigPath = new URL("../bunfig.win2.parallel.rest.toml", import.meta.url)
-const macosShard1bConfigPath = new URL("../bunfig.macos-shard-1b.toml", import.meta.url)
+const macosShard1bConfigPath = new URL("../bunfig.root-shard-1b.toml", import.meta.url)
 
 function quarantinedTestPaths(config: string): readonly string[] {
   return [...config.matchAll(/"([^"]+\.test\.ts)"/g)].map((match) => match[1] ?? "")
@@ -37,12 +54,15 @@ function linuxTestJobs(): string {
   return workflow.slice(start, end)
 }
 
-function senpiCompatibilityJob(): string {
-  const start = workflow.indexOf("  senpi-compatibility:\n")
-  const end = workflow.indexOf("\n  lazycodex-published-smoke:", start)
-  if (start < 0 || end < 0) throw new Error("Senpi compatibility job not found")
+function workflowSlice(from: string, to: string): string {
+  const start = workflow.indexOf(`  ${from}:\n`)
+  const end = workflow.indexOf(`\n  ${to}:`, start)
+  if (start < 0 || end < 0) throw new Error(`${from} job not found`)
   return workflow.slice(start, end)
 }
+
+const windowsShard1Job = () => workflowSlice("test-windows-1", "windows-test-1-status")
+const senpiCompatibilityJob = () => workflowSlice("senpi-tests-windows", "windows-senpi-status")
 
 interface TestBunfig {
   readonly preload: unknown
@@ -95,8 +115,16 @@ describe("root test CI partition", () => {
     expect(matrix).toContain("- os: windows-latest")
     expect(matrix).not.toContain("- os: ubuntu-latest")
     expect(matrix).not.toContain("- os: macos-latest")
-    expect(matrix).toContain('shard: "1/2"')
+    expect(matrix).not.toContain('shard: "1/2"')
     expect(matrix).toContain('shard: "2/2"')
+    const status = workflowJobs["windows-test-1-status"]
+    expect(status).toMatchObject({
+      name: "test",
+      needs: ["ci-mode", "test-windows-1"],
+      if: "${{ always() && !cancelled() }}",
+      "runs-on": "ubuntu-26.04",
+    })
+    expect(status?.strategy?.matrix?.include).toEqual([{ os: "windows-latest", shard: "1/2" }])
     expect(matrix).not.toContain("config:")
     expect(matrix).not.toContain("test_args:")
     expect(matrix).not.toContain("parallel_args:")
@@ -111,7 +139,9 @@ describe("root test CI partition", () => {
   test("#given global zauc mocks #when Windows root tests are partitioned #then omo-opencode stays in one process", () => {
     const job = rootTestJob()
 
-    expect(job).toContain('-TestArguments @("test", "packages/omo-opencode", "packages/memory-core")')
+    expect(windowsShard1Job()).toContain(
+      '-TestArguments @("--config=bunfig.root-shard-1b.toml", "test", "packages/omo-opencode", "packages/memory-core")',
+    )
     expect(linuxTestJobs()).toContain("run: bun test --timeout 20000 packages/omo-opencode\n")
     expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")')
     expect(existsSync(win2ConfigPath)).toBe(true)
@@ -229,9 +259,10 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
     const runBlock = job.slice(job.indexOf("      - name: Run tests"))
 
-    expect(runBlock).toContain(
-      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2'",
-    )
+    for (const part of ["a", "b"]) {
+      expect(windowsShard1Job()).toContain(`if: matrix.part == '${part}'\n        shell: pwsh\n`)
+    }
+    expect(windowsShard1Job()).not.toContain("shell: bash\n        run: |")
     expect(runBlock).toContain(
       "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2'",
     )
@@ -280,8 +311,10 @@ describe("root test CI partition", () => {
   test("#given both Windows shards #when root tests run #then telemetry wraps every Bun invocation", () => {
     const job = rootTestJob()
 
-    expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(4)
-    expect(job).toContain('-Invocation "shard-1"')
+    expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(3)
+    const shard1 = telemetryInvocations("test-windows-1")
+    expect([...shard1.keys()].sort()).toEqual(["shard-1a", "shard-1b"])
+    for (const call of shard1.values()) expect(call).toMatch(/-TimingRecord\b/)
     expect(job).toContain('-Invocation "shard-2-quarantine"')
     expect(job).toContain('-Invocation "shard-2-rpc-host"')
     expect(job).toContain('-Invocation "shard-2-remainder"')
@@ -304,11 +337,12 @@ describe("root test CI partition", () => {
       job.indexOf("      - name: Write job summary"),
     )
 
-    expect(windowsStep).toContain("runner.os == 'Windows'")
+    expect(job).toContain("runs-on: windows-latest")
     expect(windowsStep).toContain("shell: pwsh")
-    expect(windowsStep).toContain("& .github/scripts/windows-ci-telemetry.ps1")
-    expect(windowsStep).toContain('-Invocation "senpi-compatibility"')
-    expect(windowsStep).toContain('-TestArguments @("test", "packages/omo-senpi")')
+    expect([...windowsStep.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(4)
+    for (const invocation of ["senpi-one", "senpi-two", "senpi-three-worker", "senpi-three-rest"]) {
+      expect(windowsStep).toContain(`-Invocation "${invocation}" \`\n              -TimingRecord \``)
+    }
     expect(windowsStep).toContain("exit $LASTEXITCODE")
     const stepBudget = Number(/^        timeout-minutes: (\d+)$/m.exec(windowsStep)?.[1])
     const jobBudget = Number(/^    timeout-minutes: (\d+)$/m.exec(job)?.[1])
@@ -320,7 +354,7 @@ describe("root test CI partition", () => {
     expect(stepBudget, "#11815: the step budget must leave room for the job's install and build steps").toBeLessThan(
       jobBudget,
     )
-    expect(uploadStep).toContain("if: always() && runner.os == 'Windows'")
+    expect(uploadStep).toContain("if: always()")
     expect(uploadStep).toContain("continue-on-error: true")
     expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
   })

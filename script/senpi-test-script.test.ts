@@ -265,14 +265,15 @@ describe("Senpi compatibility test script", () => {
     const workflow = readFileSync(ciWorkflowPath, "utf8")
 
     // #when
-    const senpiJob = sliceWorkflowSection(workflow, "  senpi-compatibility:", "  senpi-bundle-check:")
+    const senpiJob = sliceWorkflowSection(workflow, "  senpi-tests-windows:", "  windows-senpi-status:")
     const linuxTests = sliceWorkflowSection(workflow, "  senpi-tests-linux:", "  linux-senpi-status:")
     const linuxStatus = sliceWorkflowSection(workflow, "  linux-senpi-status:", "  save-shard-timings:")
     const posixScript = readFileSync(new URL("../.github/scripts/ci-senpi-posix.sh", import.meta.url), "utf8")
-    const needsReferences = workflow.match(/needs: \[[^\]]*senpi-compatibility[^\]]*\]/g) ?? []
+    const needsReferences = workflow.match(/needs: \[[^\]]*windows-senpi-status[^\]]*\]/g) ?? []
 
     // #then
-    expect(senpiJob).toContain("os: [windows-latest]")
+    expect(senpiJob).toContain("runs-on: windows-latest")
+    expect(senpiJob).toContain("part: [one, two, three]")
     expect(linuxStatus).toContain(
       "name: senpi-compatibility\n    needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]",
     )
@@ -304,7 +305,7 @@ describe("Senpi compatibility test script", () => {
     expect(senpiJob).not.toContain("senpi install")
     expect(
       needsReferences.length,
-      "senpi-compatibility must be included in both downstream needs lists",
+      "the Windows senpi-compatibility status must be included in both downstream needs lists",
     ).toBeGreaterThanOrEqual(2)
   })
 })

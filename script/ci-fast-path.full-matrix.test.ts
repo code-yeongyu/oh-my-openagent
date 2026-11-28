@@ -495,30 +495,27 @@ describe("full-matrix workflow wiring", () => {
   })
 
   describe("#given the OS matrix jobs", () => {
-    test.each(["test", "codex-compatibility", "senpi-compatibility"])(
-      "#then every heavy step in %s is ubuntu-first",
-      (jobName) => {
-        // given
-        const heavySteps = jobSteps(jobName).filter((step) => String(step["if"] ?? "").includes("run_heavy"))
+    test.each(["test", "codex-compatibility"])("#then every heavy step in %s is ubuntu-first", (jobName) => {
+      // given
+      const heavySteps = jobSteps(jobName).filter((step) => String(step["if"] ?? "").includes("run_heavy"))
 
-        // then
-        expect(heavySteps.length).toBeGreaterThan(0)
-        for (const step of heavySteps) {
-          const condition = String(step["if"])
-          const ubuntuFirst =
-            condition.includes(UBUNTU_OR_FULL_MATRIX) ||
-            // A step already pinned to ubuntu can never reach a non-ubuntu leg.
-            condition.includes("matrix.os == 'ubuntu-latest' &&") ||
-            condition.endsWith("matrix.os == 'ubuntu-latest'")
-          expect({ step: step["name"] ?? step["uses"], ubuntuFirst }).toEqual({
-            step: step["name"] ?? step["uses"],
-            ubuntuFirst: true,
-          })
-        }
-      },
-    )
+      // then
+      expect(heavySteps.length).toBeGreaterThan(0)
+      for (const step of heavySteps) {
+        const condition = String(step["if"])
+        const ubuntuFirst =
+          condition.includes(UBUNTU_OR_FULL_MATRIX) ||
+          // A step already pinned to ubuntu can never reach a non-ubuntu leg.
+          condition.includes("matrix.os == 'ubuntu-latest' &&") ||
+          condition.endsWith("matrix.os == 'ubuntu-latest'")
+        expect({ step: step["name"] ?? step["uses"], ubuntuFirst }).toEqual({
+          step: step["name"] ?? step["uses"],
+          ubuntuFirst: true,
+        })
+      }
+    })
 
-    test.each(["test", "codex-compatibility", "senpi-compatibility"])(
+    test.each(["test", "codex-compatibility", "test-windows-1", "senpi-tests-windows"])(
       "#then checkout and summary steps in %s stay unconditional",
       (jobName) => {
         // given
