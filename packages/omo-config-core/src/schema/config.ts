@@ -1,6 +1,7 @@
 import * as z from "zod"
 
 import { OmoAgentsConfigSchema } from "./agent"
+import { OmoAtomicSettingsLayerSchema, OmoAtomicSettingsSchema } from "./atomic"
 import { OmoCategoriesConfigSchema } from "./category"
 import { OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema } from "./computer"
 import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./git-master"
@@ -61,6 +62,7 @@ export const OmoTypedHarnessConfigSchema = z
     disabled_skills: OmoDisabledSkillsSchema.optional(),
     keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
+    atomic: OmoAtomicSettingsLayerSchema.optional(),
   })
   .strict()
 
@@ -87,6 +89,7 @@ export const OmoConfigProfileSchema = z
     disabled_skills: OmoDisabledSkillsSchema.optional(),
     keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
+    atomic: OmoAtomicSettingsLayerSchema.optional(),
     "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
     "[native]": OmoTypedHarnessConfigSchema.optional(),
     "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -118,6 +121,7 @@ export const OmoConfigSchema = z
     disabled_skills: OmoDisabledSkillsSchema.optional(),
     keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
+    atomic: OmoAtomicSettingsSchema.optional(),
     "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
     "[native]": OmoTypedHarnessConfigSchema.optional(),
     "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -152,6 +156,7 @@ export const OmoConfigLayerSchema = z
     disabled_skills: OmoDisabledSkillsSchema.optional(),
     keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
+    atomic: OmoAtomicSettingsLayerSchema.optional(),
     "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
     "[native]": OmoTypedHarnessConfigSchema.optional(),
     "[senpi]": OmoTypedHarnessConfigSchema.optional(),

@@ -1,4 +1,5 @@
 export * from "./agent"
+export * from "./atomic"
 export * from "./category"
 export * from "./config"
 export * from "./fallback-models"

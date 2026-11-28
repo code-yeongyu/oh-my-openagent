@@ -2784,6 +2784,91 @@
         "type": "string"
       }
     },
+    "atomic": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "binary_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "default": {
+            "enabled": true,
+            "limit": 5,
+            "budget_chars": 8000,
+            "timeout_ms": 1000,
+            "cache_ttl_ms": 15000
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "budget_chars": {
+              "default": 8000,
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 16000
+            },
+            "timeout_ms": {
+              "default": 1000,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 5000
+            },
+            "cache_ttl_ms": {
+              "default": 15000,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 60000
+            }
+          },
+          "additionalProperties": false
+        },
+        "recording": {
+          "default": {
+            "enabled": true,
+            "owner": "auto",
+            "timeout_ms": 30000
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "owner": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "omo",
+                "external"
+              ]
+            },
+            "timeout_ms": {
+              "default": 30000,
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 120000
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "[opencode]": {
       "$ref": "#/definitions/opencode"
     },
@@ -5332,6 +5417,70 @@
           "items": {
             "type": "string"
           }
+        },
+        "atomic": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "binary_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                },
+                "budget_chars": {
+                  "type": "integer",
+                  "minimum": 256,
+                  "maximum": 16000
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 5000
+                },
+                "cache_ttl_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 60000
+                }
+              },
+              "additionalProperties": false
+            },
+            "recording": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "owner": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "omo",
+                    "external"
+                  ]
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 120000
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -7881,6 +8030,70 @@
           "items": {
             "type": "string"
           }
+        },
+        "atomic": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "binary_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                },
+                "budget_chars": {
+                  "type": "integer",
+                  "minimum": 256,
+                  "maximum": 16000
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 5000
+                },
+                "cache_ttl_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 60000
+                }
+              },
+              "additionalProperties": false
+            },
+            "recording": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "owner": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "omo",
+                    "external"
+                  ]
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 120000
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -10430,6 +10643,70 @@
           "items": {
             "type": "string"
           }
+        },
+        "atomic": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "binary_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                },
+                "budget_chars": {
+                  "type": "integer",
+                  "minimum": 256,
+                  "maximum": 16000
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 5000
+                },
+                "cache_ttl_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 60000
+                }
+              },
+              "additionalProperties": false
+            },
+            "recording": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "owner": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "omo",
+                    "external"
+                  ]
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 120000
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -12986,6 +13263,70 @@
               "type": "string"
             }
           },
+          "atomic": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "binary_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "context": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "budget_chars": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 16000
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 5000
+                  },
+                  "cache_ttl_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 60000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "recording": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "owner": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "omo",
+                      "external"
+                    ]
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 120000
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "[opencode]": {
             "$ref": "#/definitions/opencode"
           },
@@ -15534,6 +15875,70 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "atomic": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "binary_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "context": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "budget_chars": {
+                        "type": "integer",
+                        "minimum": 256,
+                        "maximum": 16000
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 5000
+                      },
+                      "cache_ttl_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recording": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "owner": {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "omo",
+                          "external"
+                        ]
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 120000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -18083,6 +18488,70 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "atomic": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "binary_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "context": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "budget_chars": {
+                        "type": "integer",
+                        "minimum": 256,
+                        "maximum": 16000
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 5000
+                      },
+                      "cache_ttl_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recording": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "owner": {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "omo",
+                          "external"
+                        ]
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 120000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -20632,6 +21101,70 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "atomic": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "binary_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "context": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "budget_chars": {
+                        "type": "integer",
+                        "minimum": 256,
+                        "maximum": 16000
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 5000
+                      },
+                      "cache_ttl_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recording": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "owner": {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "omo",
+                          "external"
+                        ]
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 120000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -30554,6 +31087,70 @@
             "goal": {
               "default": false,
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "atomic": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "binary_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                },
+                "budget_chars": {
+                  "type": "integer",
+                  "minimum": 256,
+                  "maximum": 16000
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 5000
+                },
+                "cache_ttl_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 60000
+                }
+              },
+              "additionalProperties": false
+            },
+            "recording": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "owner": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "omo",
+                    "external"
+                  ]
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 120000
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
